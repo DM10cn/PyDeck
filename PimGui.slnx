@@ -1,0 +1,6 @@
+<Solution>
+  <Configurations><Platform Name="x64" /></Configurations>
+  <Project Path="src/PimGui.Core/PimGui.Core.csproj" />
+  <Project Path="src/PimGui.App/PimGui.App.csproj" />
+  <Project Path="tests/PimGui.Checks/PimGui.Checks.csproj" />
+</Solution>
