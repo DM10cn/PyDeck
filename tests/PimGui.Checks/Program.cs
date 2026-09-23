@@ -65,6 +65,46 @@ Check("Malformed configuration stays untouched", () =>
 });
 Check("Appearance settings persist", () => { var store = new SettingsStore(Path.Combine(scratch, "settings")); store.Save(new() { Design = "Fluent", Theme = "Light" }); Require(store.Load().Design == "Fluent" && store.Load().Theme == "Light", "Settings mismatch"); });
 
+async Task WaitForStagedWriteAsync(string path)
+{
+    var deadline = System.Diagnostics.Stopwatch.StartNew();
+    while (!Directory.EnumerateFiles(scratch, Path.GetFileName(path) + ".*.tmp").Any())
+    {
+        if (deadline.Elapsed > TimeSpan.FromSeconds(3)) throw new Exception("Writer did not stage a replacement");
+        await Task.Delay(5);
+    }
+}
+await CheckAsync("Atomic settings replacement tolerates a short-lived reader lock", async () =>
+{
+    var path = Path.Combine(scratch, "transient-reader.json"); File.WriteAllText(path, "old");
+    using var reader = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+    var writer = Task.Run(() => AtomicJson.Write(path, "new"));
+    try { await WaitForStagedWriteAsync(path); await Task.Delay(40); Require(!writer.IsCompleted, "Reader did not block replacement"); }
+    finally { reader.Dispose(); }
+    await writer;
+    Require(File.ReadAllText(path) == "new" && !Directory.EnumerateFiles(scratch, "transient-reader.json.*.tmp").Any(), "Replacement did not finish cleanly");
+});
+Check("Persistent settings locks retain the original and remove staging files", () =>
+{
+    var path = Path.Combine(scratch, "persistent-reader.json"); File.WriteAllText(path, "old");
+    using var reader = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+    var elapsed = System.Diagnostics.Stopwatch.StartNew();
+    Throws<IOException>(() => AtomicJson.Write(path, "new"));
+    Require(elapsed.Elapsed < TimeSpan.FromSeconds(3), "Lock retry is unbounded");
+    Require(File.ReadAllText(path) == "old" && !Directory.EnumerateFiles(scratch, "persistent-reader.json.*.tmp").Any(), "Failed save changed the original or left staging files");
+});
+await CheckAsync("Atomic settings retries reject an intervening external edit", async () =>
+{
+    var path = Path.Combine(scratch, "concurrent-settings.json"); File.WriteAllText(path, "old");
+    using var reader = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+    var writer = Task.Run(() => AtomicJson.Write(path, "our value"));
+    try { await WaitForStagedWriteAsync(path); File.WriteAllText(path, "external value"); }
+    finally { reader.Dispose(); }
+    try { await writer; throw new Exception("External edit was overwritten"); }
+    catch (IOException ex) { Require(ex.Message.Contains("changed while saving"), "Unexpected failure: " + ex.Message); }
+    Require(File.ReadAllText(path) == "external value", "External edit was lost");
+});
+
 await CheckAsync("Discovery rejects the legacy launcher", async () =>
 {
     var client = new PimClient(new FakeRunner((_, _) => Task.FromResult(new CommandResult(0, "Python Launcher for Windows", ""))));

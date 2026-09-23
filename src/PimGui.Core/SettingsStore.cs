@@ -58,6 +58,7 @@ public static class AtomicJson
     public static void Write(string path, string text)
     {
         SafeFiles.RequireNoLinks(path);
+        var originalHash = File.Exists(path) ? Fingerprint(path) : null;
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
@@ -66,11 +67,28 @@ public static class AtomicJson
                 stream.Write(System.Text.Encoding.UTF8.GetBytes(text));
                 stream.Flush(flushToDisk: true);
             }
-            SafeFiles.RequireNoLinks(path);
-            if (File.Exists(path)) File.Replace(temporary, path, null);
-            else File.Move(temporary, path);
+            // Antivirus/indexing readers can briefly deny ReplaceFile's delete access.
+            // Keep the atomic replacement and ACL preservation; never delete the old file as a fallback.
+            for (var attempt = 0; ; attempt++)
+            {
+                SafeFiles.RequireNoLinks(path);
+                if (originalHash is null) { File.Move(temporary, path); break; }
+                if (!originalHash.AsSpan().SequenceEqual(Fingerprint(path)))
+                    throw new IOException("The configuration changed while saving. Try again.");
+                try { File.Replace(temporary, path, null); break; }
+                catch (IOException ex) when (attempt < 4 && (ex.HResult & 0xffff) is 32 or 33 or 1175)
+                {
+                    Thread.Sleep(25 << attempt); // At most 375 ms, then surface a persistent failure.
+                }
+            }
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
+    }
+    private static byte[] Fingerprint(string path)
+    {
+        using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        if (file.Length > 2 * 1024 * 1024) throw new IOException("The configuration file is too large to replace safely.");
+        return System.Security.Cryptography.SHA256.HashData(file);
     }
 }
 

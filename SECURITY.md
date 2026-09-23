@@ -33,6 +33,8 @@ Stopping installation may leave partial files. PyDeck does not claim automatic r
 
 Configuration checks reduce accidental overwrite and path redirection but are not a transaction shared with unrelated tools. Offline source selection does not override administrator policy imposed on PIM.
 
+Atomic configuration replacement retries brief Windows sharing/delete-access failures for at most 375 ms. Each retry rechecks path redirection and the original file's fingerprint; a concurrent edit aborts the save. Persistent locks surface an error while retaining the original file. There is no delete-then-write fallback.
+
 ## 🗂️ Data handling
 
 PyDeck adds no analytics. Preferences and bounded crash diagnostics are local. Session activity remains in memory, limited to 2,000 lines / 1 MiB. Individual process streams retain at most 8 Mi characters. Copying activity is an explicit user action.
