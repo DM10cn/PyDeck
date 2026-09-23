@@ -12,6 +12,10 @@ PyDeck 是 **Python Install Manager** 的原生 **WinUI 3** 图形界面，支�
 
 🚧 **开发预览版 · 0.4.0** · 🪟 **Windows 11 x64** · 📄 **MIT**
 
+## 📦 下载
+
+从 [GitHub Releases](https://github.com/DM10cn/PyDeck/releases) 获取 **MSI**、**MSIX** 和 **ZIP / tar.gz 源码**。安装前请阅读 [安装说明](docs/INSTALL.zh-CN.md)：运行时仍需单独安装，自签 MSIX 预览版需要手动信任公开证书
+
 ## ✨ 可以做什么
 
 - 🐍 **查看 Python 安装** — 版本、发行方、架构、可执行文件路径和实际默认版本
@@ -50,7 +54,7 @@ cd PyDeck
 
 也可以在 Visual Studio 中打开 `PimGui.slnx`，选择 `PimGui.App`，使用 **x64** 构建。内部项目名称保留 `PimGui`，应用和可执行文件名为 **PyDeck**
 
-开发输出位于 `artifacts/`，是**依赖外部运行时的非打包应用**，使用时请保留输出目录中的所有文件。MSIX 和 MSI 安装包计划在产品完成后制作
+开发输出位于 `artifacts/`，是**依赖外部运行时的非打包应用**，使用时请保留输出目录中的所有文件。MSI 与 MSIX 的构建方式见 [发行流程](docs/RELEASING.zh-CN.md)
 
 🧑‍💻 [开发指南](docs/DEVELOPMENT.zh-CN.md) · 🗺️ [功能状态](docs/FEATURES.zh-CN.md) · 🔐 [安全说明](docs/SECURITY.zh-CN.md)
 

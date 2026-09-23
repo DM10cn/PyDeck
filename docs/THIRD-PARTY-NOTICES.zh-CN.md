@@ -15,3 +15,5 @@ PyDeck 与 Microsoft 不存在隶属或背书关系，Windows、.NET、WinUI 等
 项目通过 NuGet 还原 Microsoft .NET / Windows App SDK 组件，依赖清单见项目文件及 `packages.lock.json`，各依赖保留自己的许可证和声明。源码仓库不内置还原后的包与运行时二进制文件
 
 Python Install Manager、Python 发行包和离线包是独立软件，适用各自许可证，PyDeck 的 MIT 协议不替代这些条款。分发编译产物时，请检查实际包含组件的许可证和声明要求
+
+📦 发行安装包包含 `ThirdPartyNotices` 目录，保留所还原运行组件、Windows SDK 和 .NET 主机工具链提供的许可证与声明，原始法律文本不作翻译

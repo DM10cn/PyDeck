@@ -148,7 +148,7 @@ public sealed partial class MainWindow
         }
         catch (Exception ex)
         {
-            File.WriteAllText(Path.Combine(directory, "result.json"), JsonSerializer.Serialize(new { passed = false, checks, error = ex.ToString() }, new JsonSerializerOptions { WriteIndented = true }));
+            File.WriteAllText(Path.Combine(directory, "result.json"), JsonSerializer.Serialize(new { passed = false, checks, error = ex.ToString(), preferences, uiMessage = MessageBar.Message, recentActivity = logLines.TakeLast(8).ToArray() }, new JsonSerializerOptions { WriteIndented = true }));
         }
         finally { Close(); }
     }
@@ -172,16 +172,16 @@ public sealed partial class MainWindow
                 throw new InvalidOperationException("Progress disappeared on navigation.");
             if (language == "en-US")
             {
-                InvokeButton(CancelOperationButton); await Task.Delay(180); Root.UpdateLayout();
-                var dialog = OpenCancellationDialog();
+                InvokeButton(CancelOperationButton);
+                var dialog = await WaitForCancellationDialogAsync();
                 if (dialog.DefaultButton != ContentDialogButton.Close) throw new InvalidOperationException("Stop dialog has unsafe default.");
                 InvokeButton(Descendants(dialog).OfType<Button>().Single(b => b.Content as string == T("Cancel")));
-                await Task.Delay(180);
+                await WaitForSmokeConditionAsync(() => !cancelDialogOpen, "Stop confirmation did not close.");
                 if (operation.IsCancellationRequested) throw new InvalidOperationException("Dismissing confirmation stopped the installation.");
-                InvokeButton(CancelOperationButton); await Task.Delay(180); Root.UpdateLayout();
-                dialog = OpenCancellationDialog();
+                InvokeButton(CancelOperationButton);
+                dialog = await WaitForCancellationDialogAsync();
                 InvokeButton(Descendants(dialog).OfType<Button>().Single(b => b.Content as string == T("Stop installation")));
-                await Task.Delay(180);
+                await WaitForSmokeConditionAsync(() => operation.IsCancellationRequested && !cancelDialogOpen, "Stop confirmation did not finish.");
                 if (!operation.IsCancellationRequested || CancelOperationButton.IsEnabled || OperationPhaseText.Text != T("Stopping…"))
                     throw new InvalidOperationException("Stop confirmation did not cancel exactly this operation.");
                 await CaptureAsync(Path.Combine(directory, "14-stopping.png"));
@@ -199,9 +199,29 @@ public sealed partial class MainWindow
         }
         SavePreferences(preferences with { Language = "en-US" });
     }
-    private ContentDialog OpenCancellationDialog() => VisualTreeHelper.GetOpenPopupsForXamlRoot(Root.XamlRoot)
-        .SelectMany(popup => new[] { popup.Child }.Concat(Descendants(popup.Child)))
-        .OfType<ContentDialog>().Single(dialog => dialog.Title as string == T("Stop this installation?"));
+    private async Task<ContentDialog> WaitForCancellationDialogAsync()
+    {
+        ContentDialog? dialog = null;
+        await WaitForSmokeConditionAsync(() =>
+        {
+            dialog = VisualTreeHelper.GetOpenPopupsForXamlRoot(Root.XamlRoot)
+                .SelectMany(popup => new[] { popup.Child }.Concat(Descendants(popup.Child)))
+                .OfType<ContentDialog>().SingleOrDefault(item => item.Title as string == T("Stop this installation?"));
+            return dialog is not null;
+        }, "Stop confirmation did not open.");
+        return dialog!;
+    }
+    private async Task WaitForSmokeConditionAsync(Func<bool> condition, string message)
+    {
+        var timeout = System.Diagnostics.Stopwatch.StartNew();
+        while (timeout.Elapsed < TimeSpan.FromSeconds(8))
+        {
+            Root.UpdateLayout();
+            if (condition()) return;
+            await Task.Delay(50);
+        }
+        throw new InvalidOperationException($"{message} Cancellation dialog: {cancelDialogOpen}; other confirmation: {confirmationOpen}; UI message: {MessageBar.Message}");
+    }
     private static void InvokeButton(Button button)
     {
         var peer = new Microsoft.UI.Xaml.Automation.Peers.ButtonAutomationPeer(button);

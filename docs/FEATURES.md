@@ -23,6 +23,8 @@
 | 🖼️ App identity | PyDeck icon in executable, window, title bar, and sidebar; About and dependency information |
 | 📋 Activity | Bounded session output, errors, exit codes, and explicit copy action |
 | 🔐 Safeguards | Argument validation, ownership and stale-state checks, cross-instance operation lock, bounded output, and atomic configuration writes |
+| 📦 Preview packaging | Per-user MSI, MSIX, local certificate signing, separate runtime prerequisites, and stable upgrade identities |
+| 🗜️ Source release archives | ZIP / tar.gz from the matching clean commit, bilingual install guide, and SHA-256 checksums |
 
 Only PIM-managed runtimes can be updated or removed. Uninstallation does not expose mid-operation cancellation. See [Security](../SECURITY.md) for trust boundaries.
 
@@ -32,8 +34,7 @@ Only PIM-managed runtimes can be updated or removed. Uninstallation does not exp
 | --- | --- |
 | 🧪 Full runtime lifecycle | Install, update, uninstall, and effective-default changes in a disposable test environment |
 | ♿ Desktop acceptance | External keyboard and screen-reader testing, DPI behavior, and native backdrop appearance |
-| 📦 MSIX and MSI | Packaging, signing, upgrades, and prerequisite detection after product completion |
-| 🗜️ Source release archives | Versioned ZIP / tar.gz artifacts and release notes after product completion |
+| 🔏 Production signing | Publicly trusted signing and clean-machine verification of the certificate-trust installation path |
 | 🧼 Clean-machine deployment | Verify external runtime prerequisites and startup on a clean Windows 11 installation |
 
 ## 💭 Under consideration

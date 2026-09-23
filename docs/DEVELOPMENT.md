@@ -23,7 +23,7 @@ The build script keeps NuGet packages and .NET CLI state under ignored `.local/`
 
 The output uses external .NET and Windows App Runtime installations. The script checks the runtime configuration, compiled WinUI resources, and absence of embedded native runtime binaries. Keep every published file together.
 
-`EnableMsixTooling` enables WinUI resource compilation; `WindowsPackageType=None` keeps development output unpackaged. No MSI, MSIX, signing certificate, or runtime installer is included.
+`EnableMsixTooling` enables WinUI resource compilation; `WindowsPackageType=None` keeps development output unpackaged. The separate [release workflow](RELEASING.md) creates MSI/MSIX packages. No signing private key or runtime installer is included in the repository.
 
 NuGet versions are recorded in `packages.lock.json`. To enforce the committed dependency graph during restore:
 

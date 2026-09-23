@@ -17,6 +17,8 @@
     <PublishReadyToRun>false</PublishReadyToRun>
     <WindowsAppSDKBootstrapInitialize>true</WindowsAppSDKBootstrapInitialize>
     <WindowsAppSdkBootstrapAutoInitializeOptions_OnNoMatch_ShowUI>true</WindowsAppSdkBootstrapAutoInitializeOptions_OnNoMatch_ShowUI>
+    <!-- MSIX resolves the declared framework dependency; MSI still uses bootstrap discovery. -->
+    <WindowsAppSdkBootstrapAutoInitializeOptions_OnPackageIdentity_NOOP>true</WindowsAppSdkBootstrapAutoInitializeOptions_OnPackageIdentity_NOOP>
     <ApplicationTitle>PyDeck</ApplicationTitle>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <AssemblyName>PyDeck</AssemblyName>

@@ -12,6 +12,10 @@ PyDeck is a native **WinUI 3** companion for **Python Install Manager**. Browse 
 
 🚧 **Development preview · 0.4.0** · 🪟 **Windows 11 x64** · 📄 **MIT**
 
+## 📦 Download
+
+Get **MSI**, **MSIX**, and **source ZIP / tar.gz** from [GitHub Releases](https://github.com/DM10cn/PyDeck/releases). See the [installation guide](docs/INSTALL.md) before installing: runtimes remain separate dependencies, and the self-signed MSIX preview requires an explicit certificate-trust step.
+
 ## ✨ What you can do
 
 - 🐍 **See your Python installations** — version, publisher, architecture, executable path, and effective default
@@ -50,7 +54,7 @@ cd PyDeck
 
 You can also open `PimGui.slnx` in Visual Studio, select `PimGui.App`, and build for **x64**. The internal project names remain `PimGui`; the application and executable are **PyDeck**.
 
-The development output is an **unpackaged, framework-dependent application** under `artifacts/`. Keep all published files together. MSIX and MSI installers are planned after product completion.
+The development output is an **unpackaged, framework-dependent application** under `artifacts/`. Keep all published files together. See the [release workflow](docs/RELEASING.md) to build MSI and MSIX packages.
 
 🧑‍💻 [Development guide](docs/DEVELOPMENT.md) · 🗺️ [Feature status](docs/FEATURES.md) · 🔐 [Security notes](SECURITY.md)
 

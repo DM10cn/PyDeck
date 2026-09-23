@@ -23,7 +23,7 @@
 
 输出依赖单独安装的 .NET 和 Windows App Runtime。脚本检查运行时配置、编译后的 WinUI 资源，以及是否意外内置原生运行时文件，使用时需要保留整个输出目录
 
-`EnableMsixTooling` 用于编译 WinUI 资源，`WindowsPackageType=None` 表示开发输出不打包。仓库不包含 MSI、MSIX、签名证书或运行时安装程序
+`EnableMsixTooling` 用于编译 WinUI 资源，`WindowsPackageType=None` 表示开发输出不打包。独立的 [发行流程](RELEASING.zh-CN.md) 用于生成 MSI / MSIX，源码仓库不包含签名私钥或运行时安装程序
 
 NuGet 版本记录在 `packages.lock.json` 中，可使用以下命令强制按提交的依赖图还原
 
