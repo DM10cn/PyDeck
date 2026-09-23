@@ -8,20 +8,36 @@
 
 ## 📋 准备依赖
 
-🧰 原生依赖窗口无需 .NET、Windows App Runtime、WebView2 或另外安装的 VC++ 运行库即可启动。点击**下载**打开 Microsoft 官方来源，安装 x64 版本后点击**重新检查**，再**打开 PyDeck**。窗口不会执行安装程序、自行提权或修改证书信任，默认英语，支持简体中文、繁体中文（台湾）和日语
+本页统一说明用户运行依赖，源码编译工具见[开发指南](https://github.com/DM10cn/PyDeck/blob/main/docs/DEVELOPMENT.zh-CN.md)
 
-MSIX 安装前可先运行独立的 `PyDeck-Dependencies-0.5.1-win-x64.exe`。Windows 可能在缺少框架依赖时阻止 MSIX 安装，届时包内窗口也无法运行；独立工具不受这一依赖链影响，补齐后再回到 MSIX 安装程序
+| 依赖 | 何时需要 | 官方来源 |
+| --- | --- | --- |
+| Windows 11，x64 | PyDeck、安装器和原生工具，Windows 10 支持暂缓 | — |
+| .NET Runtime 10.0.x，x64，稳定版 | MSI 与 MSIX 的完整 GUI | [.NET 10 下载](https://dotnet.microsoft.com/download/dotnet/10.0)，Desktop Runtime 10 / SDK 10 也提供此运行时 |
+| Windows App Runtime 2.x，x64，最低 2.5.1.0 | 两种格式的完整 GUI，需为当前用户注册，可使用同系列兼容更新 | [Windows App SDK 下载](https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads) |
+| Visual C++ v14 Redistributable，x64 | MSI / 非打包 GUI；MSIX 的框架依赖由 Windows 在安装时解析 | [Microsoft 官方下载](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist) |
+| Python Install Manager | 管理 Python 时需要，缺少它也能打开 GUI | [Python 官方 Windows 下载](https://www.python.org/downloads/windows/) |
 
-| 依赖 | 官方来源 |
+🔌 PyDeck 不内置或自动下载、安装这些共享运行时或 PIM。原生依赖工具与 MSI 文件夹浏览组件静态链接 C++ 基础库，因此这两个小组件自身无需 .NET、Windows App Runtime、WebView2 或另外安装的 VC++ 运行库。离线使用 Python 包前，请先准备好 GUI 运行依赖和 PIM
+
+### 🧰 两种依赖工具
+
+| 入口 | 行为 |
 | --- | --- |
-| .NET Runtime 10，x64 | [.NET 10 下载](https://dotnet.microsoft.com/download/dotnet/10.0)，选择 **.NET Runtime**，也可使用 Desktop Runtime / SDK |
-| Windows App Runtime 2.5.1 或兼容的较新 2.x，x64 | [Windows App SDK 下载](https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads) |
-| Visual C++ v14 Redistributable，x64 | [Microsoft 官方下载](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist)，非打包 / MSI 运行路径需要此依赖 |
-| Python Install Manager | [Windows 上的 Python](https://docs.python.org/3/using/windows.html) |
+| 已安装的 `PyDeck.Launcher.exe` / PyDeck 快捷方式 | 依赖齐全时启动 GUI，否则显示依赖窗口；手动安装缺失组件后，点击**重新检查**，再**打开 PyDeck** |
+| 独立的 `PyDeck-Dependencies-0.5.1-win-x64.exe` | 始终显示检查结果和下载入口，**打开 PyDeck 保持禁用**；即使放在应用旁边，也不安装或启动应用，请关闭工具后回到安装器或已安装的快捷方式 |
 
-🔌 **PyDeck 不内置或自动下载 .NET 和 Windows App Runtime**，Python Install Manager 也需要单独安装。离线使用前，请在联网时准备好这些依赖
+**下载**按钮打开 Microsoft 官方来源，工具不执行安装程序、自行提权或修改证书信任。独立工具按非打包环境检查，也会提示 VC++；MSIX 自身能否安装，以 Windows 的包依赖检查为准
 
-发行附件中的 `Test-Prerequisites.ps1` 可进行只读检查。如果管理器不在 PATH 中，可在 PyDeck 设置中手动选择
+MSIX 缺少框架时可能在包内启动器运行前就被阻止安装，可先使用独立工具准备依赖；该工具不能绕过 MSIX 的依赖或证书信任要求
+
+🌏 应用和依赖工具提供英语、简体中文、繁体中文（台湾）及日语。应用会保存语言选择，依赖工具每次以英语打开。MSI 向导目前使用英语，原生文件夹窗口使用 Windows 的语言设置
+
+发行附件 `Test-Prerequisites.ps1` 是辅助只读清单，检查常见安装位置及 PATH 中的 PIM。它的提示不等于启动器的精确就绪判断：PATH 之外的管理器可在设置中选择，缺少 PIM 也不阻止 GUI 启动。原生启动器的只读运行时状态可通过 `PyDeck.Launcher.exe --check` 查看
+
+### 🐍 连接 Python Install Manager
+
+GUI 运行时齐全后，可在未安装 PIM 时打开 PyDeck。在未连接页面或设置中选择**下载 Python Install Manager**，从 Python 官方 Windows 页面手动安装，再点击**重新检查**或**自动检测**，也可在设置中选择管理器文件。按钮只打开下载页面或重新连接，不自行安装 PIM；重连无需重启 PyDeck
 
 ## 🛠️ MSI
 
@@ -32,7 +48,7 @@ MSIX 安装前可先运行独立的 `PyDeck-Dependencies-0.5.1-win-x64.exe`。Wi
 
 MSI 为当前用户安装，默认目录为 `%LocalAppData%\Programs\PyDeck`，可手动输入或通过原生文件夹窗口选择其他可写目录。修复和后续 MSI 升级会保留目录与快捷方式选择。如果两项快捷方式都关闭，可从所选目录运行 `PyDeck.Launcher.exe`
 
-安装前检查 Windows 11，允许稍后补装 .NET。两类快捷方式均打开原生依赖启动器，检测通过后进入完整应用。请保留整个安装目录；直接打开 `PyDeck.exe` 会跳过依赖窗口
+安装前检查 Windows 11，允许稍后补装 GUI 运行依赖。两类快捷方式均打开原生依赖启动器，运行时检查通过后进入完整应用。请保留整个安装目录；直接打开 `PyDeck.exe` 会跳过依赖窗口
 
 🧑‍💻 当前用户的静默安装也可使用相同选项，`0` 表示关闭，`1` 表示开启
 
@@ -41,8 +57,6 @@ msiexec /i PyDeck-0.5.1-win-x64.msi /qn INSTALLFOLDER="D:\Apps\PyDeck" DESKTOPSH
 ```
 
 请选择当前账号有写入权限的目录。原生文件夹选择窗口不依赖 .NET；MSIX 的安装位置由 Windows 管理，不提供这些 MSI 选项
-
-🐍 未安装 Python Install Manager 也能进入主界面。在未连接页面或设置中点击**下载 Python Install Manager**，从 Python 官方 Windows 页面安装管理器后，点击**重新检查**或**自动检测**即可连接，无需重启。按钮仅打开官方下载页面，不会静默安装 PIM 或 Python
 
 预览版使用自签证书，Windows 不会将其识别为公开受信任的发布者。安装 MSI 不要求导入预览证书，遇到 Windows 提示时请先核对下载来源，再决定是否继续
 
@@ -83,7 +97,7 @@ MSI 使用固定升级标识，MSIX 使用包名 `DM10cn.PyDeck` 和发布者 `C
 
 ## 🗜️ 源码归档
 
-`PyDeck-0.5.1-source.zip` 和 `PyDeck-0.5.1-source.tar.gz` 仅包含发行提交中的文件，排除构建产物、日志、本地设置、包缓存和签名密钥，也可使用 GitHub 自动提供的源码链接
+`PyDeck-0.5.1-source.zip` 和 `PyDeck-0.5.1-source.tar.gz` 仅包含发行提交中的文件，排除构建产物、日志、本地设置、包缓存和签名密钥，也可使用 GitHub 自动提供的源码链接。发行归档和随附指南保留发布时的快照，后续文档修正见[仓库当前指南](https://github.com/DM10cn/PyDeck/blob/main/docs/INSTALL.zh-CN.md)，不替换已打标签的源码或签名安装包
 
 ## 🧪 预览版边界
 

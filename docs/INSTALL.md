@@ -8,20 +8,36 @@ Download assets from [GitHub Releases](https://github.com/DM10cn/PyDeck/releases
 
 ## 📋 Prepare the prerequisites
 
-🧰 The native prerequisite window runs without .NET, Windows App Runtime, WebView2, or a separately installed VC++ runtime. Missing dependencies have **Download** buttons that open official Microsoft sources. Install the x64 packages, choose **Check again**, then **Open PyDeck**. The window does not run installers, elevate itself, or change certificate trust. English is the default, with Simplified Chinese, Traditional Chinese (Taiwan), and Japanese available.
+This page is the reference for end-user dependencies. Build tools belong in the [development guide](https://github.com/DM10cn/PyDeck/blob/main/docs/DEVELOPMENT.md).
 
-For MSIX, run the standalone `PyDeck-Dependencies-0.5.1-win-x64.exe` before installing the package if needed. Windows can block MSIX installation on a missing framework dependency before any in-package window can run. The standalone tool stays outside that dependency chain; after checking, return to the MSIX installer.
+| Dependency | When needed | Official source |
+| --- | --- | --- |
+| Windows 11, x64 | PyDeck, its installers, and the native helper; Windows 10 support is deferred | — |
+| .NET Runtime 10.0.x, x64, stable | Full GUI, both MSI and MSIX | [.NET 10 downloads](https://dotnet.microsoft.com/download/dotnet/10.0); Desktop Runtime 10 / SDK 10 also provide this runtime |
+| Windows App Runtime 2.x, x64, minimum 2.5.1.0 | Full GUI, both formats; registered for the current user, with a compatible 2.x update accepted | [Windows App SDK downloads](https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads) |
+| Visual C++ v14 Redistributable, x64 | MSI / unpackaged GUI; Windows resolves framework dependencies when installing MSIX | [Microsoft's supported downloads](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist) |
+| Python Install Manager | Python management operations; the GUI can open without it | [Official Python Windows downloads](https://www.python.org/downloads/windows/) |
 
-| Dependency | Official source |
+🔌 PyDeck does not bundle or automatically download/install these shared runtimes or PIM. Its native helper and MSI folder browser statically link their C++ support libraries, so those small components themselves do not require .NET, Windows App Runtime, WebView2, or a separately installed VC++ runtime. Prepare the GUI dependencies and PIM before using offline Python bundles.
+
+### 🧰 Two dependency tools
+
+| Entry | Behavior |
 | --- | --- |
-| .NET Runtime 10, x64 | [.NET 10 downloads](https://dotnet.microsoft.com/download/dotnet/10.0) — choose **.NET Runtime**, or Desktop Runtime / SDK |
-| Windows App Runtime 2.5.1 or newer compatible 2.x, x64 | [Windows App SDK downloads](https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads) |
-| Visual C++ v14 Redistributable, x64 | [Microsoft's supported downloads](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist) — required by the unpackaged/MSI runtime path |
-| Python Install Manager | [Python on Windows](https://docs.python.org/3/using/windows.html) |
+| Installed `PyDeck.Launcher.exe` / PyDeck shortcut | Starts the GUI when dependencies are ready; otherwise shows the dependency window. Install missing packages yourself, choose **Check again**, then **Open PyDeck** |
+| Standalone `PyDeck-Dependencies-0.5.1-win-x64.exe` | Always opens the checklist and download links. **Open PyDeck stays disabled**: this tool does not install or launch the app, even beside an app executable. Close it and return to the installer or installed shortcut |
 
-🔌 **No .NET or Windows App Runtime is bundled or automatically downloaded by PyDeck.** Python Install Manager is also separate. Install the prerequisites while online before using offline Python bundles.
+The **Download** buttons open official Microsoft sources. The tools do not execute installers, elevate themselves, or change certificate trust. The standalone checklist checks the unpackaged prerequisites, including VC++; MSIX installation itself is governed by Windows package-dependency checks.
 
-The optional `Test-Prerequisites.ps1` release asset performs read-only checks. If your manager is not on PATH, select it in PyDeck Settings.
+For MSIX, use the standalone helper before installation if needed: a missing framework can block the package before its bundled launcher can run. The helper cannot bypass MSIX dependencies or certificate trust.
+
+🌏 The app and helper offer English, Simplified Chinese, Traditional Chinese (Taiwan), and Japanese. The app saves its language; the helper starts in English each time. The MSI wizard currently uses English, and the native folder picker uses Windows language settings.
+
+The optional `Test-Prerequisites.ps1` asset is a supplementary read-only checklist of common install locations and PIM on PATH. Its warnings are not the launcher's exact readiness decision: a manager outside PATH can be selected in Settings, and missing PIM does not block GUI startup. Use `PyDeck.Launcher.exe --check` for the native launcher's read-only runtime status.
+
+### 🐍 Connect Python Install Manager
+
+Once the GUI runtimes are ready, you can open PyDeck without PIM. Choose **Download Python Install Manager** in the empty state or Settings, install it from Python's official Windows page, then choose **Check again** or **Auto-detect**. You can also select its executable in Settings. These buttons open the download page or reconnect; they do not install PIM themselves, and reconnect does not require restarting PyDeck.
 
 ## 🛠️ MSI
 
@@ -32,7 +48,7 @@ The optional `Test-Prerequisites.ps1` release asset performs read-only checks. I
 
 The MSI installs for the current user, with `%LocalAppData%\Programs\PyDeck` as the default. You can enter another writable folder or select one in the native folder picker. Repair and later MSI upgrades retain your folder and shortcut choices. If you disable both shortcuts, open `PyDeck.Launcher.exe` in the chosen folder.
 
-It checks Windows 11 before installation, but allows .NET to be installed later. Both shortcuts open the native prerequisite launcher, which enters the full app once prerequisites are detected. Keep the entire installed folder together; opening `PyDeck.exe` directly bypasses the prerequisite window.
+It checks Windows 11 before installation, but allows GUI runtime dependencies to be installed later. Both shortcuts open the native prerequisite launcher, which enters the full app once its runtime checks pass. Keep the entire installed folder together; opening `PyDeck.exe` directly bypasses the prerequisite window.
 
 🧑‍💻 For an unattended current-user installation, the same options are available as MSI properties (`0` = off, `1` = on):
 
@@ -42,11 +58,9 @@ msiexec /i PyDeck-0.5.1-win-x64.msi /qn INSTALLFOLDER="D:\Apps\PyDeck" DESKTOPSH
 
 Use a folder your account can write to. The native folder picker does not require .NET. MSIX uses Windows-managed placement and does not expose these MSI options.
 
-🐍 Missing Python Install Manager does not block the GUI. Choose **Download Python Install Manager** in the empty state or Settings, install the manager from Python's official Windows page, then choose **Check again** or **Auto-detect**. PyDeck reconnects without restarting. These actions open the official download page; they do not silently install PIM or Python.
-
 The preview uses a self-signed certificate, so Windows will not recognize it as a publicly trusted publisher. MSI does not require importing the preview certificate to install. Review the download source before choosing to proceed with any Windows prompt.
 
-Newer MSI versions upgrade the same per-user installation and older versions are blocked. Uninstall from **Settings → Apps → Installed apps**. The installer removes its own files and shortcut; it does not uninstall Python or shared runtimes.
+Newer MSI versions upgrade the same per-user installation and older versions are blocked. Uninstall from **Settings → Apps → Installed apps**. The installer removes its own files and selected shortcuts; it does not uninstall Python or shared runtimes.
 
 ## 🪟 MSIX — self-signed preview
 
@@ -83,7 +97,7 @@ Settings remain under `%LocalAppData%\PyDeck`. Python installations, PIM configu
 
 ## 🗜️ Source archives
 
-`PyDeck-0.5.1-source.zip` and `PyDeck-0.5.1-source.tar.gz` contain only files from the release commit. Build output, logs, local settings, package caches, and signing keys are excluded. The GitHub-generated source links are also available.
+`PyDeck-0.5.1-source.zip` and `PyDeck-0.5.1-source.tar.gz` contain only files from the release commit. Build output, logs, local settings, package caches, and signing keys are excluded. The GitHub-generated source links are also available. Release archives and attached guides are snapshots; later documentation corrections live in the [current repository guide](https://github.com/DM10cn/PyDeck/blob/main/docs/INSTALL.md) without replacing the tagged source or signed packages.
 
 ## 🧪 Preview limits
 

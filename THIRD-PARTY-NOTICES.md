@@ -14,7 +14,7 @@ PyDeck is not affiliated with or endorsed by Microsoft. Windows, .NET, WinUI, an
 
 The project restores Microsoft .NET / Windows App SDK components through NuGet. Dependencies are listed in the project files and `packages.lock.json`; each dependency retains its own license and notices. Restored packages and runtime binaries are not vendored in this source repository.
 
-The native prerequisite launcher is built with Microsoft C++ and statically links its release support libraries. Those components retain Microsoft's applicable terms; the launcher does not require a separately installed Visual C++ Redistributable. The main WinUI app's runtime requirements are unchanged.
+The native prerequisite launcher, standalone checker, and MSI folder-browser actions are built with Microsoft C++ and statically link its release support libraries. Those components retain Microsoft's applicable terms. These native helpers do not require a separately installed Visual C++ Redistributable; the full MSI / unpackaged WinUI app does. The [installation guide](docs/INSTALL.md) maintains the complete runtime requirements.
 
 Python Install Manager, Python distributions, and offline bundles are separate software with their own licenses. PyDeck's MIT license does not replace those terms. When distributing compiled builds, review the licenses and notice requirements of all included components.
 

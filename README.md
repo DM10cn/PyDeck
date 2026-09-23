@@ -14,7 +14,7 @@ PyDeck is a native **WinUI 3** companion for **Python Install Manager**. Browse 
 
 ## 📦 Download
 
-Get **MSI**, **MSIX**, and **source ZIP / tar.gz** from [GitHub Releases](https://github.com/DM10cn/PyDeck/releases). See the [installation guide](docs/INSTALL.md) before installing: runtimes remain separate dependencies, and the self-signed MSIX preview requires an explicit certificate-trust step.
+Get **MSI**, **MSIX**, the **standalone dependency helper**, and **source ZIP / tar.gz** from [GitHub Releases](https://github.com/DM10cn/PyDeck/releases). Follow the [installation guide](docs/INSTALL.md) for dependencies, installer choices, and MSIX certificate trust.
 
 ## ✨ What you can do
 
@@ -25,23 +25,18 @@ Get **MSI**, **MSIX**, and **source ZIP / tar.gz** from [GitHub Releases](https:
 - 🛠️ **Manage a runtime** — update, uninstall, set the default, open a terminal or folder, and copy its path
 - 🎨 **Make it yours** — Fluent or Material 3 Expressive, System / Light / Dark themes, and optional Fluent Mica or Acrylic
 - 🌏 **Choose your language** — English by default, plus Simplified Chinese, Traditional Chinese (Taiwan), and Japanese
-- 🧰 **Recover missing dependencies** — a small native window opens official runtime downloads; add Python Install Manager and reconnect inside the app
+- 🧰 **Recover missing dependencies** — open official runtime or Python Install Manager download pages, install the missing software yourself, then recheck or reconnect
 - 🗂️ **Choose how to install** — MSI folder selection with Browse, optional desktop and Start menu shortcuts, and preferences retained during upgrades
 
 See the [feature status and roadmap](docs/FEATURES.md) for implementation details and remaining acceptance work.
 
 ## 📋 Before you start
 
-| Dependency | Requirement |
-| --- | --- |
-| Operating system | Windows 11, x64 |
-| .NET | .NET Runtime 10, x64 |
-| Windows App Runtime | 2.5.1, x64, matching the project reference |
-| Python manager | [Python Install Manager](https://docs.python.org/3/using/windows.html) |
+PyDeck targets **Windows 11 x64**. The full GUI needs **.NET Runtime 10 x64** and **Windows App Runtime**; the MSI / unpackaged GUI also needs **Visual C++ v14 x64**. Exact versions, official downloads, and format-specific requirements are maintained in the [installation guide](docs/INSTALL.md).
 
-**.NET and Windows App Runtime are separate prerequisites.** PyDeck does not bundle or automatically download either runtime. The .NET Desktop Runtime or SDK also includes the base .NET runtime required by this app.
+The native dependency window can open before those runtimes are installed. **Python Install Manager is needed to manage Python, but its absence does not block the GUI**: download it from the app's official link, install it, then reconnect. None of these dependencies is bundled or silently installed by PyDeck.
 
-Python Install Manager is detected automatically. You can choose its executable in Settings if detection fails. Windows 10 support is currently deferred.
+Windows 10 support is deferred. Visual Studio and the build tools below are only needed when building from source.
 
 ## 🚀 Build and run
 
@@ -56,7 +51,7 @@ cd PyDeck
 .\scripts\Run.ps1
 ```
 
-You can also open `PimGui.slnx` in Visual Studio, select `PimGui.App`, and build for **x64**. The internal project names remain `PimGui`; the application and executable are **PyDeck**.
+You can also open `PimGui.slnx` in Visual Studio, select `PimGui.App`, and build the C# GUI for **x64**. Use the publish script above to include the C++ prerequisite launcher; it is built by script, not by the solution. The product is **PyDeck**, its GUI is `PyDeck.exe`, and the normal launch entry is `PyDeck.Launcher.exe`; `PimGui` remains an internal project name.
 
 The development output is an **unpackaged, framework-dependent application** under `artifacts/`. Keep all published files together. See the [release workflow](docs/RELEASING.md) to build MSI and MSIX packages.
 
@@ -68,7 +63,7 @@ The development output is an **unpackaged, framework-dependent application** und
 2. Copy the complete generated folder, including `index.json` and ZIP files, to the offline computer
 3. Open **Install Python → Offline → Choose folder**, select that folder, and install a version
 
-Python Install Manager and both runtime prerequisites must already be present on the offline computer. Bundles produced by `pymanager install --download=<folder> <tag>` are also supported.
+Prepare Python Install Manager and all [runtime prerequisites for your installation format](docs/INSTALL.md) before taking the computer offline. This feature installs Python packages offline; it does not supply PyDeck's own runtime dependencies. Bundles produced by `pymanager install --download=<folder> <tag>` are also supported.
 
 PyDeck requires a standalone local bundle with SHA-256 checksums and stages a verified copy before installation. A checksum checks integrity, not publisher identity, so use a trusted source. Missing or damaged packages stop the operation. See [Python's offline installation guide](https://docs.python.org/3/using/windows.html#offline-installs).
 
@@ -76,7 +71,7 @@ PyDeck requires a standalone local bundle with SHA-256 checksums and stages a ve
 
 The operation panel stays visible across pages. Download and extraction percentages are **approximate stage progress** derived from PIM output; other phases use an indeterminate bar.
 
-You can stop installation, updates, and offline downloads. Stopping an installation requires confirmation and **may leave partial files**. PyDeck waits for the current process to exit and refreshes the installed list; it does not promise rollback. Uninstallation cannot be cancelled mid-operation.
+You can stop Python installation, updates, and offline downloads. Stopping an installation requires confirmation and **may leave partial files**. PyDeck waits for the current process to exit and refreshes the installed list; it does not promise rollback. Python uninstallation cannot be cancelled mid-operation. These controls apply to Python operations inside PyDeck, not to the MSI / MSIX setup wizard.
 
 ## 🎨 Appearance and language
 
@@ -86,9 +81,9 @@ Language changes apply immediately and are saved. Documentation is maintained in
 
 ## 🧪 Validation status
 
-The repository includes core regression checks and an optional in-app GUI smoke test. Read-only live PIM queries, isolated offline extraction, and cancellation of a test download have also been exercised.
+The 0.5.1 preview passed core and native checks, installed-MSI GUI checks, and MSIX development-registration / activation checks. MSI folder selection, shortcut choices, repair, and upgrades have also been exercised.
 
-Full install/update/uninstall/default-switch acceptance in a disposable environment, external keyboard and screen-reader testing, native backdrop appearance, and clean-machine deployment remain outstanding. See [development and testing](docs/DEVELOPMENT.md) for commands and boundaries.
+The **complete Python interpreter lifecycle** still needs acceptance testing, as do clean-machine deployment and the MSIX production certificate-trust installation path. The [feature-status table](docs/FEATURES.md) records completed checks and remaining work; the [development guide](docs/DEVELOPMENT.md) explains how to run them.
 
 ## 🤝 Contributing
 

@@ -4,19 +4,20 @@
 
 ## 🧰 工具链
 
-原生启动器还需 **MSVC x64/x86 编译工具**（`Microsoft.VisualStudio.Component.VC.Tools.x86.x64`），包括 C++ 标准头文件与桌面库
-
 - Windows 11 x64
+- PowerShell 7，用于仓库的构建与发行脚本
 - Visual Studio 2026，安装 **WinUI 应用程序开发**
-- .NET SDK **10.0.400** 或兼容补丁版本，以 `global.json` 为准
+- **MSVC x64/x86 编译工具**（`Microsoft.VisualStudio.Component.VC.Tools.x86.x64`），包括 C++ 标准头文件与桌面库，用于原生启动器和 MSI 操作
+- .NET SDK **10.0.400** 或同一 **10.0.4xx** 功能带的后续补丁，以 `global.json` 的 `latestPatch` 为准
 - Windows SDK **10.0.26100**
-- 运行 GUI 还需要 .NET Runtime 10 x64、Windows App Runtime **2.5.1 x64** 和 Python Install Manager
+
+以上为源码编译工具。运行发布后的 GUI 请按[用户依赖指南](INSTALL.zh-CN.md)准备环境，非打包版本也需要 VC++。打开 GUI 可以没有 PIM，但 Python 操作、真实 PIM 检查和 GUI 冒烟检查需要它
 
 应用目标框架为 `net10.0-windows10.0.26100.0`，项目中较低的最低平台值不代表已经验证 Windows 10 支持，当前构建仅面向 x64
 
-## 🔨 构建
+项目在 `PimGui.App.csproj` 和 `packages.lock.json` 中固定各个 Windows App SDK 组件包版本；这些编译引用与安装指南中的兼容运行时版本是不同概念
 
-`Build.ps1 -Publish` 会使用 `/MT` 静态链接 C++ 基础库，检查启动器只导入 Windows 系统 DLL，并运行原生检查。可单独执行 `scripts/Build-Launcher.ps1 -OutputDirectory artifacts/launcher -Checks`。正常启动请运行 `PyDeck.Launcher.exe`；`--dependencies` 强制显示依赖窗口，`--check` 输出只读 JSON 状态（就绪时退出码为 0，否则为缺失项位掩码）。独立发行工具始终显示窗口，不启动相邻应用。原生测试覆盖注入的缺失状态及真实 Win32 控件，不能替代干净机器验收
+## 🔨 构建
 
 ```powershell
 .\scripts\Build.ps1 -Checks -Publish
@@ -24,6 +25,8 @@
 ```
 
 构建脚本将 NuGet 缓存和 .NET CLI 状态放在已忽略的 `.local/` 中，发布时创建带时间戳的新目录，并在 `artifacts/latest-build.txt` 中记录位置供启动脚本读取
+
+Visual Studio 构建 `PimGui.slnx` 中的 C# 项目；`Build.ps1 -Publish` 还会编译 C++ 原生启动器、确认只导入系统 DLL，并运行原生检查。不带 `-Publish` 的 `Build.ps1 -Checks` 仅运行核心检查。`Run.ps1` 启动最近一次开发发布的启动器，不使用发行安装包或单独的 Visual Studio 构建输出
 
 输出依赖单独安装的 .NET 和 Windows App Runtime。脚本检查运行时配置、编译后的 WinUI 资源，以及是否意外内置原生运行时文件，使用时需要保留整个输出目录
 
@@ -43,11 +46,14 @@ dotnet restore PimGui.slnx --locked-mode -p:Platform=x64
 | `src/PimGui.App` | WinUI 页面、语义设计 token、外观策略、操作面板和应用内冒烟检查 |
 | `src/PyDeck.Launcher` | Win32 依赖窗口、系统 DLL 导入、官方下载链接和受控 GUI 启动 |
 | `packaging/msi` | WiX 安装选项、原生文件夹选择与设置操作，静态链接 C++ 基础库 |
-| `tests/PimGui.Checks` | 核心回归检查和按需启用的 PIM 集成检查 |
+| `tests/PimGui.Checks` | C# 核心回归检查和按需启用的 PIM 集成检查 |
+| `tests/Launcher.Checks.cpp` | 原生依赖组合、窗口控件、语言选择和重新检查行为 |
 | `scripts` | 构建、启动、GUI 冒烟测试和图标生成 |
 | `docs` | 英语及简体中文文档 |
 
-产品名称为 PyDeck，已有的 `PimGui` 项目名称和命名空间仅用于内部标识
+产品名称为 PyDeck，已有的 `PimGui` 项目名称和命名空间仅用于内部标识。`PyDeck.exe` 是 C# GUI，`PyDeck.Launcher.exe` 是正常启动入口。小型头文件 `resource.h` 只定义原生控件编号，GitHub 可能将其统计为 C，它不是独立程序
+
+启动器使用 `/MT` 静态链接 C++ 基础库，可单独执行 `scripts/Build-Launcher.ps1 -OutputDirectory artifacts/launcher -Checks` 构建并检查。向 `PyDeck.Launcher.exe` 传入 `--dependencies` 可在依赖齐全时仍显示窗口；`--check` 输出只读 JSON 状态，就绪时退出码为 0，否则为缺失运行时位掩码，此处不检查 PIM。[安装指南](INSTALL.zh-CN.md)说明了启动器与独立检查工具的区别。原生测试使用注入的缺失状态和真实 Win32 控件，干净机器部署仍需单独验收
 
 ## 🧪 测试
 
@@ -64,7 +70,7 @@ dotnet restore PimGui.slnx --locked-mode -p:Platform=x64
 
 核心检查覆盖异常协议响应、版本身份、陈旧状态与非托管版本、操作锁、进程输出限额、配置保留、离线校验、背景策略和语言键一致性
 
-GUI 检查使用独立设置，将截图和结果写入已忽略的 `artifacts/`，覆盖页面状态、筛选、主题、透明效果设置、语言切换、布局和设置持久化。这是**应用内状态与渲染检查**，不是外部鼠标或键盘自动化；RenderTargetBitmap 无法捕获合成器中的 Mica / Acrylic 和原生标题栏按钮
+GUI 检查需要可用的运行时、PIM 和在线目录访问，使用独立设置，将截图和结果写入已忽略的 `artifacts/`，覆盖页面状态、缺少管理器时的恢复入口、筛选、主题、透明效果设置、语言切换、布局和设置持久化。这是**应用内状态与渲染检查**，不是外部鼠标或键盘自动化；RenderTargetBitmap 无法捕获合成器中的 Mica / Acrylic 和原生标题栏按钮
 
 可选集成检查
 
@@ -79,7 +85,7 @@ dotnet run --project tests/PimGui.Checks -- --offline-fixture "C:\TestBundles\Py
 
 这些检查需要 PIM，可能创建临时测试文件，下载检查还会访问网络；不会安装到常规 PIM 管理的解释器目录。日志和截图可能包含本地路径，分享前请检查
 
-🚧 后续仍需在专用环境验收完整解释器生命周期，并补充外部键盘与读屏、原生背景视觉、DPI 和干净机器部署测试，核心检查通过不能替代这些验收
+已完成的验证与待验收项目统一见[功能状态](FEATURES.zh-CN.md)。MSI / MSIX 安装检查见[发行流程](RELEASING.zh-CN.md)，这些检查不能证明完整 Python 解释器生命周期已经通过
 
 ## 🎨 外观与本地化
 
@@ -87,7 +93,7 @@ dotnet run --project tests/PimGui.Checks -- --offline-fixture "C:\TestBundles\Py
 
 应用文案位于 `src/PimGui.Core/Strings` 的嵌入式 JSON 资源中，`en-US`、`zh-CN`、`zh-TW`、`ja-JP` 的键需要一致，默认英语。界面优先使用自然、简短的词句，CJK 标签减少不必要的句末标点，PIM 标识和原始输出不翻译
 
-仓库 Markdown 文档仅维护英语和简体中文，修改时请同步更新
+仓库 Markdown 文档仅维护英语和简体中文，修改时请同步更新并保持章节对应。用户依赖统一维护在 `INSTALL`，功能与验收状态在 `FEATURES`，构建方法在本页，打包流程在 `RELEASING`；README 概述并链接这些页面，避免再维护一份独立版本表
 
 ## 🔐 本地数据与贡献
 

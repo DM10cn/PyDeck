@@ -14,6 +14,7 @@ Include the affected version, impact, and minimal reproduction steps in the priv
 - 📦 **Offline packages must come from a trusted source** — SHA-256 proves file integrity against the chosen index, not the identity of its publisher
 - 👤 **Operations run as the current user** — PyDeck does not request elevation for Python operations and cannot defend against an attacker who already controls that account
 - 🔒 **Operation locking coordinates PyDeck instances** — independent PIM commands and unrelated configuration editors do not participate in that lock
+- 🧰 **Dependency recovery provides download links** — users install the packages themselves; the native readiness check is not a signature or publisher-authenticity check
 
 ## 🛡️ Implementation safeguards
 
@@ -26,10 +27,11 @@ Include the affected version, impact, and minimal reproduction steps in the priv
 | Output | Drain stdout/stderr with bounded retention; reject truncated list responses; keep observer failures from blocking pipe draining |
 | Configuration | Bounded reads, unique temporary files, flushed atomic replacement, backup before default changes, preservation of unrelated JSON fields |
 | Terminal | Constant PowerShell code; selected executable passed through an environment variable rather than inserted into shell source |
+| Dependency entry point | Fixed official HTTPS download destinations; no installer execution or elevation; installed launcher uses an explicit sibling GUI path, while the standalone helper never launches it |
 
 Cancellation targets only the current subprocess tree, waits for exit and stream draining, then releases the operation lock. If termination is refused, the lock stays held until exit. Cancellable install commands disable their own BITS backend so a download is not handed to a background service that outlives the process. Other BITS jobs and persistent environment settings are untouched.
 
-Stopping installation may leave partial files. PyDeck does not claim automatic rollback or delete broad Python directories. Uninstallation has no mid-operation cancel action.
+Stopping a Python installation may leave partial files. PyDeck does not claim automatic rollback or delete broad Python directories. Python uninstallation inside the app has no mid-operation cancel action. These rules concern Python operations, not the Windows Installer UI for installing PyDeck itself.
 
 Configuration checks reduce accidental overwrite and path redirection but are not a transaction shared with unrelated tools. Offline source selection does not override administrator policy imposed on PIM.
 
@@ -43,4 +45,4 @@ Logs and screenshots may reveal installation paths and manager output. Review th
 
 ## 🧪 Validation limits
 
-Regression checks exercise malformed identities, unmanaged and stale runtime rejection, concurrency, configuration preservation, path handling, excessive process output, observer failure, and offline archive checks. These checks are not an independent security audit. Full real-world lifecycle tests and interactions with arbitrary third-party PIM configuration remain acceptance work.
+Regression checks exercise malformed identities, unmanaged and stale runtime rejection, concurrency, configuration preservation, path handling, excessive process output, observer failure, and offline archive checks. These checks are not an independent security audit. Full real-world Python lifecycle tests and interactions with arbitrary third-party PIM configuration remain acceptance work. The [feature-status record](docs/FEATURES.md) distinguishes this work from completed PyDeck installer checks.

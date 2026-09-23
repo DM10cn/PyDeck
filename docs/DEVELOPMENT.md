@@ -5,13 +5,17 @@
 ## 🧰 Toolchain
 
 - Windows 11 x64
+- PowerShell 7 for repository build and release scripts
 - Visual Studio 2026 with **WinUI application development**
-- **MSVC x64/x86 build tools** (`Microsoft.VisualStudio.Component.VC.Tools.x86.x64`), including C++ headers and desktop libraries, for the native launcher
-- .NET SDK **10.0.400** or a compatible patch, as specified in `global.json`
+- **MSVC x64/x86 build tools** (`Microsoft.VisualStudio.Component.VC.Tools.x86.x64`), including C++ headers and desktop libraries, for the native launcher and MSI actions
+- .NET SDK **10.0.400** or a later patch in the same **10.0.4xx** feature band, as specified by `global.json` and `latestPatch`
 - Windows SDK **10.0.26100**
-- For running the GUI: .NET Runtime 10 x64, Windows App Runtime **2.5.1 x64**, and Python Install Manager
+
+These are source-build tools. To run the published GUI, follow the [end-user dependency guide](INSTALL.md), including VC++ for the unpackaged build. PIM is optional for opening the GUI, but required for Python operations and live / GUI smoke checks.
 
 The app targets `net10.0-windows10.0.26100.0`. The lower minimum platform value in the project is not a claim of tested Windows 10 support. The build currently targets x64 only.
+
+The project pins individual Windows App SDK component packages in `PimGui.App.csproj` and `packages.lock.json`; those build references are distinct from the compatible runtime versions described in the installation guide.
 
 ## 🔨 Build
 
@@ -21,6 +25,8 @@ The app targets `net10.0-windows10.0.26100.0`. The lower minimum platform value 
 ```
 
 The build script keeps NuGet packages and .NET CLI state under ignored `.local/` directories. Publishing creates a new timestamped folder and records it in `artifacts/latest-build.txt` for the run script.
+
+Visual Studio builds the C# projects in `PimGui.slnx`. `Build.ps1 -Publish` additionally compiles the native C++ launcher, verifies system-only DLL imports, and runs the native checks. `Build.ps1 -Checks` without `-Publish` runs the core checks only. `Run.ps1` uses the launcher's most recent development publish, not a release installer or a bare Visual Studio build.
 
 The output uses external .NET and Windows App Runtime installations. The script checks the runtime configuration, compiled WinUI resources, and absence of embedded native runtime binaries. Keep every published file together.
 
@@ -40,13 +46,14 @@ dotnet restore PimGui.slnx --locked-mode -p:Platform=x64
 | `src/PimGui.App` | WinUI pages, semantic design tokens, appearance policy, operation panel, and in-app smoke checks |
 | `src/PyDeck.Launcher` | Win32 prerequisite dialog, system-only imports, official download links, and guarded GUI startup |
 | `packaging/msi` | WiX install options and native folder-picker / preference actions with a static C++ runtime |
-| `tests/PimGui.Checks` | Core regressions and opt-in PIM integration checks |
+| `tests/PimGui.Checks` | C# core regressions and opt-in PIM integration checks |
+| `tests/Launcher.Checks.cpp` | Native prerequisite combinations, dialog controls, language choices, and recheck behavior |
 | `scripts` | Build, launch, GUI smoke test, and icon generation |
 | `docs` | English and Simplified Chinese documentation |
 
-The product name is PyDeck. Existing `PimGui` project names and namespaces are internal identifiers.
+The product name is PyDeck. Existing `PimGui` project names and namespaces are internal identifiers. `PyDeck.exe` is the C# GUI; `PyDeck.Launcher.exe` is the normal startup entry. The small `resource.h` file defines native control IDs and may be counted as C by GitHub; it is not a separate program.
 
-`Build.ps1 -Publish` also builds the launcher with a static C++ runtime (`/MT`) and verifies its DLL imports. Use `scripts/Build-Launcher.ps1 -OutputDirectory artifacts/launcher -Checks` to run the native prerequisite and dialog tests separately. Launch `PyDeck.Launcher.exe` normally, with `--dependencies` to show the window even when ready, or `--check` for read-only JSON status (exit 0 when ready, otherwise a missing-dependency bit mask). The standalone release helper always shows the window and never launches a sibling app. Native tests use injected missing states and real Win32 controls; clean-machine deployment still needs separate acceptance testing.
+The launcher uses a static C++ runtime (`/MT`). Use `scripts/Build-Launcher.ps1 -OutputDirectory artifacts/launcher -Checks` to build it and run its tests separately. Pass `--dependencies` to `PyDeck.Launcher.exe` to show the window even when ready, or `--check` for read-only JSON status (exit 0 when ready, otherwise a missing-runtime bit mask; PIM is not checked here). The [installation guide](INSTALL.md) distinguishes this launcher from the standalone checker. Native tests use injected missing states and real Win32 controls; clean-machine deployment remains separate acceptance work.
 
 ## 🧪 Testing
 
@@ -63,7 +70,7 @@ The product name is PyDeck. Existing `PimGui` project names and namespaces are i
 
 Core checks cover malformed protocol responses, runtime identity, stale and unmanaged runtimes, operation locks, bounded process output, configuration preservation, offline validation, backdrop policy, and locale key parity.
 
-The GUI check uses isolated preferences and writes screenshots/results under ignored `artifacts/`. It exercises page state, filters, themes, transparency settings, language switching, layouts, and saved preferences. It is **an in-app state/render check**, not external mouse or keyboard automation. RenderTargetBitmap does not capture compositor Mica/Acrylic or native caption buttons.
+The GUI check requires working runtimes, PIM, and online catalog access. It uses isolated preferences and writes screenshots/results under ignored `artifacts/`. It exercises page state, missing-manager recovery, filters, themes, transparency settings, language switching, layouts, and saved preferences. It is **an in-app state/render check**, not external mouse or keyboard automation. RenderTargetBitmap does not capture compositor Mica/Acrylic or native caption buttons.
 
 Optional integration checks:
 
@@ -78,7 +85,7 @@ dotnet run --project tests/PimGui.Checks -- --offline-fixture "C:\TestBundles\Py
 
 These checks require PIM and can create temporary test files; the download check uses the network. They do not install into the normal PIM-managed runtime location. Logs and screenshots can contain local paths and should be reviewed before sharing.
 
-🚧 Remaining acceptance work includes the complete managed-runtime lifecycle in a disposable environment, external keyboard/screen-reader testing, native backdrop appearance, DPI behavior, and deployment on a clean machine. Passing core checks is not a substitute for these tests.
+See [feature status](FEATURES.md) for the current validation record and outstanding acceptance work. MSI / MSIX installation checks are covered by the [release workflow](RELEASING.md); they do not validate the complete Python interpreter lifecycle.
 
 ## 🎨 Appearance and localization
 
@@ -86,7 +93,7 @@ Use `DesignTokens` and the appearance policy for semantic colors, spacing, and s
 
 App strings are embedded JSON resources under `src/PimGui.Core/Strings`. Maintain the same keys in `en-US`, `zh-CN`, `zh-TW`, and `ja-JP`. English is the default. Prefer short, natural UI wording; avoid unnecessary sentence-ending punctuation in CJK labels. PIM identifiers and raw process output should not be translated.
 
-The repository's Markdown documentation has only English and Simplified Chinese editions. Update both editions together.
+The repository's Markdown documentation has only English and Simplified Chinese editions. Update both editions together and keep their sections aligned. Maintain end-user requirements in `INSTALL`, feature / acceptance status in `FEATURES`, build instructions here, and packaging procedures in `RELEASING`. README summarizes those pages and links to them; avoid maintaining another version matrix there.
 
 ## 🔐 Local data and contributions
 

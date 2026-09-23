@@ -14,7 +14,7 @@ PyDeck 是 **Python Install Manager** 的原生 **WinUI 3** 图形界面，支�
 
 ## 📦 下载
 
-从 [GitHub Releases](https://github.com/DM10cn/PyDeck/releases) 获取 **MSI**、**MSIX** 和 **ZIP / tar.gz 源码**。安装前请阅读 [安装说明](docs/INSTALL.zh-CN.md)：运行时仍需单独安装，自签 MSIX 预览版需要手动信任公开证书
+从 [GitHub Releases](https://github.com/DM10cn/PyDeck/releases) 获取 **MSI**、**MSIX**、**独立依赖工具**和 **ZIP / tar.gz 源码**。依赖要求、安装选项与 MSIX 证书信任步骤统一见 [安装说明](docs/INSTALL.zh-CN.md)
 
 ## ✨ 可以做什么
 
@@ -25,29 +25,24 @@ PyDeck 是 **Python Install Manager** 的原生 **WinUI 3** 图形界面，支�
 - 🛠️ **管理解释器** — 更新、卸载、设为默认、打开终端或文件夹、复制路径
 - 🎨 **调整外观** — Fluent / Material 3 Expressive、跟随系统 / 浅色 / 深色，以及 Fluent 专属的 Mica / Acrylic
 - 🌏 **切换语言** — 默认英语，另有简体中文、繁体中文（台湾）和日语
-- 🧰 **补齐运行依赖** — 原生简化窗口直达官方下载，应用内可补装 Python Install Manager 并重连
+- 🧰 **补齐运行依赖** — 打开运行时或 Python Install Manager 官方下载页面，手动安装后重新检查或连接
 - 🗂️ **选择安装方式** — MSI 支持目录浏览、可选桌面和开始菜单快捷方式，升级时保留选择
 
 详细实现情况与待验收项目见 [功能状态与计划](docs/FEATURES.zh-CN.md)
 
 ## 📋 使用前准备
 
-| 依赖 | 要求 |
-| --- | --- |
-| 操作系统 | Windows 11，x64 |
-| .NET | .NET Runtime 10，x64 |
-| Windows App Runtime | 2.5.1，x64，与项目引用保持一致 |
-| Python 管理器 | [Python Install Manager](https://docs.python.org/3/using/windows.html) |
+PyDeck 面向 **Windows 11 x64**。完整 GUI 需要 **.NET Runtime 10 x64** 和 **Windows App Runtime**；MSI / 非打包 GUI 还需要 **Visual C++ v14 x64**。具体版本、官方下载来源与不同安装格式的要求统一见 [安装说明](docs/INSTALL.zh-CN.md)
 
-**.NET 和 Windows App Runtime 需要单独安装**，PyDeck 不内置或自动下载这两个运行时。.NET Desktop Runtime 或 SDK 也包含本应用需要的基础 .NET 运行时
+原生依赖窗口可在这些运行时尚未安装时打开。**管理 Python 需要 Python Install Manager，但缺少它不会阻止打开 GUI**：可从应用中的官方链接下载，手动安装后重新连接。PyDeck 不内置或静默安装这些依赖
 
-应用会自动检测 Python Install Manager，检测失败时可在设置中选择它的可执行文件。Windows 10 支持暂缓
+Windows 10 支持暂缓，下面的 Visual Studio 和编译工具仅供源码构建使用
 
 ## 🚀 构建与运行
 
 使用 **Visual Studio 2026**，安装 **WinUI 应用程序开发**、**.NET 10 SDK** 和 **Windows SDK 26100**。SDK 基线见 `global.json`，NuGet 依赖包含锁定文件
 
-原生依赖启动器还需要 **MSVC x64/x86 编译工具**组件，包括 C++ 标准头文件与桌面库。发布目录通过 `PyDeck.Launcher.exe` 启动，C++ 基础库静态链接，仅导入 Windows 系统 DLL。缺少运行依赖时可从简化窗口打开官方下载入口，进入主界面后也能补装 PIM 并重新连接
+编译原生依赖启动器还需要 **MSVC x64/x86 编译工具**组件，包括 C++ 标准头文件与桌面库。发布目录通过 `PyDeck.Launcher.exe` 启动，C++ 基础库静态链接，仅导入 Windows 系统 DLL
 
 ```powershell
 git clone https://github.com/DM10cn/PyDeck.git
@@ -56,7 +51,7 @@ cd PyDeck
 .\scripts\Run.ps1
 ```
 
-也可以在 Visual Studio 中打开 `PimGui.slnx`，选择 `PimGui.App`，使用 **x64** 构建。内部项目名称保留 `PimGui`，应用和可执行文件名为 **PyDeck**
+也可以在 Visual Studio 中打开 `PimGui.slnx`，选择 `PimGui.App`，使用 **x64** 构建 C# GUI。若要包含 C++ 依赖启动器，请使用上面的发布脚本；该部分由脚本编译，不在解决方案构建中。产品名为 **PyDeck**，GUI 为 `PyDeck.exe`，正常启动入口为 `PyDeck.Launcher.exe`；`PimGui` 仅为内部项目名称
 
 开发输出位于 `artifacts/`，是**依赖外部运行时的非打包应用**，使用时请保留输出目录中的所有文件。MSI 与 MSIX 的构建方式见 [发行流程](docs/RELEASING.zh-CN.md)
 
@@ -68,7 +63,7 @@ cd PyDeck
 2. 将生成的整个文件夹复制到离线电脑，包括 `index.json` 和 ZIP 文件
 3. 打开 **安装 Python → 离线 → 选择文件夹**，选择离线包目录并安装
 
-离线电脑需要预先安装 Python Install Manager 和两个运行时依赖，也可以使用 `pymanager install --download=<folder> <tag>` 生成的离线包
+断网前请准备好 Python Install Manager 及[所选安装格式需要的全部运行时](docs/INSTALL.zh-CN.md)。此功能离线安装的是 Python 包，不提供 PyDeck 自身的运行依赖；也支持 `pymanager install --download=<folder> <tag>` 生成的离线包
 
 PyDeck 接受包含 SHA-256 校验值的独立本地离线包，并在安装前创建经过验证的副本。校验值只能验证完整性，不能证明发布者身份，请使用可信来源；缺包或文件损坏时会停止操作。参见 [Python 离线安装指南](https://docs.python.org/3/using/windows.html#offline-installs)
 
@@ -76,7 +71,7 @@ PyDeck 接受包含 SHA-256 校验值的独立本地离线包，并在安装前�
 
 操作面板在切换页面后仍然可见。下载和解压百分比来自 PIM 输出，表示**当前阶段的大致进度**，其他阶段使用不定进度条
 
-安装、更新和离线下载支持停止。停止安装需要确认，且**可能留下部分文件**。PyDeck 会等待当前进程退出并刷新安装列表，不承诺自动回滚；卸载不支持中途取消
+Python 安装、更新和离线下载支持停止。停止安装需要确认，且**可能留下部分文件**。PyDeck 会等待当前进程退出并刷新安装列表，不承诺自动回滚；Python 卸载不支持中途取消。这里指 PyDeck 内的 Python 操作，不是 MSI / MSIX 安装向导
 
 ## 🎨 外观与语言
 
@@ -86,9 +81,9 @@ Fluent 提供 **透明效果：使用 Windows 设置 / 开 / 关**，并可单�
 
 ## 🧪 验证状态
 
-仓库包含核心回归检查和可选的应用内 GUI 冒烟测试，也已验证真实 PIM 的只读查询、独立目录中的离线解压，以及测试下载的取消流程
+0.5.1 预览版已通过核心与原生检查、已安装 MSI 的 GUI 检查，以及 MSIX 开发注册 / 激活检查，也已验证 MSI 目录浏览、快捷方式选项、修复和升级
 
-仍需在专用测试环境验收完整安装、更新、卸载和默认版本切换，并补充外部键盘与读屏测试、原生背景视觉检查和干净机器部署测试。命令与验证边界见 [开发与测试](docs/DEVELOPMENT.zh-CN.md)
+**完整 Python 解释器生命周期**仍需验收，干净机器部署和 MSIX 正式证书信任安装路径也尚待验证。已完成与待验收项目统一记录在[功能状态表](docs/FEATURES.zh-CN.md)，运行检查的方法见[开发指南](docs/DEVELOPMENT.zh-CN.md)
 
 ## 🤝 参与贡献
 
