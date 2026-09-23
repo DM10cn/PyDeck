@@ -20,7 +20,15 @@ public sealed partial class PimClient(IProcessRunner runner, string? mutationLoc
             candidates.Add(Path.Combine(apps, "pymanager.exe"));
             candidates.Add(Path.Combine(apps, "PythonSoftwareFoundation.PythonManager_3847v3x7pw1km", "pymanager.exe"));
             candidates.Add(Path.Combine(apps, "PythonSoftwareFoundation.PythonManager_qbz5n2kfra8p0", "pymanager.exe"));
-            var paths = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator);
+            // A manager installed while PyDeck is open may have updated the registry PATH.
+            // Read it again on reconnect instead of requiring a restart of this process.
+            var pathValues = new List<string?> { Environment.GetEnvironmentVariable("PATH") };
+            if (OperatingSystem.IsWindows())
+            {
+                pathValues.Add(Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User));
+                pathValues.Add(Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine));
+            }
+            var paths = string.Join(Path.PathSeparator, pathValues).Split(Path.PathSeparator);
             foreach (var name in new[] { "pymanager.exe", "py.exe" })
                 foreach (var path in paths.Where(p => !string.IsNullOrWhiteSpace(p)))
                     candidates.Add(Path.Combine(path.Trim().Trim('"'), name));

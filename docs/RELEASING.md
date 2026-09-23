@@ -8,7 +8,6 @@ Use the [development toolchain](DEVELOPMENT.md), PowerShell 7, **WiX 7.0.0**, an
 
 ```powershell
 wix extension add -g WixToolset.UI.wixext/7.0.0
-wix extension add -g WixToolset.Netfx.wixext/7.0.0
 ```
 
 WiX 7 requires acceptance of its [OSMF terms](https://docs.firegiant.com/wix/osmf/). Review your eligibility and obligations before accepting; repository scripts do not accept the EULA for you.
@@ -24,6 +23,8 @@ $thumbprint = .\scripts\New-PreviewCertificate.ps1
 This creates or reuses a code-signing certificate in `CurrentUser\My`, with a non-exportable private key. It does not import a trusted root or export a PFX. Keep the signing account and key available for future updates. A developer's newly generated certificate is not the official release certificate even if its subject has the same text.
 
 The release script signs the app executable, MSI, and MSIX and exports only the public `.cer`. Self-signed previews require an explicit trust step for MSIX users; see [installation](INSTALL.md). Public production signing is future work. Current preview packages have no timestamp.
+
+The native `PyDeck.Launcher.exe` is also signed. An identical signed copy is exported as `PyDeck-Dependencies-<version>-win-x64.exe` for use before MSIX installation. Include that helper among the release assets. The MSI no longer blocks installation on missing .NET; its shortcut and MSIX activation both enter through the native launcher. MSIX's external framework dependency remains mandatory.
 
 ## 📦 Build
 
@@ -42,6 +43,14 @@ $release = (Get-Content .\artifacts\latest-release.txt -Raw).Trim()
 ## 🧪 Validate
 
 `Test-Release.ps1` checks package identity, external runtimes, excluded private/debug files, the MSIX block map and cryptographic signature, signer identity, MSI version, per-user scope, and upgrade identity. A self-signed certificate's chain remains untrusted unless the tester explicitly trusts it.
+
+🗂️ The MSI uses a native `IFileOpenDialog` folder picker and stores the chosen folder and shortcut flags in the current user's installer preferences. `Build-Launcher.ps1` also compiles its `/MT` custom-action DLL and verifies system-only imports. It is embedded in the MSI, not shipped as an application dependency.
+
+```powershell
+.\scripts\Test-MsiOptions.ps1 -ReleaseDirectory $release
+```
+
+This opt-in test installs and removes isolated MSI fixtures with unique product, component, registry, and shortcut identities. It checks all four shortcut combinations, Unicode / spaced paths, repair, upgrade retention, and preservation of unrelated files during uninstall. It does not replace an existing PyDeck installation. Also exercise the real wizard's Browse, selection, cancellation, and Next / Back navigation before release; command-line installation alone does not validate the UI.
 
 Also test MSI install → launch → uninstall, upgrade, downgrade rejection, and missing-prerequisite behavior in a disposable environment. Test signed MSIX installation on a machine where its preview certificate has been deliberately trusted.
 

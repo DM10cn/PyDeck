@@ -4,6 +4,8 @@
 
 ## 🧰 工具链
 
+原生启动器还需 **MSVC x64/x86 编译工具**（`Microsoft.VisualStudio.Component.VC.Tools.x86.x64`），包括 C++ 标准头文件与桌面库
+
 - Windows 11 x64
 - Visual Studio 2026，安装 **WinUI 应用程序开发**
 - .NET SDK **10.0.400** 或兼容补丁版本，以 `global.json` 为准
@@ -13,6 +15,8 @@
 应用目标框架为 `net10.0-windows10.0.26100.0`，项目中较低的最低平台值不代表已经验证 Windows 10 支持，当前构建仅面向 x64
 
 ## 🔨 构建
+
+`Build.ps1 -Publish` 会使用 `/MT` 静态链接 C++ 基础库，检查启动器只导入 Windows 系统 DLL，并运行原生检查。可单独执行 `scripts/Build-Launcher.ps1 -OutputDirectory artifacts/launcher -Checks`。正常启动请运行 `PyDeck.Launcher.exe`；`--dependencies` 强制显示依赖窗口，`--check` 输出只读 JSON 状态（就绪时退出码为 0，否则为缺失项位掩码）。独立发行工具始终显示窗口，不启动相邻应用。原生测试覆盖注入的缺失状态及真实 Win32 控件，不能替代干净机器验收
 
 ```powershell
 .\scripts\Build.ps1 -Checks -Publish
@@ -37,6 +41,8 @@ dotnet restore PimGui.slnx --locked-mode -p:Platform=x64
 | --- | --- |
 | `src/PimGui.Core` | PIM 发现与协议、进程调用、离线包、设置、版本目录和语言资源 |
 | `src/PimGui.App` | WinUI 页面、语义设计 token、外观策略、操作面板和应用内冒烟检查 |
+| `src/PyDeck.Launcher` | Win32 依赖窗口、系统 DLL 导入、官方下载链接和受控 GUI 启动 |
+| `packaging/msi` | WiX 安装选项、原生文件夹选择与设置操作，静态链接 C++ 基础库 |
 | `tests/PimGui.Checks` | 核心回归检查和按需启用的 PIM 集成检查 |
 | `scripts` | 构建、启动、GUI 冒烟测试和图标生成 |
 | `docs` | 英语及简体中文文档 |

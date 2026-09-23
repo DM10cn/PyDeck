@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
-     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
-     xmlns:netfx="http://wixtoolset.org/schemas/v4/wxs/netfx">
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package Name="PyDeck" Manufacturer="DM10cn" Version="$(var.ProductVersion)" Language="1033"
            UpgradeCode="D43AFAF7-DFE0-4AC1-A0A3-8F73AD6F89CA" Scope="perUser" InstallerVersion="500">
     <MajorUpgrade DowngradeErrorMessage="A newer version of PyDeck is already installed." Schedule="afterInstallInitialize" />
@@ -10,29 +9,62 @@
     <Property Id="ARPPRODUCTICON" Value="PyDeckIcon" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/DM10cn/PyDeck" />
     <Property Id="ARPHELPLINK" Value="https://github.com/DM10cn/PyDeck/issues" />
+    <Property Id="INSTALLFOLDER" Secure="yes" />
+    <Property Id="DESKTOPSHORTCUT" Secure="yes" />
+    <Property Id="STARTMENUSHORTCUT" Secure="yes" />
+    <Property Id="PYDECK_OPTIONS_INITIALIZED" Secure="yes" />
+    <Property Id="SAVED_DESKTOP_SHORTCUT" Value="0" />
+    <Property Id="SAVED_START_MENU_SHORTCUT" Value="0" />
+    <Property Id="PREVIOUS_INSTALL_FOLDER">
+      <RegistrySearch Id="PreviousFolder" Root="HKCU" Key="Software\DM10cn\PyDeck\Installer" Name="InstallFolder" Type="raw" />
+    </Property>
+    <Property Id="PREVIOUS_DESKTOP_SHORTCUT">
+      <RegistrySearch Id="PreviousDesktop" Root="HKCU" Key="Software\DM10cn\PyDeck\Installer" Name="DesktopShortcutEnabled" Type="raw" />
+    </Property>
+    <Property Id="PREVIOUS_START_MENU_SHORTCUT">
+      <RegistrySearch Id="PreviousStartMenu" Root="HKCU" Key="Software\DM10cn\PyDeck\Installer" Name="StartMenuShortcutEnabled" Type="raw" />
+    </Property>
+    <Binary Id="PyDeckInstallerActions" SourceFile="$(var.InstallerActions)" />
+    <CustomAction Id="PyDeckInitializeOptions" BinaryRef="PyDeckInstallerActions" DllEntry="InitializeOptions" Execute="immediate" Return="check" />
+    <CustomAction Id="PyDeckBrowseInstallFolder" BinaryRef="PyDeckInstallerActions" DllEntry="BrowseInstallFolder" Execute="immediate" Return="check" />
+    <InstallUISequence><Custom Action="PyDeckInitializeOptions" After="AppSearch" /></InstallUISequence>
+    <InstallExecuteSequence><Custom Action="PyDeckInitializeOptions" After="AppSearch" /></InstallExecuteSequence>
+    <SetProperty Id="SAVED_DESKTOP_SHORTCUT" Value="1" Before="InstallInitialize" Sequence="execute" Condition="DESKTOPSHORTCUT = &quot;1&quot;" />
+    <SetProperty Id="SAVED_START_MENU_SHORTCUT" Value="1" Before="InstallInitialize" Sequence="execute" Condition="STARTMENUSHORTCUT = &quot;1&quot;" />
     <Property Id="WINDOWSBUILD">
       <RegistrySearch Id="WindowsBuild" Root="HKLM" Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion" Name="CurrentBuildNumber" Type="raw" Bitness="always64" />
     </Property>
-    <netfx:DotNetCompatibilityCheck Id="Net10" Property="DOTNET10CHECK" RuntimeType="core" Platform="x64" Version="10.0.0" RollForward="latestPatch" />
     <Launch Condition="Installed OR (VersionNT64 AND WINDOWSBUILD &gt;= 22000)" Message="PyDeck requires Windows 11 x64." />
-    <Launch Condition="Installed OR DOTNET10CHECK = &quot;0&quot;" Message="Install .NET Runtime 10 (x64) before installing PyDeck: https://dotnet.microsoft.com/download/dotnet/10.0" />
     <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="LOCALPROGRAMS" Name="Programs"><Directory Id="INSTALLFOLDER" Name="PyDeck" /></Directory>
     </StandardDirectory>
     <StandardDirectory Id="ProgramMenuFolder"><Directory Id="APPSTARTMENU" Name="PyDeck" /></StandardDirectory>
+    <StandardDirectory Id="DesktopFolder">
+      <Component Id="DesktopShortcut" Guid="*" Condition="DESKTOPSHORTCUT = &quot;1&quot;" Transitive="yes">
+        <Shortcut Id="DesktopPyDeck" Name="PyDeck" Target="[INSTALLFOLDER]PyDeck.Launcher.exe" WorkingDirectory="INSTALLFOLDER" Icon="PyDeckIcon" />
+        <RegistryValue Root="HKCU" Key="Software\DM10cn\PyDeck\Installer" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="InstallerPreferences" Guid="*">
+        <RegistryValue Root="HKCU" Key="Software\DM10cn\PyDeck\Installer" Name="InstallFolder" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
+        <RegistryValue Root="HKCU" Key="Software\DM10cn\PyDeck\Installer" Name="DesktopShortcutEnabled" Type="string" Value="[SAVED_DESKTOP_SHORTCUT]" />
+        <RegistryValue Root="HKCU" Key="Software\DM10cn\PyDeck\Installer" Name="StartMenuShortcutEnabled" Type="string" Value="[SAVED_START_MENU_SHORTCUT]" />
+        <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />
+      </Component>
+    </DirectoryRef>
     <DirectoryRef Id="APPSTARTMENU">
-      <Component Id="StartMenuShortcut" Guid="*">
-        <Shortcut Id="LaunchPyDeck" Name="PyDeck" Target="[INSTALLFOLDER]PyDeck.exe" WorkingDirectory="INSTALLFOLDER" Icon="PyDeckIcon" />
+      <Component Id="StartMenuShortcut" Guid="*" Condition="STARTMENUSHORTCUT = &quot;1&quot;" Transitive="yes">
+        <Shortcut Id="LaunchPyDeck" Name="PyDeck" Target="[INSTALLFOLDER]PyDeck.Launcher.exe" WorkingDirectory="INSTALLFOLDER" Icon="PyDeckIcon" />
         <RemoveFolder Id="RemoveStartMenu" On="uninstall" />
-        <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
-        <RemoveFolder Id="RemoveEmptyPrograms" Directory="LOCALPROGRAMS" On="uninstall" />
         <RegistryValue Root="HKCU" Key="Software\DM10cn\PyDeck\Installer" Name="StartMenu" Type="integer" Value="1" KeyPath="yes" />
       </Component>
     </DirectoryRef>
     <Feature Id="Application" Title="PyDeck" Level="1">
-      <ComponentGroupRef Id="PayloadFiles" /><ComponentRef Id="StartMenuShortcut" />
+      <ComponentGroupRef Id="PayloadFiles" /><ComponentRef Id="InstallerPreferences" /><ComponentRef Id="StartMenuShortcut" /><ComponentRef Id="DesktopShortcut" />
     </Feature>
-    <ui:WixUI Id="WixUI_Minimal" />
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <UIRef Id="PyDeckInstallOptions" />
     <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
   </Package>
 </Wix>

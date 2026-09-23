@@ -32,6 +32,7 @@ try {
             if (Test-Path -LiteralPath (Join-Path $outputDirectory $forbidden)) { throw "Unexpected bundled runtime: $forbidden" }
         }
         if (!(Test-Path -LiteralPath (Join-Path $outputDirectory 'PyDeck.pri'))) { throw 'Compiled WinUI resources are missing.' }
+        & (Join-Path $PSScriptRoot 'Build-Launcher.ps1') -OutputDirectory $outputDirectory -Checks
         Set-Content -LiteralPath (Join-Path $projectRoot 'artifacts\latest-build.txt') -Value $outputDirectory -Encoding utf8
         Write-Output "Development build: $outputDirectory"
     }

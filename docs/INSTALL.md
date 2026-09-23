@@ -2,11 +2,15 @@
 
 **English** · [简体中文](INSTALL.zh-CN.md) · [🏠 Project](https://github.com/DM10cn/PyDeck)
 
-🚧 **0.4.0 preview · Windows 11 x64**
+🚧 **0.5.1 preview · Windows 11 x64**
 
 Download assets from [GitHub Releases](https://github.com/DM10cn/PyDeck/releases). Choose **one** installation format. MSI and MSIX do not upgrade each other; uninstall the previous format before switching. Neither installer removes your Python installations or intentionally deletes your PyDeck preferences.
 
-## 📋 Install the prerequisites first
+## 📋 Prepare the prerequisites
+
+🧰 The native prerequisite window runs without .NET, Windows App Runtime, WebView2, or a separately installed VC++ runtime. Missing dependencies have **Download** buttons that open official Microsoft sources. Install the x64 packages, choose **Check again**, then **Open PyDeck**. The window does not run installers, elevate itself, or change certificate trust. English is the default, with Simplified Chinese, Traditional Chinese (Taiwan), and Japanese available.
+
+For MSIX, run the standalone `PyDeck-Dependencies-0.5.1-win-x64.exe` before installing the package if needed. Windows can block MSIX installation on a missing framework dependency before any in-package window can run. The standalone tool stays outside that dependency chain; after checking, return to the MSIX installer.
 
 | Dependency | Official source |
 | --- | --- |
@@ -21,11 +25,24 @@ The optional `Test-Prerequisites.ps1` release asset performs read-only checks. I
 
 ## 🛠️ MSI
 
-1. Download `PyDeck-0.4.0-win-x64.msi`
-2. Run it and follow the installer
-3. Open **PyDeck** from Start
+1. Download `PyDeck-0.5.1-win-x64.msi`
+2. Choose the installation folder, or use **Browse…** to open the Windows folder picker
+3. Choose **Create a desktop shortcut** and **Add PyDeck to the Start menu** as needed; only Start menu is selected by default
+4. Install, then open **PyDeck** from your chosen shortcut
 
-The MSI installs for the current user under `%LocalAppData%\Programs\PyDeck`. It checks Windows 11 and .NET 10 before installation. Windows App Runtime is resolved at app startup; install it separately using the link above. PIM connection is checked inside the app.
+The MSI installs for the current user, with `%LocalAppData%\Programs\PyDeck` as the default. You can enter another writable folder or select one in the native folder picker. Repair and later MSI upgrades retain your folder and shortcut choices. If you disable both shortcuts, open `PyDeck.Launcher.exe` in the chosen folder.
+
+It checks Windows 11 before installation, but allows .NET to be installed later. Both shortcuts open the native prerequisite launcher, which enters the full app once prerequisites are detected. Keep the entire installed folder together; opening `PyDeck.exe` directly bypasses the prerequisite window.
+
+🧑‍💻 For an unattended current-user installation, the same options are available as MSI properties (`0` = off, `1` = on):
+
+```powershell
+msiexec /i PyDeck-0.5.1-win-x64.msi /qn INSTALLFOLDER="D:\Apps\PyDeck" DESKTOPSHORTCUT=1 STARTMENUSHORTCUT=0
+```
+
+Use a folder your account can write to. The native folder picker does not require .NET. MSIX uses Windows-managed placement and does not expose these MSI options.
+
+🐍 Missing Python Install Manager does not block the GUI. Choose **Download Python Install Manager** in the empty state or Settings, install the manager from Python's official Windows page, then choose **Check again** or **Auto-detect**. PyDeck reconnects without restarting. These actions open the official download page; they do not silently install PIM or Python.
 
 The preview uses a self-signed certificate, so Windows will not recognize it as a publicly trusted publisher. MSI does not require importing the preview certificate to install. Review the download source before choosing to proceed with any Windows prompt.
 
@@ -35,7 +52,7 @@ Newer MSI versions upgrade the same per-user installation and older versions are
 
 MSIX requires a trusted signing certificate. This preview is **not publicly trusted**. Only trust the preview publisher if you have verified the files and intend to test PyDeck. The private signing key is never distributed.
 
-1. Download `PyDeck-0.4.0-win-x64.msix`, `PyDeck-preview.cer`, and `SHA256SUMS.txt` from the same release
+1. Download `PyDeck-0.5.1-win-x64.msix`, `PyDeck-preview.cer`, and `SHA256SUMS.txt` from the same release
 2. Compare file hashes with `SHA256SUMS.txt`, using `Get-FileHash -Algorithm SHA256`
 3. Inspect the certificate: publisher **CN=DM10cn**, thumbprint **3912817E181E5EA9AF0DED6BC51E332E99BBDD16**
 4. Import the public certificate into **Local Computer → Trusted People**, then open the MSIX
@@ -49,7 +66,7 @@ Import-Certificate -FilePath .\PyDeck-preview.cer -CertStoreLocation Cert:\Local
 Then install the package as your normal desktop user:
 
 ```powershell
-Add-AppxPackage -Path .\PyDeck-0.4.0-win-x64.msix
+Add-AppxPackage -Path .\PyDeck-0.5.1-win-x64.msix
 ```
 
 Do **not** import this certificate into Trusted Root Certification Authorities. PyDeck's scripts do not import certificates or change system trust automatically. This preview certificate expires on **2028-09-23**; the packages are not timestamped for long-term distribution.
@@ -66,7 +83,7 @@ Settings remain under `%LocalAppData%\PyDeck`. Python installations, PIM configu
 
 ## 🗜️ Source archives
 
-`PyDeck-0.4.0-source.zip` and `PyDeck-0.4.0-source.tar.gz` contain only files from the release commit. Build output, logs, local settings, package caches, and signing keys are excluded. The GitHub-generated source links are also available.
+`PyDeck-0.5.1-source.zip` and `PyDeck-0.5.1-source.tar.gz` contain only files from the release commit. Build output, logs, local settings, package caches, and signing keys are excluded. The GitHub-generated source links are also available.
 
 ## 🧪 Preview limits
 

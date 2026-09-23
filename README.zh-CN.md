@@ -10,7 +10,7 @@
 
 PyDeck 是 **Python Install Manager** 的原生 **WinUI 3** 图形界面，支持查看解释器、安装版本、设置默认版本和管理离线包，并提供 **Windows Fluent** 与 **Material 3 Expressive** 两种界面风格
 
-🚧 **开发预览版 · 0.4.0** · 🪟 **Windows 11 x64** · 📄 **MIT**
+🚧 **开发预览版 · 0.5.1** · 🪟 **Windows 11 x64** · 📄 **MIT**
 
 ## 📦 下载
 
@@ -25,6 +25,8 @@ PyDeck 是 **Python Install Manager** 的原生 **WinUI 3** 图形界面，支�
 - 🛠️ **管理解释器** — 更新、卸载、设为默认、打开终端或文件夹、复制路径
 - 🎨 **调整外观** — Fluent / Material 3 Expressive、跟随系统 / 浅色 / 深色，以及 Fluent 专属的 Mica / Acrylic
 - 🌏 **切换语言** — 默认英语，另有简体中文、繁体中文（台湾）和日语
+- 🧰 **补齐运行依赖** — 原生简化窗口直达官方下载，应用内可补装 Python Install Manager 并重连
+- 🗂️ **选择安装方式** — MSI 支持目录浏览、可选桌面和开始菜单快捷方式，升级时保留选择
 
 详细实现情况与待验收项目见 [功能状态与计划](docs/FEATURES.zh-CN.md)
 
@@ -44,6 +46,8 @@ PyDeck 是 **Python Install Manager** 的原生 **WinUI 3** 图形界面，支�
 ## 🚀 构建与运行
 
 使用 **Visual Studio 2026**，安装 **WinUI 应用程序开发**、**.NET 10 SDK** 和 **Windows SDK 26100**。SDK 基线见 `global.json`，NuGet 依赖包含锁定文件
+
+原生依赖启动器还需要 **MSVC x64/x86 编译工具**组件，包括 C++ 标准头文件与桌面库。发布目录通过 `PyDeck.Launcher.exe` 启动，C++ 基础库静态链接，仅导入 Windows 系统 DLL。缺少运行依赖时可从简化窗口打开官方下载入口，进入主界面后也能补装 PIM 并重新连接
 
 ```powershell
 git clone https://github.com/DM10cn/PyDeck.git

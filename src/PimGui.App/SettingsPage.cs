@@ -95,14 +95,15 @@ public sealed partial class MainWindow
         };
         var detect = palette.Action("Auto-detect", "\uE72C", compact: true); detect.IsEnabled = !busy;
         detect.Click += async (_, _) => await ChangeManagerAsync("");
-        var download = palette.Action("Get the manager", "\uE8A7", compact: true); download.Click += (_, _) => OpenUrl("https://www.python.org/downloads/");
+        var download = palette.Action("Download Python Install Manager", "\uE8A7", compact: true); download.Click += (_, _) => OpenManagerDownload();
         managerActions.Children.Add(browse); managerActions.Children.Add(detect); managerActions.Children.Add(download);
         manager.Children.Add(managerActions); body.Children.Add(palette.CardBox(manager));
+        manager.Children.Add(palette.Label("After installing the manager, choose Auto-detect to connect without restarting PyDeck.", 12, muted: true));
 
         var about = new StackPanel { Spacing = 10 };
         about.Children.Add(palette.Label("About", 19, true));
         about.Children.Add(palette.Label("PyDeck", 24, true));
-        about.Children.Add(palette.Label(T("Version {0} · Development preview", "0.4.0"), 12, muted: true));
+        about.Children.Add(palette.Label(T("Version {0} · Development preview", "0.5.1"), 12, muted: true));
         about.Children.Add(palette.Label("A desktop companion for managing Python installations with Python Install Manager.", 13));
         about.Children.Add(palette.Label("Independent project. Not affiliated with the Python Software Foundation.", 12, muted: true));
         about.Children.Add(palette.Label("Built with WinUI 3. .NET and Windows App Runtime are installed separately.", 12, muted: true));

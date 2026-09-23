@@ -47,8 +47,7 @@ public sealed partial class MainWindow
         At(layout, Header("YOUR WORKSPACE", "My Python", "A little less setup. A lot more building.", actions), 0);
         if (!connected)
         {
-            At(layout, Empty("\uE8CE", busy ? "Finding your Python setup" : "Let's connect your manager",
-                busy ? "Checking Python Install Manager on this computer…" : "Install Python Install Manager, or choose its location in Settings.", busy ? null : "Open settings", () => Navigate("settings")), 3);
+            At(layout, ManagerSetup(), 3);
             return layout;
         }
         var defaultRuntime = installed.FirstOrDefault(r => r.IsDefault);
@@ -119,7 +118,7 @@ public sealed partial class MainWindow
         if (online && OfflineSource && offlineBundle is null)
             runtimeRows.Children.Add(Empty("\uE8B7", "Install from an offline bundle", "Choose a folder containing index.json and the Python packages.", "Choose folder…", () => _ = PickOfflineFolderAsync()));
         else if (!connected)
-            runtimeRows.Children.Add(Empty("\uE8CE", "Connect Python Install Manager", "Connect your manager in Settings before browsing releases.", "Open settings", () => Navigate("settings")));
+            runtimeRows.Children.Add(ManagerSetup());
         else if (online && !OfflineSource && catalog is null)
             runtimeRows.Children.Add(Empty("\uE896", busy ? "Checking the release catalog…" : "Your next Python starts here", "Available versions are loaded directly from Python Install Manager.", busy ? null : "Load releases", () => _ = LoadCatalogAsync()));
         else if (filtered.Length == 0)
@@ -127,6 +126,26 @@ public sealed partial class MainWindow
         else if (online) PopulateCatalog(filtered);
         else foreach (var runtime in filtered) runtimeRows.Children.Add(RuntimeCard(runtime, false));
     }
+
+    private UIElement ManagerSetup()
+    {
+        if (busy) return Empty("\uE8CE", "Finding your Python setup", "Checking Python Install Manager on this computer…");
+        var panel = (StackPanel)Empty("\uE8CE", "Let's connect your manager",
+            "Download Python Install Manager, then return here and check again.", "Download Python Install Manager", OpenManagerDownload);
+        panel.Tag = "ManagerSetup";
+        var retry = palette.Action("Check again", "\uE72C", compact: true);
+        retry.Tag = "ReconnectManager";
+        retry.HorizontalAlignment = HorizontalAlignment.Center;
+        retry.Click += async (_, _) => await ChangeManagerAsync("");
+        panel.Children.Add(retry);
+        var settings = palette.Action("Open settings", compact: true);
+        settings.HorizontalAlignment = HorizontalAlignment.Center;
+        settings.Click += (_, _) => Navigate("settings");
+        panel.Children.Add(settings);
+        return panel;
+    }
+
+    private void OpenManagerDownload() => OpenUrl("https://www.python.org/downloads/windows/");
 
     private void PopulateCatalog(IReadOnlyList<PythonRuntime> filtered)
     {

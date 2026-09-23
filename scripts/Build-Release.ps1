@@ -63,6 +63,7 @@ try {
     Invoke-Checked dotnet @('restore', 'PimGui.slnx', '--locked-mode', '-p:Platform=x64', '--nologo')
     if (!$SkipChecks) { Invoke-Checked dotnet @('run', '--project', 'tests/PimGui.Checks/PimGui.Checks.csproj', '-c', 'Release', '--no-restore') }
     Invoke-Checked dotnet @('publish', 'src/PimGui.App/PimGui.App.csproj', '-c', 'Release', '-p:Platform=x64', '--no-restore', '--self-contained', 'false', '-p:DebugType=None', '-p:DebugSymbols=false', '-p:PublishReadyToRun=false', "-p:PathMap=$repoRoot=/_/PyDeck", '-o', $payload, '--nologo')
+    & (Join-Path $PSScriptRoot 'Build-Launcher.ps1') -OutputDirectory $payload -Checks:(!$SkipChecks) -InstallerActionsDirectory (Join-Path $work 'native')
     $runtimeConfig = Get-Content -LiteralPath (Join-Path $payload 'PyDeck.runtimeconfig.json') -Raw | ConvertFrom-Json
     if ($runtimeConfig.runtimeOptions.framework.name -ne 'Microsoft.NETCore.App') { throw 'Expected an external .NET runtime.' }
     foreach ($forbidden in @('coreclr.dll', 'hostpolicy.dll', 'System.Private.CoreLib.dll', 'Microsoft.UI.Xaml.dll', 'onnxruntime.dll', 'DirectML.dll')) {
@@ -100,9 +101,12 @@ try {
         if (Test-Path -LiteralPath $notice) { Copy-Item -LiteralPath $notice -Destination (Join-Path $notices ('DotNet-' + $name)) }
     }
     if ($certificate) {
-        Invoke-Checked (Join-Path $sdkTools 'signtool.exe') @('sign', '/fd', 'SHA256', '/sha1', $CertificateThumbprint, '/s', 'My', (Join-Path $payload 'PyDeck.exe'))
+        foreach ($name in @('PyDeck.exe', 'PyDeck.Launcher.exe')) {
+            Invoke-Checked (Join-Path $sdkTools 'signtool.exe') @('sign', '/fd', 'SHA256', '/sha1', $CertificateThumbprint, '/s', 'My', (Join-Path $payload $name))
+        }
         Export-Certificate -Cert $certificate -FilePath (Join-Path $assets 'PyDeck-preview.cer') | Out-Null
     }
+    Copy-Item -LiteralPath (Join-Path $payload 'PyDeck.Launcher.exe') -Destination (Join-Path $assets "PyDeck-Dependencies-$version-win-x64.exe")
 
     # Generate explicit per-user components with stable HKCU key paths; no recursive installer deletion.
     $fragment = [Text.StringBuilder]::new()
@@ -139,7 +143,7 @@ try {
     $licenseRtf = Join-Path $work 'License.rtf'
     [IO.File]::WriteAllText($licenseRtf, '{\rtf1\ansi\deff0 {\fonttbl {\f0 Segoe UI;}}\f0\fs18 ' + $licenseText + '}', [Text.Encoding]::ASCII)
     $msi = Join-Path $assets "PyDeck-$version-win-x64.msi"
-    Invoke-Checked $WixCommand @('build', 'packaging/msi/Package.wxs', $fragmentPath, '-arch', 'x64', '-ext', 'WixToolset.UI.wixext/7.0.0', '-ext', 'WixToolset.Netfx.wixext/7.0.0', '-d', "ProductVersion=$version", '-d', "PayloadDir=$payload", '-d', "LicenseRtf=$licenseRtf", '-pdbtype', 'none', '-intermediatefolder', (Join-Path $work 'wix'), '-o', $msi)
+    Invoke-Checked $WixCommand @('build', 'packaging/msi/Package.wxs', 'packaging/msi/InstallOptions.wxs', $fragmentPath, '-arch', 'x64', '-ext', 'WixToolset.UI.wixext/7.0.0', '-d', "ProductVersion=$version", '-d', "PayloadDir=$payload", '-d', "LicenseRtf=$licenseRtf", '-d', ('InstallerActions=' + (Join-Path $work 'native\PyDeck.InstallerActions.dll')), '-pdbtype', 'none', '-intermediatefolder', (Join-Path $work 'wix'), '-o', $msi)
 
     $msixStage = Join-Path $work 'msix'
     New-Item -ItemType Directory -Path $msixStage | Out-Null

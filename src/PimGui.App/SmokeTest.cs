@@ -20,6 +20,20 @@ public sealed partial class MainWindow
         {
             if (!connected) throw new InvalidOperationException("PIM was not connected: " + client.LastDiscoveryError);
             checks.Add($"PIM connected; {installed.Count} installed runtimes loaded.");
+            connected = false;
+            foreach (var language in Strings.Languages)
+            {
+                Strings.Language = language;
+                Navigate("runtimes"); RenderPage(); Root.UpdateLayout();
+                var setup = Descendants(PageHost).OfType<StackPanel>().Single(panel => panel.Tag as string == "ManagerSetup");
+                if (!setup.Children.OfType<Button>().Any(button => Microsoft.UI.Xaml.Automation.AutomationProperties.GetName(button) == T("Download Python Install Manager")) ||
+                    !setup.Children.OfType<Button>().Any(button => button.Tag as string == "ReconnectManager" && button.IsEnabled))
+                    throw new InvalidOperationException("Missing manager recovery actions: " + language);
+            }
+            Strings.Language = preferences.Language;
+            await ChangeManagerAsync("");
+            if (!connected) throw new InvalidOperationException("Manager reconnect failed without app restart");
+            checks.Add("Four-language missing-manager download / reconnect actions; reconnect succeeds without app restart.");
             if (preferences.Language != "en-US") throw new InvalidOperationException("English is not the default language.");
             Navigate("runtimes");
             await CaptureAsync(Path.Combine(directory, "01-material-dark-runtimes.png"));

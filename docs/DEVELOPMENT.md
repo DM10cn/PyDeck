@@ -6,6 +6,7 @@
 
 - Windows 11 x64
 - Visual Studio 2026 with **WinUI application development**
+- **MSVC x64/x86 build tools** (`Microsoft.VisualStudio.Component.VC.Tools.x86.x64`), including C++ headers and desktop libraries, for the native launcher
 - .NET SDK **10.0.400** or a compatible patch, as specified in `global.json`
 - Windows SDK **10.0.26100**
 - For running the GUI: .NET Runtime 10 x64, Windows App Runtime **2.5.1 x64**, and Python Install Manager
@@ -37,11 +38,15 @@ dotnet restore PimGui.slnx --locked-mode -p:Platform=x64
 | --- | --- |
 | `src/PimGui.Core` | PIM discovery and protocol, subprocess execution, offline bundles, settings, catalog, and language resources |
 | `src/PimGui.App` | WinUI pages, semantic design tokens, appearance policy, operation panel, and in-app smoke checks |
+| `src/PyDeck.Launcher` | Win32 prerequisite dialog, system-only imports, official download links, and guarded GUI startup |
+| `packaging/msi` | WiX install options and native folder-picker / preference actions with a static C++ runtime |
 | `tests/PimGui.Checks` | Core regressions and opt-in PIM integration checks |
 | `scripts` | Build, launch, GUI smoke test, and icon generation |
 | `docs` | English and Simplified Chinese documentation |
 
 The product name is PyDeck. Existing `PimGui` project names and namespaces are internal identifiers.
+
+`Build.ps1 -Publish` also builds the launcher with a static C++ runtime (`/MT`) and verifies its DLL imports. Use `scripts/Build-Launcher.ps1 -OutputDirectory artifacts/launcher -Checks` to run the native prerequisite and dialog tests separately. Launch `PyDeck.Launcher.exe` normally, with `--dependencies` to show the window even when ready, or `--check` for read-only JSON status (exit 0 when ready, otherwise a missing-dependency bit mask). The standalone release helper always shows the window and never launches a sibling app. Native tests use injected missing states and real Win32 controls; clean-machine deployment still needs separate acceptance testing.
 
 ## 🧪 Testing
 

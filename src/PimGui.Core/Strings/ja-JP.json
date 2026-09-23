@@ -228,5 +228,9 @@
   "Download stopped. An incomplete bundle may remain in the selected folder.": "ダウンロードを停止しました\n保存先に未完成のファイルが残っている場合があります",
   "Installation stopped. The version list has been refreshed; partial files may remain. Reinstall the version if needed.": "インストールを停止し、バージョン一覧を更新しました\n一部のファイルが残っている場合は再インストールしてください",
   "Stopped, but the version list could not be refreshed. Refresh it before trying again.": "操作を停止しましたが、一覧を更新できませんでした\n再試行する前に一覧を更新してください",
-  "Operation stopped": "操作を停止しました"
+  "Operation stopped": "操作を停止しました",
+  "Download Python Install Manager": "Python Install Manager をダウンロード",
+  "Download Python Install Manager, then return here and check again.": "Python Install Manager をインストールしたら、ここで再確認してください",
+  "Check again": "再確認",
+  "After installing the manager, choose Auto-detect to connect without restarting PyDeck.": "インストール後に自動検出を選ぶと、PyDeck を再起動せずに接続できます"
 }

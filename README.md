@@ -10,7 +10,7 @@
 
 PyDeck is a native **WinUI 3** companion for **Python Install Manager**. Browse interpreters, install a version, choose your default, and keep offline packages close at hand — in a desktop interface with **Windows Fluent** and **Material 3 Expressive** styles.
 
-🚧 **Development preview · 0.4.0** · 🪟 **Windows 11 x64** · 📄 **MIT**
+🚧 **Development preview · 0.5.1** · 🪟 **Windows 11 x64** · 📄 **MIT**
 
 ## 📦 Download
 
@@ -25,6 +25,8 @@ Get **MSI**, **MSIX**, and **source ZIP / tar.gz** from [GitHub Releases](https:
 - 🛠️ **Manage a runtime** — update, uninstall, set the default, open a terminal or folder, and copy its path
 - 🎨 **Make it yours** — Fluent or Material 3 Expressive, System / Light / Dark themes, and optional Fluent Mica or Acrylic
 - 🌏 **Choose your language** — English by default, plus Simplified Chinese, Traditional Chinese (Taiwan), and Japanese
+- 🧰 **Recover missing dependencies** — a small native window opens official runtime downloads; add Python Install Manager and reconnect inside the app
+- 🗂️ **Choose how to install** — MSI folder selection with Browse, optional desktop and Start menu shortcuts, and preferences retained during upgrades
 
 See the [feature status and roadmap](docs/FEATURES.md) for implementation details and remaining acceptance work.
 
@@ -44,6 +46,8 @@ Python Install Manager is detected automatically. You can choose its executable 
 ## 🚀 Build and run
 
 Use **Visual Studio 2026** with **WinUI application development**, the **.NET 10 SDK**, and **Windows SDK 26100**. The SDK baseline is pinned in `global.json`; NuGet dependencies have committed lock files.
+
+The prerequisite launcher also needs the **MSVC x64/x86 build tools** component, including C++ headers and desktop libraries. Published output starts through `PyDeck.Launcher.exe`; it statically links its C++ support library and imports only Windows system DLLs.
 
 ```powershell
 git clone https://github.com/DM10cn/PyDeck.git

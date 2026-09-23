@@ -2,7 +2,7 @@ param([string]$BuildDirectory, [string]$OfflineFixture)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 if (!$BuildDirectory) { $BuildDirectory = (Get-Content -LiteralPath (Join-Path $projectRoot 'artifacts\latest-build.txt') -Raw).Trim() }
-$appPath = Join-Path $BuildDirectory 'PyDeck.exe'
+$appPath = Join-Path $BuildDirectory 'PyDeck.Launcher.exe'
 if (!(Test-Path -LiteralPath $appPath)) { throw 'Build the app with scripts/Build.ps1 -Publish first.' }
 $outputDirectory = Join-Path $projectRoot ('artifacts\smoke-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 $appArguments = @('--smoke-test', ('"' + $outputDirectory + '"'))

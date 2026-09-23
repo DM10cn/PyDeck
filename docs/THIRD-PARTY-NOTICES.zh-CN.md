@@ -10,6 +10,8 @@ Python 及 Python 标志是 Python Software Foundation 的商标或注册商标�
 
 ## 🪟 平台与依赖
 
+原生依赖启动器使用 Microsoft C++ 编译，静态链接发行版基础库，对应组件仍遵循 Microsoft 的适用条款。启动器不要求额外安装 Visual C++ Redistributable，完整 WinUI 应用的运行依赖保持不变
+
 PyDeck 与 Microsoft 不存在隶属或背书关系，Windows、.NET、WinUI 等产品名称归各自权利人所有
 
 项目通过 NuGet 还原 Microsoft .NET / Windows App SDK 组件，依赖清单见项目文件及 `packages.lock.json`，各依赖保留自己的许可证和声明。源码仓库不内置还原后的包与运行时二进制文件

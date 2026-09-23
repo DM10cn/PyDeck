@@ -1,0 +1,14 @@
+#pragma once
+#define IDD_DEPENDENCIES 101
+#define IDI_APP 102
+#define IDC_INTRO 200
+#define IDC_WINDOWS 201
+#define IDC_NET 202
+#define IDC_APP_RUNTIME 203
+#define IDC_VC 204
+#define IDC_DOWNLOAD_NET 205
+#define IDC_DOWNLOAD_APP_RUNTIME 206
+#define IDC_DOWNLOAD_VC 207
+#define IDC_RECHECK 208
+#define IDC_NOTE 209
+#define IDC_LANGUAGE 210

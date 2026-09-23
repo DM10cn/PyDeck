@@ -2,13 +2,14 @@
 
 **English** · [简体中文](FEATURES.zh-CN.md) · [🏠 Home](../README.md)
 
-**Development preview 0.4.0** — “Implemented” means the code and UI exist, with validation limits described separately. Planned items are future work; ideas under consideration are not commitments.
+**Development preview 0.5.1** — “Implemented” means the code and UI exist, with validation limits described separately. Planned items are future work; ideas under consideration are not commitments.
 
 ## ✅ Implemented
 
 | Area | Current behavior |
 | --- | --- |
 | 🔌 PIM connection | Automatic discovery, file-picker replacement, validation before saving, and reconnect |
+| 🧰 Prerequisite recovery | Native Win32 startup window, official runtime downloads, recheck, independent MSIX preflight helper, and in-app PIM download / reconnect |
 | 🐍 Installed versions | Effective default, version, publisher, architecture, full executable path, search, and filters |
 | ⭐ Recommendations | Latest standard stable version, expandable older versions and specialized distributions |
 | 📥 Runtime actions | Exact-ID install, update, uninstall, default selection, terminal, folder, and path copy |
@@ -24,6 +25,7 @@
 | 📋 Activity | Bounded session output, errors, exit codes, and explicit copy action |
 | 🔐 Safeguards | Argument validation, ownership and stale-state checks, cross-instance operation lock, bounded output, and atomic configuration writes |
 | 📦 Preview packaging | Per-user MSI, MSIX, local certificate signing, separate runtime prerequisites, and stable upgrade identities |
+| 🗂️ MSI installation options | Editable folder, native folder browser, optional desktop / Start menu shortcuts, and choices preserved through repair and upgrades |
 | 🗜️ Source release archives | ZIP / tar.gz from the matching clean commit, bilingual install guide, and SHA-256 checksums |
 
 Only PIM-managed runtimes can be updated or removed. Uninstallation does not expose mid-operation cancellation. See [Security](../SECURITY.md) for trust boundaries.

@@ -228,5 +228,9 @@
   "Download stopped. An incomplete bundle may remain in the selected folder.": "Download stopped. An incomplete bundle may remain in the selected folder.",
   "Installation stopped. The version list has been refreshed; partial files may remain. Reinstall the version if needed.": "Installation stopped. The version list has been refreshed; partial files may remain. Reinstall the version if needed.",
   "Stopped, but the version list could not be refreshed. Refresh it before trying again.": "Stopped, but the version list could not be refreshed. Refresh it before trying again.",
-  "Operation stopped": "Operation stopped"
+  "Operation stopped": "Operation stopped",
+  "Download Python Install Manager": "Download Python Install Manager",
+  "Download Python Install Manager, then return here and check again.": "Download Python Install Manager, then return here and check again.",
+  "Check again": "Check again",
+  "After installing the manager, choose Auto-detect to connect without restarting PyDeck.": "After installing the manager, choose Auto-detect to connect without restarting PyDeck."
 }
