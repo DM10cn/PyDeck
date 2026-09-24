@@ -213,7 +213,7 @@ public sealed partial class MainWindow
         {
             var existing = installed.FirstOrDefault(r => r.Id.Equals(runtime.Id, StringComparison.OrdinalIgnoreCase));
             var install = palette.Action(existing is null ? "Install" : "Installed", existing is null ? "\uE896" : "\uE73E", primary: existing is null, compact: true);
-            install.IsEnabled = existing is null && !busy && connected;
+            install.IsEnabled = existing is null && !busy && connected && client.SupportsMutations;
             install.Click += async (_, _) => { if (OfflineSource) await InstallOfflineRuntimeAsync(runtime); else await ChangeRuntimeAsync(RuntimeAction.Install, runtime); };
             actions.Children.Add(install);
             if (!OfflineSource)
@@ -238,11 +238,13 @@ public sealed partial class MainWindow
             MenuFlyoutItem Item(string text, string glyph, Action action, bool enabled = true)
             { var item = new MenuFlyoutItem { Text = T(text), Icon = new FontIcon { Glyph = glyph }, IsEnabled = enabled }; item.Click += (_, _) => action(); menu.Items.Add(item); return item; }
             Item("Set as default", "\uE735", () => _ = SetDefaultAsync(runtime), !runtime.IsDefault);
-            Item("Check for updates", "\uE895", () => _ = ChangeRuntimeAsync(RuntimeAction.Update, runtime), runtime.IsManaged);
+            Item("Check for updates", "\uE895", () => _ = ChangeRuntimeAsync(RuntimeAction.Update, runtime), runtime.IsManaged && client.SupportsMutations);
             Item("Open installation folder", "\uE8B7", () => OpenFolder(runtime));
             Item("Copy executable path", "\uE8C8", () => Copy(runtime.Executable));
+            Item("Check installation", "\uE73E", () => _ = CheckRuntimeAsync(runtime), runtime.IsManaged);
+            Item("Reinstall to repair", "\uE90F", () => _ = ChangeRuntimeAsync(RuntimeAction.Repair, runtime), runtime.IsManaged && client.SupportsRepair && client.SupportsMutations);
             menu.Items.Add(new MenuFlyoutSeparator());
-            Item("Uninstall…", "\uE74D", () => _ = ChangeRuntimeAsync(RuntimeAction.Uninstall, runtime), runtime.IsManaged);
+            Item("Uninstall…", "\uE74D", () => _ = ChangeRuntimeAsync(RuntimeAction.Uninstall, runtime), runtime.IsManaged && client.SupportsMutations);
             more.Flyout = menu; actions.Children.Add(more);
         }
         Grid.SetColumn(actions, 2); grid.Children.Add(actions);

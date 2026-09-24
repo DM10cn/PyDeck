@@ -58,6 +58,13 @@ public sealed partial class MainWindow
         });
         OperationPhaseText.Text = progress.Percent is { } percent
             ? T(progress.Approximate ? "{0} · about {1}%" : "{0} · {1}%", label, percent) : label;
+        if (progress.DownloadedBytes is { } downloaded)
+        {
+            OperationPhaseText.Text += " · " + TransferUnits.Bytes(downloaded);
+            if (progress.TotalBytes is { } total) OperationPhaseText.Text += " / " + TransferUnits.Bytes(total);
+            if (progress.BytesPerSecond is { } speed) OperationPhaseText.Text += " · " + TransferUnits.Bytes(speed) + "/s";
+            OperationPhaseText.Text += " · " + (progress.Remaining is { } remaining ? T("About {0} s remaining", Math.Ceiling(remaining.TotalSeconds)) : T("Time remaining unknown"));
+        }
         OperationProgressBar.IsIndeterminate = progress.Percent is null;
         OperationProgressBar.Value = progress.Percent ?? 0;
         OperationProgressBar.Foreground = Palette.Brush(palette.Accent);
@@ -87,17 +94,23 @@ public sealed partial class MainWindow
         Log("Cancellation requested by the user.");
         StatusText.Text = T("Stopping…");
     }
-    private async Task ReconcileCancelledOperationAsync(bool download = false)
+    private async Task ReconcileCancelledOperationAsync(bool download = false, PythonRuntime? target = null)
     {
         operationCanCancel = false; UpdateOperationPanel();
         try
         {
             installed = await client.ListAsync();
+            if (!download && target is not null && installed.FirstOrDefault(r => r.Id == target.Id) is { } current)
+            {
+                var health = await RuntimeHealth.CheckAsync(current);
+                if (!health.Healthy) { Notify(health.Message, InfoBarSeverity.Warning); StatusText.Text = T("Operation stopped"); return; }
+            }
             Notify(download ? "Download stopped. An incomplete bundle may remain in the selected folder."
                 : "Installation stopped. The version list has been refreshed; partial files may remain. Reinstall the version if needed.", InfoBarSeverity.Warning);
         }
         catch (Exception ex)
         {
+            installed = [];
             Log("Post-cancellation refresh failed: " + ex.Message);
             Notify("Stopped, but the version list could not be refreshed. Refresh it before trying again.", InfoBarSeverity.Warning);
         }

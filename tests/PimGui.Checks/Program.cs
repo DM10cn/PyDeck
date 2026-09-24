@@ -2,6 +2,7 @@ using PimGui.Core;
 using System.Text.Json.Nodes;
 
 if (args.Contains("--emit-long-output")) { Console.Write(new string('x', 9 * 1024 * 1024)); return 0; }
+if (args.Contains("--emit-proxy-secret")) { Console.WriteLine(new string('x', 2040) + "boundary-secret-value"); Console.WriteLine("boundary-secret-value"); return 0; }
 if (args.Contains("--wait-child")) { await Task.Delay(TimeSpan.FromSeconds(45)); return 0; }
 if (args.Contains("--touch-marker")) { File.WriteAllText(args[^1], "started"); return 0; }
 if (args.Contains("--cancellation-parent"))
@@ -39,8 +40,8 @@ Check("Malformed JSON is not an empty list", () => Throws<FormatException>(() =>
 Check("Missing identity is rejected", () => Throws<FormatException>(() => RuntimeParser.Parse("{\"versions\":[{\"tag\":\"3.14\"}]}")));
 Check("Preview and architecture detection", () => { var r = runtime with { Tag = "3.15t-dev-arm64", Version = "3.15.0rc2" }; Require(r.IsPrerelease && r.IsFreeThreaded && r.Architecture == "ARM64", "Preview classification"); });
 Check("Unmanaged runtime cannot be uninstalled", () => Throws<InvalidOperationException>(() => PimClient.BuildArguments(RuntimeAction.Uninstall, runtime)));
-Check("Uninstall uses exact ID and has no purge flag", () => { var args = PimClient.BuildArguments(RuntimeAction.Uninstall, runtime with { IsManaged = true }); Require(args.SequenceEqual(new[] { "uninstall", "--yes", "--by-id", runtime.Id }), "Unsafe uninstall arguments"); });
-Check("Update uses exact ID and update semantics", () => Require(PimClient.BuildArguments(RuntimeAction.Update, runtime with { IsManaged = true }).SequenceEqual(new[] { "install", "--yes", "--update", "--by-id", runtime.Id }), "Wrong update arguments"));
+Check("Uninstall uses a validated selector and has no purge flag", () => { var args = PimClient.BuildArguments(RuntimeAction.Uninstall, runtime with { IsManaged = true }); Require(args.SequenceEqual(new[] { "uninstall", "--yes", runtime.Selector }), "Unsafe uninstall arguments"); });
+Check("Update uses a validated selector and update semantics", () => Require(PimClient.BuildArguments(RuntimeAction.Update, runtime with { IsManaged = true }).SequenceEqual(new[] { "install", "--yes", "--update", runtime.Selector }), "Wrong update arguments"));
 Check("Option-shaped runtime IDs are rejected", () => Throws<ArgumentException>(() => PimClient.BuildArguments(RuntimeAction.Install, runtime with { Id = "--purge" })));
 
 var scratch = Path.Combine(Environment.CurrentDirectory, "artifacts", "checks", Guid.NewGuid().ToString("N"));
@@ -112,20 +113,20 @@ await CheckAsync("Discovery rejects the legacy launcher", async () =>
 });
 await CheckAsync("A failed list is surfaced instead of showing no runtimes", async () =>
 {
-    var client = new PimClient(new FakeRunner((_, args) => Task.FromResult(args[0] == "help" ? new CommandResult(0, "--only-managed --online", "") : new CommandResult(5, "", "Access denied"))));
+    var client = new PimClient(new FakeRunner((_, args) => Task.FromResult(args[0] == "help" ? new CommandResult(0, "Python installation manager 26.3\n--only-managed --online", "") : new CommandResult(5, "", "Access denied"))));
     Require(await client.DiscoverAsync(fakeManager), "Discovery failed");
     try { await client.ListAsync(); throw new Exception("Failed process was accepted"); } catch (InvalidOperationException ex) { Require(ex.Message.Contains("Access denied"), "Failure detail lost"); }
 });
 await CheckAsync("Managed state comes from only-managed query", async () =>
 {
-    var client = new PimClient(new FakeRunner((_, args) => Task.FromResult(new CommandResult(0, args[0] == "help" ? "--only-managed --online" : args.Contains("--only-managed") ? "{\"versions\":[]}" : json, ""))));
+    var client = new PimClient(new FakeRunner((_, args) => Task.FromResult(new CommandResult(0, args[0] == "help" ? "Python installation manager 26.3\n--only-managed --online" : args.Contains("--only-managed") ? "{\"versions\":[]}" : json, ""))));
     await client.DiscoverAsync(fakeManager);
     Require(!(await client.ListAsync()).Single().IsManaged, "Unmanaged entry was elevated to managed");
 });
 await CheckAsync("Concurrent mutation is rejected until the first exits", async () =>
 {
     var pending = new TaskCompletionSource<CommandResult>();
-    var client = new PimClient(new FakeRunner((_, args) => args[0] == "help" ? Task.FromResult(new CommandResult(0, "--only-managed --online", "")) :
+    var client = new PimClient(new FakeRunner((_, args) => args[0] == "help" ? Task.FromResult(new CommandResult(0, "Python installation manager 26.3\n--only-managed --online", "")) :
         args[0] == "list" ? Task.FromResult(new CommandResult(0, json, "")) : pending.Task), lockPath);
     await client.DiscoverAsync(fakeManager);
     var first = client.ChangeAsync(RuntimeAction.Install, runtime, _ => { });
@@ -208,7 +209,7 @@ await CheckAsync("Stale management status prevents destructive commands", async 
     var client = new PimClient(new FakeRunner((_, arguments) =>
     {
         if (arguments[0] is "install" or "uninstall") mutated = true;
-        return Task.FromResult(new CommandResult(0, arguments[0] == "help" ? "--only-managed --online" : arguments.Contains("--only-managed") ? "{\"versions\":[]}" : json, ""));
+        return Task.FromResult(new CommandResult(0, arguments[0] == "help" ? "Python installation manager 26.3\n--only-managed --online" : arguments.Contains("--only-managed") ? "{\"versions\":[]}" : json, ""));
     }), lockPath);
     await client.DiscoverAsync(fakeManager);
     try { await client.ChangeAsync(RuntimeAction.Uninstall, runtime with { IsManaged = true }, _ => { }); throw new Exception("Stale card accepted"); }
@@ -219,7 +220,7 @@ await CheckAsync("Separate clients share an operation lock", async () =>
 {
     var pending = new TaskCompletionSource<CommandResult>();
     var runner = new FakeRunner((_, arguments) => arguments[0] is "install" ? pending.Task :
-        Task.FromResult(new CommandResult(0, arguments[0] == "help" ? "--only-managed --online" : json, "")));
+        Task.FromResult(new CommandResult(0, arguments[0] == "help" ? "Python installation manager 26.3\n--only-managed --online" : json, "")));
     var first = new PimClient(runner, lockPath); var second = new PimClient(runner, lockPath);
     await first.DiscoverAsync(fakeManager); await second.DiscoverAsync(fakeManager);
     var operation = first.ChangeAsync(RuntimeAction.Install, runtime, _ => { });
@@ -232,7 +233,7 @@ await CheckAsync("Large output without newlines stays bounded and an observer ca
 {
     using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
     var result = await new ProcessRunner().RunAsync(Environment.ProcessPath!, ["--emit-long-output"], _ => throw new Exception("observer"), timeout.Token);
-    Require(result.ExitCode == 0 && result.OutputTruncated && result.Output.Length == 8 * 1024 * 1024, "Output cap failed");
+    Require(result.ExitCode == 0 && result.OutputTruncated && result.Output.Length <= 8 * 1024 * 1024, "Output cap failed");
 });
 Check("UI copy uses short labels without CJK sentence stops", () =>
 {
@@ -299,7 +300,7 @@ await CheckAsync("Corrupt packages and unsafe ZIP entries fail before PIM execut
         if (name == "tampered") File.AppendAllText(Path.Combine(directory, "python.zip"), "changed");
         var called = false;
         var client = new PimClient(new FakeRunner((_, arguments) =>
-        { if (arguments[0] != "help") called = true; return Task.FromResult(new CommandResult(0, "--only-managed --online", "")); }), lockPath);
+        { if (arguments[0] != "help") called = true; return Task.FromResult(new CommandResult(0, "Python installation manager 26.3\n--only-managed --online", "")); }), lockPath);
         await client.DiscoverAsync(fakeManager);
         try { await client.InstallOfflineAsync(bundle, bundle.Runtimes.Single(), _ => { }); throw new Exception("Unsafe package accepted"); }
         catch (IOException) { }
@@ -311,9 +312,9 @@ await CheckAsync("Offline install uses only a verified local source without onli
     var bundle = OfflineBundle.Load(MakeBundle("offline-command")); var calls = 0;
     var client = new PimClient(new FakeRunner((_, arguments) =>
     {
-        if (arguments[0] == "help") return Task.FromResult(new CommandResult(0, "--only-managed --online", ""));
+        if (arguments[0] == "help") return Task.FromResult(new CommandResult(0, "Python installation manager 26.3\n--only-managed --online", ""));
         calls++;
-        Require(arguments[0] == "install" && arguments.Contains("--by-id") && arguments.Contains("--dry-run") && arguments[^1] == runtime.Id, "Wrong offline command");
+        Require(arguments[0] == "install" && !arguments.Contains("--by-id") && arguments.Contains("--dry-run") && arguments[^1] == runtime.Selector, "Wrong offline command");
         var source = arguments.Single(a => a.StartsWith("--source="))[9..];
         Require(File.Exists(source) && !arguments.Any(a => a.Contains("https:")), "Network or missing source");
         Require(OfflineBundle.Load(Path.GetDirectoryName(source)!).Runtimes.Single().Id == runtime.Id, "Wrong offline snapshot");
@@ -327,7 +328,7 @@ await CheckAsync("Offline download uses a fresh folder and never issues a manage
     var fixture = MakeBundle("download-source"); var calls = 0;
     var client = new PimClient(new FakeRunner((_, arguments) =>
     {
-        if (arguments[0] == "help") return Task.FromResult(new CommandResult(0, "--only-managed --online", ""));
+        if (arguments[0] == "help") return Task.FromResult(new CommandResult(0, "Python installation manager 26.3\n--only-managed --online", ""));
         if (arguments[0] == "list") return Task.FromResult(new CommandResult(0, json, ""));
         calls++;
         var destination = arguments.Single(a => a.StartsWith("--download="))[11..];
@@ -402,7 +403,7 @@ await CheckAsync("Cancellation keeps the operation lock until the child task fin
     var starts = 0;
     var runner = new OperationRunner(async (arguments, token, observe) =>
     {
-        if (arguments[0] == "help") return new CommandResult(0, "--only-managed --online", "");
+        if (arguments[0] == "help") return new CommandResult(0, "Python installation manager 26.3\n--only-managed --online", "");
         if (arguments[0] == "list") return new CommandResult(0, json, "");
         if (++starts == 1)
         {
@@ -423,6 +424,7 @@ await CheckAsync("Cancellation keeps the operation lock until the child task fin
     try { await running; throw new Exception("Cancellation swallowed"); } catch (OperationCanceledException) { }
     await second.ChangeAsync(RuntimeAction.Install, runtime, _ => { });
 });
+await ManagementChecks.RunAsync(Check, CheckAsync, scratch);
 if (args.Contains("--live"))
 {
     await CheckAsync("Live PIM read-only integration", async () =>

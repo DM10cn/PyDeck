@@ -2,7 +2,7 @@
 
 [English](INSTALL.md) · **简体中文** · [🏠 项目首页](https://github.com/DM10cn/PyDeck)
 
-🚧 **0.5.1 预览版 · Windows 11 x64**
+📦 **0.6.0 · Windows 11 x64**
 
 从 [GitHub Releases](https://github.com/DM10cn/PyDeck/releases) 下载文件，选择**一种**安装格式。MSI 与 MSIX 不能相互升级，切换格式前请卸载旧格式。两个安装器都不会移除 Python 安装，也不会主动删除 PyDeck 偏好设置
 
@@ -25,7 +25,7 @@
 | 入口 | 行为 |
 | --- | --- |
 | 已安装的 `PyDeck.Launcher.exe` / PyDeck 快捷方式 | 依赖齐全时启动 GUI，否则显示依赖窗口；手动安装缺失组件后，点击**重新检查**，再**打开 PyDeck** |
-| 独立的 `PyDeck-Dependencies-0.5.1-win-x64.exe` | 始终显示检查结果和下载入口，**打开 PyDeck 保持禁用**；即使放在应用旁边，也不安装或启动应用，请关闭工具后回到安装器或已安装的快捷方式 |
+| 独立的 `PyDeck-Dependencies-0.6.0-win-x64.exe` | 始终显示检查结果和下载入口，**打开 PyDeck 保持禁用**；即使放在应用旁边，也不安装或启动应用，请关闭工具后回到安装器或已安装的快捷方式 |
 
 **下载**按钮打开 Microsoft 官方来源，工具不执行安装程序、自行提权或修改证书信任。独立工具按非打包环境检查，也会提示 VC++；MSIX 自身能否安装，以 Windows 的包依赖检查为准
 
@@ -37,11 +37,13 @@ MSIX 缺少框架时可能在包内启动器运行前就被阻止安装，可先
 
 ### 🐍 连接 Python Install Manager
 
+**0.6.0**修改 Python 安装需要 PIM **26.3 或更高版本**，旧版或无法识别的管理器仅支持兼容的只读查询，升级后请重新连接。详见 [Python 管理](MANAGEMENT.zh-CN.md)，已发布的 0.5.1 安装包尚无这项能力限制
+
 GUI 运行时齐全后，可在未安装 PIM 时打开 PyDeck。在未连接页面或设置中选择**下载 Python Install Manager**，从 Python 官方 Windows 页面手动安装，再点击**重新检查**或**自动检测**，也可在设置中选择管理器文件。按钮只打开下载页面或重新连接，不自行安装 PIM；重连无需重启 PyDeck
 
 ## 🛠️ MSI
 
-1. 下载 `PyDeck-0.5.1-win-x64.msi`
+1. 下载 `PyDeck-0.6.0-win-x64.msi`
 2. 输入安装目录，或点击 **Browse…（浏览）** 打开 Windows 文件夹选择窗口
 3. 按需勾选**创建桌面快捷方式**与**添加到开始菜单**，默认仅勾选开始菜单
 4. 完成安装，从所选快捷方式打开 **PyDeck**
@@ -53,20 +55,20 @@ MSI 为当前用户安装，默认目录为 `%LocalAppData%\Programs\PyDeck`，�
 🧑‍💻 当前用户的静默安装也可使用相同选项，`0` 表示关闭，`1` 表示开启
 
 ```powershell
-msiexec /i PyDeck-0.5.1-win-x64.msi /qn INSTALLFOLDER="D:\Apps\PyDeck" DESKTOPSHORTCUT=1 STARTMENUSHORTCUT=0
+msiexec /i PyDeck-0.6.0-win-x64.msi /qn INSTALLFOLDER="D:\Apps\PyDeck" DESKTOPSHORTCUT=1 STARTMENUSHORTCUT=0
 ```
 
 请选择当前账号有写入权限的目录。原生文件夹选择窗口不依赖 .NET；MSIX 的安装位置由 Windows 管理，不提供这些 MSI 选项
 
-预览版使用自签证书，Windows 不会将其识别为公开受信任的发布者。安装 MSI 不要求导入预览证书，遇到 Windows 提示时请先核对下载来源，再决定是否继续
+0.6.0 仍使用自签证书，Windows 不会将其识别为公开受信任的发布者。安装 MSI 不要求导入预览证书，遇到 Windows 提示时请先核对下载来源，再决定是否继续
 
 较新的 MSI 会升级同一用户的安装，旧版本会被阻止。可从 **设置 → 应用 → 安装的应用** 卸载，只移除安装器自身的文件和快捷方式，不卸载 Python 或共享运行时
 
-## 🪟 MSIX — 自签预览版
+## 🪟 MSIX — 自签安装包
 
-MSIX 要求签名证书受信任，本预览版**没有公开信任的签名**。请仅在核对文件并确实准备测试 PyDeck 时信任预览发布者，签名私钥不会分发
+MSIX 要求签名证书受信任，此安装包**没有公开信任的签名**。请仅在核对文件并确实准备使用 PyDeck 时信任该发布者，签名私钥不会分发
 
-1. 从同一发行页下载 `PyDeck-0.5.1-win-x64.msix`、`PyDeck-preview.cer` 和 `SHA256SUMS.txt`
+1. 从同一发行页下载 `PyDeck-0.6.0-win-x64.msix`、`PyDeck-preview.cer` 和 `SHA256SUMS.txt`
 2. 使用 `Get-FileHash -Algorithm SHA256`，将文件哈希与 `SHA256SUMS.txt` 对照
 3. 检查证书：发布者 **CN=DM10cn**，指纹 **3912817E181E5EA9AF0DED6BC51E332E99BBDD16**
 4. 将公开证书导入 **本地计算机 → 受信任人（Trusted People）**，再打开 MSIX
@@ -80,7 +82,7 @@ Import-Certificate -FilePath .\PyDeck-preview.cer -CertStoreLocation Cert:\Local
 随后以正常桌面用户安装
 
 ```powershell
-Add-AppxPackage -Path .\PyDeck-0.5.1-win-x64.msix
+Add-AppxPackage -Path .\PyDeck-0.6.0-win-x64.msix
 ```
 
 **不要**导入“受信任的根证书颁发机构”。PyDeck 的脚本不会自动导入证书或更改系统信任设置。当前预览证书于 **2028-09-23** 到期，安装包未加用于长期分发的时间戳
@@ -97,8 +99,8 @@ MSI 使用固定升级标识，MSIX 使用包名 `DM10cn.PyDeck` 和发布者 `C
 
 ## 🗜️ 源码归档
 
-`PyDeck-0.5.1-source.zip` 和 `PyDeck-0.5.1-source.tar.gz` 仅包含发行提交中的文件，排除构建产物、日志、本地设置、包缓存和签名密钥，也可使用 GitHub 自动提供的源码链接。发行归档和随附指南保留发布时的快照，后续文档修正见[仓库当前指南](https://github.com/DM10cn/PyDeck/blob/main/docs/INSTALL.zh-CN.md)，不替换已打标签的源码或签名安装包
+`PyDeck-0.6.0-source.zip` 和 `PyDeck-0.6.0-source.tar.gz` 仅包含发行提交中的文件，排除构建产物、日志、本地设置、包缓存和签名密钥，也可使用 GitHub 自动提供的源码链接。发行归档和随附指南保留发布时的快照，后续文档修正见[仓库当前指南](https://github.com/DM10cn/PyDeck/blob/main/docs/INSTALL.zh-CN.md)，不替换已打标签的源码或签名安装包
 
-## 🧪 预览版边界
+## 🧪 验证边界
 
-这是预览版，本机安装和激活检查不能替代干净机器、辅助功能、所有 DPI 设置及完整 Python 安装 / 更新 / 卸载验收，详见仓库中的 [功能状态](https://github.com/DM10cn/PyDeck/blob/main/docs/FEATURES.zh-CN.md)
+正式 Release 状态不代表覆盖所有环境；本机安装和激活检查不能替代干净机器 GUI、辅助功能和所有 DPI 验收。Python 生命周期使用一次性 Sandbox 验收，详见仓库中的 [功能状态](https://github.com/DM10cn/PyDeck/blob/main/docs/FEATURES.zh-CN.md)

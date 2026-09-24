@@ -74,6 +74,8 @@ public sealed partial class MainWindow
                 throw new InvalidOperationException("Specialized package preference was not applied.");
             SavePreferences(preferences with { ShowPreviewReleases = false, ShowSpecializedPackages = false, DefaultArchitecture = "x64" });
             checks.Add("Python defaults drive catalog filtering and expansion; manager location is read-only.");
+            await CheckManagementSettingsAsync(directory);
+            checks.Add("Four-language network / PIM configuration dialogs, read-only PATH diagnostics, and actual byte progress rendered without saving user settings.");
             SaveAppearance("Fluent", "Dark"); Navigate("runtimes"); architecture = "All architectures"; RenderPage();
             await CaptureAsync(Path.Combine(directory, "04-fluent-dark-runtimes.png"));
             SavePreferences(preferences with { Transparency = "Off" });
@@ -213,14 +215,42 @@ public sealed partial class MainWindow
         }
         SavePreferences(preferences with { Language = "en-US" });
     }
-    private async Task<ContentDialog> WaitForCancellationDialogAsync()
+    private async Task CheckManagementSettingsAsync(string directory)
+    {
+        foreach (var language in Strings.Languages)
+        {
+            SavePreferences(preferences with { Language = language }); Navigate("settings");
+            var editing = EditNetworkAsync();
+            var dialog = await WaitForCancellationDialogAsync("Network");
+            if (!Descendants(dialog).OfType<PasswordBox>().Any() || !Descendants(dialog).OfType<TextBlock>().Any(t => t.Text == T("Passwords are stored in Windows Credential Manager")))
+                throw new IOException("Network dialog missing protected credential UI");
+            await CaptureAsync(Path.Combine(directory, "15-network-" + language + ".png"), dialog);
+            dialog.Hide(); await editing;
+            editing = EditPimConfigurationAsync();
+            dialog = await WaitForCancellationDialogAsync("PIM configuration");
+            if (Descendants(dialog).OfType<ComboBox>().Count() < 4) throw new IOException("Configuration choices missing");
+            await CaptureAsync(Path.Combine(directory, "16-pim-config-" + language + ".png"), dialog);
+            dialog.Hide(); await editing;
+            var operation = BeginOperation("Download", download: true);
+            operation.Transfer(2 * 1024 * 1024, 4 * 1024 * 1024, 1024 * 1024, TimeSpan.FromSeconds(2));
+            UpdateOperationPanel();
+            if (!OperationPhaseText.Text.Contains("MB") || OperationProgressBar.Value != 50) throw new IOException("Measured transfer not displayed");
+            FinishOperation(operation);
+        }
+        SavePreferences(preferences with { Language = "en-US" });
+        var inspecting = ShowPathDiagnosticsAsync();
+        var diagnostics = await WaitForCancellationDialogAsync("PATH and aliases");
+        await CaptureAsync(Path.Combine(directory, "17-path-diagnostics.png"), diagnostics);
+        diagnostics.Hide(); await inspecting;
+    }
+    private async Task<ContentDialog> WaitForCancellationDialogAsync(string title = "Stop this installation?")
     {
         ContentDialog? dialog = null;
         await WaitForSmokeConditionAsync(() =>
         {
             dialog = VisualTreeHelper.GetOpenPopupsForXamlRoot(Root.XamlRoot)
                 .SelectMany(popup => new[] { popup.Child }.Concat(Descendants(popup.Child)))
-                .OfType<ContentDialog>().SingleOrDefault(item => item.Title as string == T("Stop this installation?"));
+                .OfType<ContentDialog>().SingleOrDefault(item => item.Title as string == T(title));
             return dialog is not null;
         }, "Stop confirmation did not open.");
         return dialog!;
@@ -284,12 +314,12 @@ public sealed partial class MainWindow
         }
     }
 
-    private async Task CaptureAsync(string path)
+    private async Task CaptureAsync(string path, UIElement? element = null)
     {
         Root.UpdateLayout();
         await Task.Delay(500);
         var target = new RenderTargetBitmap();
-        await target.RenderAsync(Root);
+        await target.RenderAsync(element ?? Root);
         if (target.PixelWidth == 0 || target.PixelHeight == 0) throw new InvalidOperationException("The window did not render.");
         var pixels = await target.GetPixelsAsync();
         using var reader = DataReader.FromBuffer(pixels);

@@ -3,4 +3,5 @@
   <Project Path="src/PimGui.Core/PimGui.Core.csproj" />
   <Project Path="src/PimGui.App/PimGui.App.csproj" />
   <Project Path="tests/PimGui.Checks/PimGui.Checks.csproj" />
+  <Project Path="tests/PimGui.E2E/PimGui.E2E.csproj" />
 </Solution>

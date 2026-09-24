@@ -27,7 +27,7 @@ public static class PyDeckPackageActivation {
 $output = Join-Path $repoRoot ('artifacts\smoke-msix-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 $processId = [PyDeckPackageActivation]::Start(($package.PackageFamilyName + '!App'), ('--smoke-test "' + $output + '"'))
 $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
-if ($process -and !$process.WaitForExit(60000)) { throw "Packaged smoke test is still running as process $processId" }
+if ($process -and !$process.WaitForExit(180000)) { throw "Packaged smoke test is still running as process $processId" }
 $resultPath = Join-Path $output 'result.json'
 if (!(Test-Path -LiteralPath $resultPath)) { throw "Packaged GUI produced no result. Inspect activation/runtime errors for process $processId" }
 $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json

@@ -3,7 +3,8 @@ using System.Text;
 namespace PimGui.Core;
 
 public enum OperationPhase { Preparing, Downloading, Verifying, Extracting, Finalizing, Stopping }
-public sealed record OperationProgress(OperationPhase Phase, int? Percent = null, bool Approximate = false);
+public sealed record OperationProgress(OperationPhase Phase, int? Percent = null, bool Approximate = false,
+    long? DownloadedBytes = null, long? TotalBytes = null, double? BytesPerSecond = null, TimeSpan? Remaining = null);
 
 /// <summary>One user operation: cancellation and stage progress, independent of any page.</summary>
 public sealed class PimOperation(Action<OperationProgress>? changed = null) : IDisposable
@@ -42,6 +43,16 @@ public sealed class PimOperation(Action<OperationProgress>? changed = null) : ID
                 else if (progressLine.Length < 256) progressLine.Append(character);
             }
             ParseLine();
+        }
+    }
+    public void Transfer(long bytes, long? total, double? speed, TimeSpan? remaining)
+    {
+        lock (gate)
+        {
+            if (IsCancellationRequested) return;
+            current = new(OperationPhase.Downloading, total is > 0 ? (int)Math.Min(100, bytes * 100 / total.Value) : null,
+                false, bytes, total, speed, remaining);
+            try { changed?.Invoke(current); } catch (Exception) { }
         }
     }
     private void ParseLine(bool ended = false)

@@ -22,7 +22,7 @@ $thumbprint = .\scripts\New-PreviewCertificate.ps1
 
 脚本在 `CurrentUser\My` 中创建或复用代码签名证书，私钥不可导出，不导入受信任根证书，也不导出 PFX。请保留签名账号和密钥供后续更新使用；即使主题文字相同，开发者新生成的证书也不等于正式发行使用的证书
 
-发行脚本签署应用 EXE、MSI 和 MSIX，仅导出公开 `.cer`。自签预览版的 MSIX 用户需要手动信任证书，详见 [安装说明](INSTALL.zh-CN.md)。公开受信任的正式签名仍属后续工作，当前预览包不带时间戳
+发行脚本签署应用 EXE、MSI 和 MSIX，仅导出公开 `.cer`。自签包（包括 0.6.0）的 MSIX 用户需要手动信任证书，详见 [安装说明](INSTALL.zh-CN.md)。公开受信任的正式签名仍属后续工作，当前包不带时间戳。正式 Release 状态不等于证书公开受信任，`PyDeck-preview.cer` 沿用历史文件名与签名身份
 
 原生 `PyDeck.Launcher.exe` 也会签名，并将相同签名文件复制为 `PyDeck-Dependencies-<版本>-win-x64.exe`。文件名决定独立检查模式，该模式不启动相邻应用，发行时请一并上传。MSI 允许在缺少 GUI 运行时时安装；其快捷方式与 MSIX 激活均使用已安装的启动器，MSIX 框架依赖仍然必须满足。用户依赖与恢复步骤统一见 [INSTALL.zh-CN.md](INSTALL.zh-CN.md)
 
@@ -72,7 +72,7 @@ powershell.exe -NoProfile -File .\scripts\Smoke-Packaged.ps1
 
 导出要求 Git 工作区干净，且提交与安装包构建记录一致。ZIP 与 tar.gz 使用 `git archive`，不包含被忽略的文件或签名密钥；脚本还附上双语安装说明、只读依赖检查脚本和所有发行附件的 SHA-256 校验值
 
-在 GitHub 创建 **pre-release**，版本标签固定到同一提交。仅上传 `assets/` 中经过检查的文件，核对远端哈希，并说明已验证范围与剩余限制。不要上传 `build.json`、`work/`、日志、截图、PFX、缓存或整个 `artifacts/`
+从 **0.6.0** 起，在 GitHub 创建普通正式 Release，`v<版本>` 标签固定到同一提交，并设为 Latest。历史 0.4.0 / 0.5.1 的发行标签使用 `-beta` 后缀，也改为普通 Release，但不设为 Latest；原标签可作为兼容引用保留，仍指向未变更的提交。仅上传 `assets/` 中经过检查的文件，核对远端哈希，并说明已验证范围与剩余限制。不要上传 `build.json`、`work/`、日志、截图、PFX、缓存或整个 `artifacts/`
 
 📝 仅修正文档时，可提交到 `main`，无需重编未变更的应用或提高应用版本。已发布标签、签名安装包、源码归档与原校验值保持不变，发行说明链接到修正后的仓库指南；随附指南和归档源码保留原发行提交的快照
 

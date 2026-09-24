@@ -46,6 +46,7 @@ dotnet restore PimGui.slnx --locked-mode -p:Platform=x64
 | `src/PimGui.App` | WinUI pages, semantic design tokens, appearance policy, operation panel, and in-app smoke checks |
 | `src/PyDeck.Launcher` | Win32 prerequisite dialog, system-only imports, official download links, and guarded GUI startup |
 | `packaging/msi` | WiX install options and native folder-picker / preference actions with a static C++ runtime |
+| `tests/PimGui.E2E` | Destructive Python lifecycle harness, guarded for disposable Windows Sandbox only |
 | `tests/PimGui.Checks` | C# core regressions and opt-in PIM integration checks |
 | `tests/Launcher.Checks.cpp` | Native prerequisite combinations, dialog controls, language choices, and recheck behavior |
 | `scripts` | Build, launch, GUI smoke test, and icon generation |
@@ -86,6 +87,18 @@ dotnet run --project tests/PimGui.Checks -- --offline-fixture "C:\TestBundles\Py
 These checks require PIM and can create temporary test files; the download check uses the network. They do not install into the normal PIM-managed runtime location. Logs and screenshots can contain local paths and should be reviewed before sharing.
 
 See [feature status](FEATURES.md) for the current validation record and outstanding acceptance work. MSI / MSIX installation checks are covered by the [release workflow](RELEASING.md); they do not validate the complete Python interpreter lifecycle.
+
+## 🐍 Isolated lifecycle acceptance
+
+Use Windows 11 with the Windows Sandbox CLI (`wsb`). The script creates and stops its own headless sandbox and never uses daily Python installations:
+
+```powershell
+.\scripts\Test-PimLifecycle.ps1
+```
+
+It tests official PIM 25.2 → 26.3, an actual Python patch update, damage / repair, measured downloads, cancellation, default changes, uninstall, and offline reinstall. `-SeedBundleDirectory` accepts a flat older official offline bundle; `-InstallerDirectory` reuses cached `pim-25.2.msi` / `pim-26.3.msi`, still checking PSF Authenticode signatures. Results are written under `artifacts/pim-e2e-*`. A failed case stops dependent cases; unexecuted cases are not passes.
+
+Do not run the harness by creating its marker on the host. PIM registration cleanup has user-wide effects even with a separate installation directory. The sandbox uses its disposable System account, so this does not replace all interactive-user, Store-package, policy, or clean-machine GUI acceptance. See [Python management](MANAGEMENT.md).
 
 ## 🎨 Appearance and localization
 

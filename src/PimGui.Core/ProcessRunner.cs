@@ -12,7 +12,7 @@ public interface IProcessRunner
         Action<string>? output = null, CancellationToken cancellationToken = default, Action<ProcessOutput>? observe = null);
 }
 
-public sealed class ProcessRunner : IProcessRunner
+public sealed class ProcessRunner(Func<NetworkSettings>? network = null, Func<string?>? password = null) : IProcessRunner
 {
     public async Task<CommandResult> RunAsync(string executable, IReadOnlyList<string> arguments,
         Action<string>? output = null, CancellationToken cancellationToken = default, Action<ProcessOutput>? observe = null)
@@ -26,6 +26,9 @@ public sealed class ProcessRunner : IProcessRunner
             WorkingDirectory = Path.GetTempPath()
         };
         foreach (var argument in arguments) start.ArgumentList.Add(argument);
+        var secret = password?.Invoke();
+        if (network is not null)
+            foreach (var item in network().Environment(secret)) start.Environment[item.Key] = item.Value;
         start.Environment["PYTHONUTF8"] = "1";
         start.Environment["PYTHON_COLORS"] = "0";
         start.Environment["NO_COLOR"] = "1";
@@ -44,15 +47,18 @@ public sealed class ProcessRunner : IProcessRunner
         {
             var buffer = new StringBuilder();
             var line = new StringBuilder();
+            var longLine = false;
             var chunk = new char[2048];
             void Report()
             {
                 if (output is not null && Interlocked.Increment(ref notifications) <= 2000)
                 {
                     // Observers must never stop pipe draining and deadlock the child process.
-                    try { output(line.ToString()); } catch (Exception) { }
+                    // Never emit a cut fragment that might contain only half of a credential.
+                    try { output(longLine ? "[Long output line omitted]" : SensitiveText.Redact(line.ToString(), secret)); } catch (Exception) { }
                 }
                 line.Clear();
+                longLine = false;
             }
             while (await reader.ReadAsync(chunk) is var count && count > 0)
             {
@@ -64,11 +70,19 @@ public sealed class ProcessRunner : IProcessRunner
                 foreach (var ch in chunk.AsSpan(0, count))
                 {
                     if (ch == '\n') Report();
-                    else if (ch != '\r') { line.Append(ch); if (line.Length == 2048) Report(); }
+                    else if (ch != '\r' && !longLine)
+                    {
+                        if (line.Length == 2048) { longLine = true; line.Clear(); }
+                        else line.Append(ch);
+                    }
                 }
             }
-            if (line.Length > 0) Report();
-            return buffer.ToString();
+            if (line.Length > 0 || longLine) Report();
+            // A bounded capture can also end in the middle of a credential.
+            var capturedText = buffer.ToString();
+            if (buffer.Length == 8 * 1024 * 1024)
+                capturedText = capturedText[..(capturedText.LastIndexOf('\n') + 1)];
+            return capturedText;
         }
         var stdout = ReadAsync(process.StandardOutput, false);
         var stderr = ReadAsync(process.StandardError, true);
@@ -93,6 +107,6 @@ public sealed class ProcessRunner : IProcessRunner
         }
         var captured = await Task.WhenAll(stdout, stderr);
         if (notifications > 2000) { try { output?.Invoke("Further live output omitted; the operation continued normally."); } catch (Exception) { } }
-        return new(process.ExitCode, captured[0], captured[1], truncated != 0);
+        return new(process.ExitCode, SensitiveText.Redact(captured[0], secret), SensitiveText.Redact(captured[1], secret), truncated != 0);
     }
 }

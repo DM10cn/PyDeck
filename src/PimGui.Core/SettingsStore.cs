@@ -16,6 +16,7 @@ public sealed record AppSettings
     public bool ShowPreviewReleases { get; init; }
     public bool ShowSpecializedPackages { get; init; }
     public bool ConfirmBeforeUninstall { get; init; } = true;
+    public NetworkSettings Network { get; init; } = new();
 
     public AppSettings Normalize() => this with
     {
@@ -26,7 +27,8 @@ public sealed record AppSettings
         Backdrop = Backdrop is "Mica" or "Acrylic" ? Backdrop : "Mica",
         DefaultArchitecture = DefaultArchitecture is "x64" or "ARM64" or "x86" ? DefaultArchitecture : "x64",
         CatalogSource = CatalogSource is "Online" or "Offline" ? CatalogSource : "Online",
-        ManagerPath = ManagerPath?.Trim() ?? ""
+        ManagerPath = ManagerPath?.Trim() ?? "",
+        Network = Network ?? new()
     };
 }
 
@@ -55,10 +57,12 @@ public sealed class SettingsStore(string directory)
 
 public static class AtomicJson
 {
-    public static void Write(string path, string text)
+    public static void Write(string path, string text, string? expectedOriginal = null, bool checkOriginal = false)
     {
         SafeFiles.RequireNoLinks(path);
         var originalHash = File.Exists(path) ? Fingerprint(path) : null;
+        if (checkOriginal && (File.Exists(path) ? SafeFiles.ReadText(path) : null) != expectedOriginal)
+            throw new IOException("The configuration changed while saving. Try again.");
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {

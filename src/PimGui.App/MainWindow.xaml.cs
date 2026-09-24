@@ -53,6 +53,7 @@ public sealed partial class MainWindow : Window
         preferences = store.Load();
         if (smokeDirectory is null && !File.Exists(store.FilePath))
             preferences = new SettingsStore(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PimGui")).Load();
+        client = CreateClient();
         InitializeSystemAppearance();
         ExtendsContentIntoTitleBar = true;
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
@@ -109,7 +110,7 @@ public sealed partial class MainWindow : Window
         ConnectionCard.Background = Palette.Brush(palette.Card);
         ConnectionCard.CornerRadius = new(palette.Tokens.IconRadius);
         ConnectionDot.Fill = Palette.Brush(connected ? palette.Green : palette.Muted);
-        StyleStatus.Text = palette.Tokens.Name + "  ·  PyDeck 0.4";
+        StyleStatus.Text = palette.Tokens.Name + "  ·  PyDeck " + typeof(MainWindow).Assembly.GetName().Version?.ToString(3);
         AppWindow.TitleBar.ButtonBackgroundColor = Colors.Transparent;
         AppWindow.TitleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
         AppWindow.TitleBar.ButtonForegroundColor = palette.Text;
@@ -213,42 +214,33 @@ public sealed partial class MainWindow : Window
     private async Task ChangeRuntimeAsync(RuntimeAction action, PythonRuntime runtime)
     {
         if (busy || !connected || confirmationOpen) return;
-        if (action == RuntimeAction.Uninstall && preferences.ConfirmBeforeUninstall)
+        if ((action == RuntimeAction.Uninstall && preferences.ConfirmBeforeUninstall) || action == RuntimeAction.Repair)
         {
             confirmationOpen = true;
             try
             {
-                var dialog = Dialog(T("Uninstall {0}?", RuntimeTitle(runtime)),
-                    T("This removes this Python runtime and its installed packages. Projects outside its installation folder are not removed.") + "\n\n" + runtime.Prefix, "Uninstall");
+                var dialog = action == RuntimeAction.Repair
+                    ? Dialog("Reinstall to repair", T("PIM will replace this interpreter. Packages installed in its folder may be removed. Projects outside that folder are not removed") + "\n\n" + runtime.Prefix, "Repair")
+                    : Dialog(T("Uninstall {0}?", RuntimeTitle(runtime)), T("This removes this Python runtime and its installed packages. Projects outside its installation folder are not removed.") + "\n\n" + runtime.Prefix, "Uninstall");
                 if (await dialog.ShowAsync() != ContentDialogResult.Primary || busy) return;
             }
             catch (Exception ex) { ShowError(ex); return; }
             finally { confirmationOpen = false; }
         }
-        var verb = action switch { RuntimeAction.Install => "Installing", RuntimeAction.Update => "Updating", _ => "Uninstalling" };
+        var verb = action switch { RuntimeAction.Install => "Installing", RuntimeAction.Update => "Updating", RuntimeAction.Repair => "Repair", _ => "Uninstalling" };
         MessageBar.IsOpen = false;
-        var operation = action == RuntimeAction.Uninstall ? null : BeginOperation(T(action == RuntimeAction.Install ? "Installing {0}…" : "Updating {0}…", RuntimeTitle(runtime)));
-        SetBusy(true, T(action switch { RuntimeAction.Install => "Installing {0}…", RuntimeAction.Update => "Updating {0}…", _ => "Uninstalling {0}…" }, RuntimeTitle(runtime)));
+        var operation = action == RuntimeAction.Uninstall ? null : BeginOperation(T(action switch { RuntimeAction.Install => "Installing {0}…", RuntimeAction.Repair => "Repairing {0}…", _ => "Updating {0}…" }, RuntimeTitle(runtime)));
+        SetBusy(true, T(action switch { RuntimeAction.Install => "Installing {0}…", RuntimeAction.Update => "Updating {0}…", RuntimeAction.Repair => "Repairing {0}…", _ => "Uninstalling {0}…" }, RuntimeTitle(runtime)));
         Log($"{verb} {runtime.DisplayName} ({runtime.Id}).");
         try
         {
             var result = await client.ChangeAsync(action, runtime, line => DispatcherQueue.TryEnqueue(() => Log(line)), operation);
             if (operation is not null) FinalizingOperation(operation);
             Log($"Process finished. Exit code: {result.ExitCode}.");
-            try { installed = await client.ListAsync(); }
-            catch (Exception refreshError)
-            {
-                Notify(T("The operation finished, but the version list could not be refreshed.") + " " + T(refreshError.Message), InfoBarSeverity.Warning);
-                return;
-            }
-            bool present = installed.Any(r => r.Id.Equals(runtime.Id, StringComparison.OrdinalIgnoreCase));
-            if ((action == RuntimeAction.Uninstall && present) || (action == RuntimeAction.Install && !present))
-                Notify("The command finished, but the refreshed list does not match the expected result. Check Activity for details.", InfoBarSeverity.Warning);
-            else Notify(action == RuntimeAction.Update ? "Update check complete. Your installed version is shown below." : "Your Python versions are up to date.", InfoBarSeverity.Success);
-            StatusText.Text = T("Operation complete");
+            await VerifyOperationAsync(action, client.LastExpectedRuntime ?? runtime);
         }
-        catch (OperationCanceledException) when (operation?.IsCancellationRequested == true) { await ReconcileCancelledOperationAsync(); }
-        catch (Exception ex) { ShowError(ex); }
+        catch (OperationCanceledException) when (operation?.IsCancellationRequested == true) { await ReconcileCancelledOperationAsync(target: runtime); }
+        catch (Exception ex) { try { installed = await client.ListAsync(); } catch { installed = []; } ShowError(ex); }
         finally { FinishOperation(operation); SetBusy(false); UpdateConnection(); RenderPage(); }
     }
 
@@ -286,6 +278,8 @@ public sealed partial class MainWindow : Window
     private void ShowError(Exception ex)
     {
         var message = ex is OperationCanceledException ? "The request timed out. Check your connection and try again." : ex.Message;
+        string? secret = null; try { secret = ProxyPassword(); } catch { }
+        message = SensitiveText.Redact(message, secret);
         Log("ERROR · " + message);
         Notify(message, InfoBarSeverity.Error);
         StatusText.Text = T("Action needed · see Activity for details");

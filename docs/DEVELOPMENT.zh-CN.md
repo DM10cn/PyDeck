@@ -46,6 +46,7 @@ dotnet restore PimGui.slnx --locked-mode -p:Platform=x64
 | `src/PimGui.App` | WinUI 页面、语义设计 token、外观策略、操作面板和应用内冒烟检查 |
 | `src/PyDeck.Launcher` | Win32 依赖窗口、系统 DLL 导入、官方下载链接和受控 GUI 启动 |
 | `packaging/msi` | WiX 安装选项、原生文件夹选择与设置操作，静态链接 C++ 基础库 |
+| `tests/PimGui.E2E` | 破坏性 Python 生命周期测试，仅在一次性 Windows Sandbox 中运行 |
 | `tests/PimGui.Checks` | C# 核心回归检查和按需启用的 PIM 集成检查 |
 | `tests/Launcher.Checks.cpp` | 原生依赖组合、窗口控件、语言选择和重新检查行为 |
 | `scripts` | 构建、启动、GUI 冒烟测试和图标生成 |
@@ -86,6 +87,18 @@ dotnet run --project tests/PimGui.Checks -- --offline-fixture "C:\TestBundles\Py
 这些检查需要 PIM，可能创建临时测试文件，下载检查还会访问网络；不会安装到常规 PIM 管理的解释器目录。日志和截图可能包含本地路径，分享前请检查
 
 已完成的验证与待验收项目统一见[功能状态](FEATURES.zh-CN.md)。MSI / MSIX 安装检查见[发行流程](RELEASING.zh-CN.md)，这些检查不能证明完整 Python 解释器生命周期已经通过
+
+## 🐍 隔离生命周期验收
+
+需要带 Windows Sandbox CLI（`wsb`）的 Windows 11。脚本创建并关闭自己的无界面沙盒，不使用日常 Python 安装：
+
+```powershell
+.\scripts\Test-PimLifecycle.ps1
+```
+
+覆盖官方 PIM 25.2 → 26.3、真实 Python 补丁更新、损坏与修复、下载统计、取消、默认切换、卸载和离线重装。`-SeedBundleDirectory` 可指定平铺的较旧官方离线包；`-InstallerDirectory` 可复用缓存的 `pim-25.2.msi` / `pim-26.3.msi`，仍检查 PSF Authenticode 签名。结果位于 `artifacts/pim-e2e-*`，某项失败会停止后续依赖项，未执行不能计为通过
+
+不要在宿主机创建标记来运行测试。即使安装目录隔离，PIM 的注册清理仍有用户级影响。沙盒使用一次性的 System 账号，因此不能替代所有交互用户、Store 包、管理员策略或干净机器 GUI 验收。详见 [Python 管理](MANAGEMENT.zh-CN.md)
 
 ## 🎨 外观与本地化
 

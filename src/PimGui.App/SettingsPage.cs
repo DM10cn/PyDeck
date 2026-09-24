@@ -70,6 +70,7 @@ public sealed partial class MainWindow
         python.Children.Add(SettingRow("Confirm before uninstall", null, Toggle(preferences.ConfirmBeforeUninstall,
             value => SavePreferences(preferences with { ConfirmBeforeUninstall = value }), "Confirm before uninstall")));
         body.Children.Add(palette.CardBox(python));
+        body.Children.Add(ManagementSettings());
 
         var manager = new StackPanel { Spacing = 12, Tag = "ManagerLocation" };
         manager.Children.Add(palette.Label("Python Install Manager location", 19, true));
@@ -103,7 +104,7 @@ public sealed partial class MainWindow
         var about = new StackPanel { Spacing = 10 };
         about.Children.Add(palette.Label("About", 19, true));
         about.Children.Add(palette.Label("PyDeck", 24, true));
-        about.Children.Add(palette.Label(T("Version {0} · Development preview", "0.5.1"), 12, muted: true));
+        about.Children.Add(palette.Label(T("Version {0}", typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? ""), 12, muted: true));
         about.Children.Add(palette.Label("A desktop companion for managing Python installations with Python Install Manager.", 13));
         about.Children.Add(palette.Label("Independent project. Not affiliated with the Python Software Foundation.", 12, muted: true));
         about.Children.Add(palette.Label("Built with WinUI 3. .NET and Windows App Runtime are installed separately.", 12, muted: true));
@@ -168,7 +169,7 @@ public sealed partial class MainWindow
         try
         {
             // Validate before committing the preference or discarding the old connection.
-            var candidate = new PimClient(new ProcessRunner());
+            var candidate = CreateClient();
             if (!await candidate.DiscoverAsync(path)) throw new InvalidOperationException(candidate.LastDiscoveryError);
             var versions = await candidate.ListAsync();
             var changed = preferences with { ManagerPath = path }; store.Save(changed);
@@ -196,14 +197,19 @@ public sealed partial class MainWindow
             var current = (await client.ListAsync()).SingleOrDefault(r => r.Id == runtime.Id && r.Selector == runtime.Selector);
             if (current is null) throw new InvalidOperationException("This Python entry has changed. Refresh the list before trying again.");
             var config = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Python", "pymanager.json");
-            var backup = DefaultVersionConfig.SetDefault(config, runtime.Selector);
+            var backup = PimConfiguration.Save(PimConfiguration.Read(config), new System.Text.Json.Nodes.JsonObject { ["default_tag"] = runtime.Selector });
             Log($"Saved default_tag = {runtime.Selector}." + (backup.Length > 0 ? $" Backup: {backup}" : ""));
             installed = await client.ListAsync();
             var active = installed.FirstOrDefault(r => r.IsDefault);
-            if (active?.Id == runtime.Id) { Notify(T("{0} is now your default.", runtime.DisplayName), InfoBarSeverity.Success); StatusText.Text = T("Default interpreter updated"); }
+            if (active?.Id == runtime.Id)
+            {
+                var health = await RuntimeHealth.CheckAsync(active);
+                Notify(health.Healthy ? T("{0} is now your default.", runtime.DisplayName) : T(health.Message), health.Healthy ? InfoBarSeverity.Success : InfoBarSeverity.Warning);
+                StatusText.Text = T(health.Healthy ? "Default interpreter updated" : "Result not confirmed");
+            }
             else Notify("Your preference was saved, but PIM reports a different effective default. A custom configuration or policy may override it.", InfoBarSeverity.Warning);
         }
-        catch (Exception ex) { ShowError(ex); }
+        catch (Exception ex) { try { installed = await client.ListAsync(); } catch { installed = []; } ShowError(ex); }
         finally { SetBusy(false); UpdateConnection(); RenderPage(); }
     }
 

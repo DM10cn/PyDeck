@@ -4,6 +4,7 @@ public sealed partial class PimClient
 {
     public async Task InstallOfflineAsync(OfflineBundle bundle, PythonRuntime runtime, Action<string> output, bool dryRun = false, PimOperation? operation = null)
     {
+        RequireMutationSupport();
         if (!await mutation.WaitAsync(0)) throw new InvalidOperationException("Another Python operation is already running.");
         try
         {
@@ -12,10 +13,10 @@ public sealed partial class PimClient
             // Checksum a private snapshot before PIM can consume it. No online catalog lookup.
             operation?.Report(OperationPhase.Verifying);
             using var prepared = await bundle.PrepareAsync(runtime, operation?.Token ?? default);
-            var arguments = new List<string> { "install", "--yes", "--by-id", "--source=" + prepared.IndexPath,
+            var arguments = new List<string> { "install", "--yes", "--source=" + prepared.IndexPath,
                 "--config=" + prepared.ConfigPath };
             if (dryRun) arguments.Add("--dry-run");
-            arguments.Add(runtime.Id);
+            arguments.Add(runtime.Selector);
             output("> pymanager " + string.Join(' ', arguments));
             operation?.Report(OperationPhase.Preparing);
             EnsureSuccess(await runner.RunAsync(RequireExecutable(), arguments, output, operation?.Token ?? default, operation is null ? null : operation.Observe));
@@ -37,6 +38,12 @@ public sealed partial class PimClient
             var directory = Path.Combine(parentDirectory, "Python-offline-" + runtime.Id + "-" + Guid.NewGuid().ToString("N")[..8]);
             if (Directory.Exists(directory) || File.Exists(directory)) throw new IOException("Choose another download folder.");
             Directory.CreateDirectory(directory);
+            if (Network is not null)
+            {
+                using var http = Network().CreateClient(ProxyPassword?.Invoke());
+                await PackageDownload.FetchAsync(current, directory, http, operation);
+                return directory;
+            }
             string[] arguments = ["install", "--yes", "--by-id", "--download=" + directory, runtime.Id];
             output("> pymanager " + string.Join(' ', arguments));
             EnsureSuccess(await runner.RunAsync(RequireExecutable(), arguments, output, operation?.Token ?? default, operation is null ? null : operation.Observe));

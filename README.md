@@ -10,7 +10,7 @@
 
 PyDeck is a native **WinUI 3** companion for **Python Install Manager**. Browse interpreters, install a version, choose your default, and keep offline packages close at hand — in a desktop interface with **Windows Fluent** and **Material 3 Expressive** styles.
 
-🚧 **Development preview · 0.5.1** · 🪟 **Windows 11 x64** · 📄 **MIT**
+📦 **Stable release · 0.6.0** · 🪟 **Windows 11 x64** · 📄 **MIT**
 
 ## 📦 Download
 
@@ -27,6 +27,8 @@ Get **MSI**, **MSIX**, the **standalone dependency helper**, and **source ZIP / 
 - 🌏 **Choose your language** — English by default, plus Simplified Chinese, Traditional Chinese (Taiwan), and Japanese
 - 🧰 **Recover missing dependencies** — open official runtime or Python Install Manager download pages, install the missing software yourself, then recheck or reconnect
 - 🗂️ **Choose how to install** — MSI folder selection with Browse, optional desktop and Start menu shortcuts, and preferences retained during upgrades
+
+New in **0.6.0**: verified operation results, PATH / alias diagnostics, PIM configuration with backup / restore, HTTP proxies with Windows Credential Manager, measured download bytes / speed / ETA, and interpreter health checks / PIM repair. See the [Python management guide](docs/MANAGEMENT.md). These additions are not in the published 0.5.1 installers.
 
 See the [feature status and roadmap](docs/FEATURES.md) for implementation details and remaining acceptance work.
 
@@ -69,7 +71,7 @@ PyDeck requires a standalone local bundle with SHA-256 checksums and stages a ve
 
 ## ⏳ Progress and cancellation
 
-The operation panel stays visible across pages. Download and extraction percentages are **approximate stage progress** derived from PIM output; other phases use an indeterminate bar.
+The operation panel stays visible across pages. In 0.6.0, official package downloads show measured bytes, smoothed speed, and ETA when reliable. Values below 1 MB use KB. Extraction percentages remain **approximate stage progress** derived from PIM output; unknown phases use an indeterminate bar. Published 0.5.1 uses approximate download progress too.
 
 You can stop Python installation, updates, and offline downloads. Stopping an installation requires confirmation and **may leave partial files**. PyDeck waits for the current process to exit and refreshes the installed list; it does not promise rollback. Python uninstallation cannot be cancelled mid-operation. These controls apply to Python operations inside PyDeck, not to the MSI / MSIX setup wizard.
 
@@ -83,7 +85,7 @@ Language changes apply immediately and are saved. Documentation is maintained in
 
 The 0.5.1 preview passed core and native checks, installed-MSI GUI checks, and MSIX development-registration / activation checks. MSI folder selection, shortcut choices, repair, and upgrades have also been exercised.
 
-The **complete Python interpreter lifecycle** still needs acceptance testing, as do clean-machine deployment and the MSIX production certificate-trust installation path. The [feature-status table](docs/FEATURES.md) records completed checks and remaining work; the [development guide](docs/DEVELOPMENT.md) explains how to run them.
+Version 0.6.0 adds a disposable Windows Sandbox lifecycle harness covering PIM upgrade, real Python update, repair, cancellation, default changes, uninstall, and offline reinstall. Clean-machine GUI deployment and the MSIX production certificate-trust installation path remain separate acceptance work. The [feature-status table](docs/FEATURES.md) records completed checks and remaining work; the [development guide](docs/DEVELOPMENT.md) explains how to run them.
 
 ## 🤝 Contributing
 

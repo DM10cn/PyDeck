@@ -22,7 +22,7 @@ $thumbprint = .\scripts\New-PreviewCertificate.ps1
 
 This creates or reuses a code-signing certificate in `CurrentUser\My`, with a non-exportable private key. It does not import a trusted root or export a PFX. Keep the signing account and key available for future updates. A developer's newly generated certificate is not the official release certificate even if its subject has the same text.
 
-The release script signs the app executable, MSI, and MSIX and exports only the public `.cer`. Self-signed previews require an explicit trust step for MSIX users; see [installation](INSTALL.md). Public production signing is future work. Current preview packages have no timestamp.
+The release script signs the app executable, MSI, and MSIX and exports only the public `.cer`. Self-signed packages, including 0.6.0, require an explicit trust step for MSIX users; see [installation](INSTALL.md). Public production signing is future work. Current packages have no timestamp. Stable release status does not make the certificate publicly trusted; `PyDeck-preview.cer` keeps its historical filename and signing identity.
 
 The native `PyDeck.Launcher.exe` is also signed. An identical signed copy is exported as `PyDeck-Dependencies-<version>-win-x64.exe`. Its filename selects standalone checker behavior: it never launches a sibling app. Include that helper among the release assets. MSI permits installation before GUI runtimes are present; its shortcuts and MSIX activation enter through the installed launcher. MSIX's external framework dependency remains mandatory. End-user requirements and recovery steps are maintained in [INSTALL.md](INSTALL.md).
 
@@ -72,7 +72,7 @@ Record actual results and remaining limits in [FEATURES.md](FEATURES.md) and its
 
 Export requires a clean Git checkout matching the package build's recorded commit. ZIP and tar.gz archives use `git archive`, so ignored files and signing keys stay out. The script includes bilingual install instructions, the read-only prerequisite check, and SHA-256 checksums for all release assets.
 
-Publish a GitHub **pre-release** with an immutable version tag pointing to that same commit. Upload only the reviewed files in `assets/`, verify the uploaded hashes, and describe tested behavior and remaining limits. Do not upload `build.json`, `work/`, logs, screenshots, PFX files, package caches, or arbitrary contents of `artifacts/`.
+Starting with **0.6.0**, publish a normal GitHub release with an immutable `v<version>` tag pointing to that same commit, and mark it Latest. Historical 0.4.0 / 0.5.1 entries use `-beta` release tags and remain ordinary releases; they are not Latest. Original tags may remain as compatibility references to the unchanged commits. Upload only the reviewed files in `assets/`, verify the uploaded hashes, and describe tested behavior and remaining limits. Do not upload `build.json`, `work/`, logs, screenshots, PFX files, package caches, or arbitrary contents of `artifacts/`.
 
 📝 Documentation-only corrections can be committed to `main` without rebuilding an unchanged application or incrementing its version. Keep the release tag, signed packages, source archives, and existing checksums intact. Link corrected repository guides from the release notes; attached guides and archived source remain snapshots of the original release commit.
 

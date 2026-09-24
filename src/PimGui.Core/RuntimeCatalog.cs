@@ -2,6 +2,17 @@ namespace PimGui.Core;
 
 public static class RuntimeCatalog
 {
+    public static int CompareVersions(string left, string right)
+    {
+        var result = SortVersion(left).CompareTo(SortVersion(right));
+        if (result != 0) return result;
+        (int Stage, int Number) Suffix(string value)
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(value, @"(?:\d)(a|b|rc)(\d+)");
+            return match.Success ? (match.Groups[1].Value switch { "a" => 0, "b" => 1, _ => 2 }, int.Parse(match.Groups[2].Value)) : (3, 0);
+        }
+        return Suffix(left).CompareTo(Suffix(right));
+    }
     public static IReadOnlyList<PythonRuntime> Filter(IEnumerable<PythonRuntime> source, string architecture, bool previews, string search) =>
         source.Where(r => (architecture == "All architectures" || r.Architecture == architecture) &&
             (previews || !r.IsPrerelease) && (search.Length == 0 ||

@@ -6,6 +6,7 @@ namespace PimGui.Core;
 public sealed record PythonRuntime(string Id, string Company, string Tag, string Version,
     string DisplayName, string Executable, string Prefix, bool IsDefault, bool IsManaged = false)
 {
+    public string? DownloadMetadata { get; init; }
     public string Architecture => Tag.Contains("arm64", StringComparison.OrdinalIgnoreCase) ? "ARM64"
         : Tag.EndsWith("-32", StringComparison.OrdinalIgnoreCase) ? "x86" : "x64";
     public bool IsPrerelease => Regex.IsMatch(Version, @"\d(?:a|b|rc)\d", RegexOptions.IgnoreCase)
@@ -48,7 +49,8 @@ public static class RuntimeParser
                 var title = Get("display-name");
                 result.Add(new(id, company, tag, version.Length > 0 ? version : tag,
                     title.Length > 0 ? title : $"{company} {tag}", Get("executable"), Get("prefix"),
-                    item.TryGetProperty("default", out var isDefault) && isDefault.ValueKind == JsonValueKind.True));
+                    item.TryGetProperty("default", out var isDefault) && isDefault.ValueKind == JsonValueKind.True)
+                    { DownloadMetadata = item.TryGetProperty("url", out _) && item.TryGetProperty("hash", out _) ? item.GetRawText() : null });
             }
             return result;
         }

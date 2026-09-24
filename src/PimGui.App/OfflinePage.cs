@@ -101,16 +101,11 @@ public sealed partial class MainWindow
         {
             await client.InstallOfflineAsync(bundle, runtime, line => DispatcherQueue.TryEnqueue(() => Log(line)), operation: operation);
             FinalizingOperation(operation);
-            try { installed = await client.ListAsync(); }
-            catch (Exception ex) { Notify(T("The operation finished, but the version list could not be refreshed.") + " " + T(ex.Message), InfoBarSeverity.Warning); return; }
-            if (installed.Any(r => r.Id.Equals(runtime.Id, StringComparison.OrdinalIgnoreCase) && r.Version == runtime.Version))
-                Notify("Offline installation complete", InfoBarSeverity.Success);
-            else Notify("The command finished, but the refreshed list does not match the expected result. Check Activity for details.", InfoBarSeverity.Warning);
-            StatusText.Text = T("Operation complete");
+            await VerifyOperationAsync(RuntimeAction.Install, runtime);
         }
-        catch (OperationCanceledException) when (operation.IsCancellationRequested) { await ReconcileCancelledOperationAsync(); }
-        catch (Exception ex) { ShowError(ex); }
-        finally { FinishOperation(operation); SetBusy(false); UpdateConnection(); }
+        catch (OperationCanceledException) when (operation.IsCancellationRequested) { await ReconcileCancelledOperationAsync(target: runtime); }
+        catch (Exception ex) { try { installed = await client.ListAsync(); } catch { installed = []; } ShowError(ex); }
+        finally { FinishOperation(operation); SetBusy(false); UpdateConnection(); RenderPage(); }
     }
     private async Task DownloadOfflineRuntimeAsync(PythonRuntime runtime)
     {

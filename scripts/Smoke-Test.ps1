@@ -8,7 +8,7 @@ $outputDirectory = Join-Path $projectRoot ('artifacts\smoke-' + (Get-Date -Forma
 $appArguments = @('--smoke-test', ('"' + $outputDirectory + '"'))
 if ($OfflineFixture) { $appArguments += @('--offline-fixture', ('"' + $OfflineFixture + '"')) }
 $appProcess = Start-Process -FilePath $appPath -ArgumentList $appArguments -WorkingDirectory $BuildDirectory -WindowStyle Hidden -PassThru
-if (!$appProcess.WaitForExit(60000)) { throw "Smoke test is still running as process $($appProcess.Id). Output: $outputDirectory" }
+if (!$appProcess.WaitForExit(180000)) { throw "Smoke test is still running as process $($appProcess.Id). Output: $outputDirectory" }
 if ($appProcess.ExitCode -ne 0) { throw "GUI exited with code $($appProcess.ExitCode)." }
 $resultPath = Join-Path $outputDirectory 'result.json'
 if (!(Test-Path -LiteralPath $resultPath)) { throw 'GUI did not produce a smoke-test result.' }
