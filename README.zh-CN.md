@@ -14,7 +14,7 @@ PyDeck 是 **Python Install Manager** 的原生 **WinUI 3** 图形界面，支�
 
 ## 📦 下载
 
-从 [GitHub Releases](https://github.com/DM10cn/PyDeck/releases) 获取 **MSI**、**MSIX**、**独立依赖工具**和 **ZIP / tar.gz 源码**。依赖要求、安装选项与 MSIX 证书信任步骤统一见 [安装说明](docs/INSTALL.zh-CN.md)
+从 [GitHub Releases](https://github.com/DM10cn/PyDeck/releases) 获取 **MSI**、**MSIX** 和 **独立依赖工具**，源码使用 Assets 中 GitHub 自动提供的 **Source code (zip)** / **Source code (tar.gz)** 链接。依赖要求、安装选项与 MSIX 证书信任步骤统一见 [安装说明](docs/INSTALL.zh-CN.md)
 
 ## ✨ 可以做什么
 

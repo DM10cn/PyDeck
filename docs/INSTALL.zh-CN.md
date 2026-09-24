@@ -99,7 +99,7 @@ MSI 使用固定升级标识，MSIX 使用包名 `DM10cn.PyDeck` 和发布者 `C
 
 ## 🗜️ 源码归档
 
-`PyDeck-0.6.0-source.zip` 和 `PyDeck-0.6.0-source.tar.gz` 仅包含发行提交中的文件，排除构建产物、日志、本地设置、包缓存和签名密钥，也可使用 GitHub 自动提供的源码链接。发行归档和随附指南保留发布时的快照，后续文档修正见[仓库当前指南](https://github.com/DM10cn/PyDeck/blob/main/docs/INSTALL.zh-CN.md)，不替换已打标签的源码或签名安装包
+使用 Release 的 Assets 区域中 **Source code (zip)** 或 **Source code (tar.gz)** 链接，GitHub 根据发行标签自动生成源码归档，PyDeck 不再上传重复源码包。`SHA256SUMS.txt` 仅校验上传的附件，不包含 GitHub 自动生成的归档。源码与随附指南保留发布时的快照，后续文档修正见[仓库当前指南](https://github.com/DM10cn/PyDeck/blob/main/docs/INSTALL.zh-CN.md)，不替换已打标签的源码或签名安装包
 
 ## 🧪 验证边界
 

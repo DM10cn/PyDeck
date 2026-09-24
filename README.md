@@ -14,7 +14,7 @@ PyDeck is a native **WinUI 3** companion for **Python Install Manager**. Browse 
 
 ## 📦 Download
 
-Get **MSI**, **MSIX**, the **standalone dependency helper**, and **source ZIP / tar.gz** from [GitHub Releases](https://github.com/DM10cn/PyDeck/releases). Follow the [installation guide](docs/INSTALL.md) for dependencies, installer choices, and MSIX certificate trust.
+Get **MSI**, **MSIX**, and the **standalone dependency helper** from [GitHub Releases](https://github.com/DM10cn/PyDeck/releases). For source, use GitHub's automatic **Source code (zip)** / **Source code (tar.gz)** links in Assets. Follow the [installation guide](docs/INSTALL.md) for dependencies, installer choices, and MSIX certificate trust.
 
 ## ✨ What you can do
 

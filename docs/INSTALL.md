@@ -99,7 +99,7 @@ Settings remain under `%LocalAppData%\PyDeck`. Python installations, PIM configu
 
 ## 🗜️ Source archives
 
-`PyDeck-0.6.0-source.zip` and `PyDeck-0.6.0-source.tar.gz` contain only files from the release commit. Build output, logs, local settings, package caches, and signing keys are excluded. The GitHub-generated source links are also available. Release archives and attached guides are snapshots; later documentation corrections live in the [current repository guide](https://github.com/DM10cn/PyDeck/blob/main/docs/INSTALL.md) without replacing the tagged source or signed packages.
+Use **Source code (zip)** or **Source code (tar.gz)** under the release's Assets section. GitHub generates these archives from the release tag; PyDeck does not upload duplicate source packages. `SHA256SUMS.txt` covers the uploaded assets, not GitHub-generated archives. Source and attached guides are snapshots; later documentation corrections live in the [current repository guide](https://github.com/DM10cn/PyDeck/blob/main/docs/INSTALL.md) without replacing the tagged source or signed packages.
 
 ## 🧪 Validation limits
 

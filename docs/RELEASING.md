@@ -70,11 +70,11 @@ Record actual results and remaining limits in [FEATURES.md](FEATURES.md) and its
 .\scripts\Export-Source.ps1 -ReleaseDirectory $release
 ```
 
-Export requires a clean Git checkout matching the package build's recorded commit. ZIP and tar.gz archives use `git archive`, so ignored files and signing keys stay out. The script includes bilingual install instructions, the read-only prerequisite check, and SHA-256 checksums for all release assets.
+The script retains its historical name but now prepares only bilingual install instructions, the read-only prerequisite check, and SHA-256 checksums for uploaded release assets. It requires a clean Git checkout matching the package build's recorded commit and rejects leftover manually generated source archives in `assets/`. Use GitHub's automatic **Source code (zip)** / **Source code (tar.gz)** links; do not upload duplicate archives or include generated source downloads in `SHA256SUMS.txt`.
 
 Starting with **0.6.0**, publish a normal GitHub release with an immutable `v<version>` tag pointing to that same commit, and mark it Latest. Historical 0.4.0 / 0.5.1 entries use `-beta` release tags and remain ordinary releases; they are not Latest. Original tags may remain as compatibility references to the unchanged commits. Upload only the reviewed files in `assets/`, verify the uploaded hashes, and describe tested behavior and remaining limits. Do not upload `build.json`, `work/`, logs, screenshots, PFX files, package caches, or arbitrary contents of `artifacts/`.
 
-📝 Documentation-only corrections can be committed to `main` without rebuilding an unchanged application or incrementing its version. Keep the release tag, signed packages, source archives, and existing checksums intact. Link corrected repository guides from the release notes; attached guides and archived source remain snapshots of the original release commit.
+📝 Documentation-only corrections can be committed to `main` without rebuilding an unchanged application or incrementing its version. Keep the release tag and signed packages intact. Link corrected repository guides from the release notes; attached guides and tagged source remain snapshots of the original release commit. If obsolete attachments are explicitly removed, update the checksum manifest to list only retained assets without changing their hashes.
 
 ## 🔁 Stable identities
 
