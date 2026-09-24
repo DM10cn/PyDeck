@@ -3,6 +3,8 @@
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package Name="PyDeck" Manufacturer="DM10cn" Version="$(var.ProductVersion)" Language="1033"
            UpgradeCode="D43AFAF7-DFE0-4AC1-A0A3-8F73AD6F89CA" Scope="perUser" InstallerVersion="500">
+    <!-- Full-package replacement upgrades: stable UpgradeCode, transactional removal
+         of obsolete components, rollback of the old version, and external user state. -->
     <MajorUpgrade DowngradeErrorMessage="A newer version of PyDeck is already installed." Schedule="afterInstallInitialize" />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
     <Icon Id="PyDeckIcon" SourceFile="$(var.PayloadDir)\Assets\AppIcon.ico" />

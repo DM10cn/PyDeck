@@ -115,3 +115,9 @@ Preferences are stored in `%LocalAppData%\PyDeck\settings.json`. The legacy `Pim
 Do not commit build output, package caches, credentials, signing keys, private configuration, personal logs, screenshots, or planning notes. `.gitignore` covers common cases, but review the staged diff before submitting changes. See [Security](../SECURITY.md).
 
 The icon source is in `src/PimGui.App/Assets/AppIcon.Source.png`. Rebuild its PNG/ICO variants with `scripts/Build-Icon.ps1`; review [third-party notices](../THIRD-PARTY-NOTICES.md) before changing branding.
+
+## 🧰 T3 checks
+
+Core checks cover stable update metadata, source validation and redirect consent, stale source snapshots, Shebang preservation and conflicts, and incomplete environment retention. Set `PYDECK_TEST_VENV_PYTHON` to a trusted local Python executable to include a real temporary venv create / probe / forget check. Test files remain in the ignored artifacts directory.
+
+`Test-PimLifecycle.ps1 -T3Only` runs source, Shebang and venv acceptance in a disposable Windows Sandbox. The HTTPS fixture creates a short-lived localhost test certificate inside that Sandbox, removes its public trust entry on disposal, and never changes host certificate trust. Omit `-T3Only` for the complete lifecycle.

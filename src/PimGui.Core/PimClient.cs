@@ -12,6 +12,8 @@ public sealed partial class PimClient(IProcessRunner runner, string? mutationLoc
     public bool SupportsMutations => Version.TryParse(ManagerVersion, out var version) && version >= new Version(26, 3);
     public Func<NetworkSettings>? Network { get; set; }
     public Func<string?>? ProxyPassword { get; set; }
+    public Func<string>? SelectedSource { get; set; }
+    public Func<Uri, Task<bool>>? ConfirmDownloadOrigin { get; set; }
     public PythonRuntime? LastExpectedRuntime { get; private set; }
 
     public async Task<bool> DiscoverAsync(string? preferredPath = null)
@@ -65,17 +67,18 @@ public sealed partial class PimClient(IProcessRunner runner, string? mutationLoc
         return false;
     }
 
-    public async Task<IReadOnlyList<PythonRuntime>> ListAsync(bool online = false, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<PythonRuntime>> ListAsync(bool online = false, CancellationToken cancellationToken = default, string? source = null)
     {
         var executable = RequireExecutable();
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(online ? 120 : 25));
         var args = new List<string> { "list", "--format=json" };
-        if (online) args.Add("--online");
+        var index = online && (source is not null || SelectedSource is not null) ? InstallationSource.Validate(source ?? SelectedSource!()) : null;
+        if (online) args.Add(index is null ? "--online" : "--source=" + index);
         var result = await runner.RunAsync(executable, args, cancellationToken: timeout.Token);
         EnsureSuccess(result);
         var runtimes = RuntimeParser.Parse(result.Output);
-        if (online) return runtimes;
+        if (online) return runtimes.Select(r => r with { CatalogIndex = index }).ToArray();
         var managedResult = await runner.RunAsync(executable, ["list", "--format=json", "--only-managed"], cancellationToken: timeout.Token);
         EnsureSuccess(managedResult);
         var managed = RuntimeParser.Parse(managedResult.Output).Select(r => r.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -109,17 +112,25 @@ public sealed partial class PimClient(IProcessRunner runner, string? mutationLoc
         try
         {
             var args = BuildArguments(action, runtime);
+            string? index = null;
+            if (SelectedSource is not null && action != RuntimeAction.Uninstall)
+            {
+                index = action == RuntimeAction.Install ? InstallationSource.Validate(SelectedSource()) : InstallationSource.Installed(runtime);
+                if (action == RuntimeAction.Install && runtime.CatalogIndex != index)
+                    throw new IOException("The installation source changed. Reload the catalog");
+                args = args.Concat(["--source=" + index]).ToArray();
+            }
             LastExpectedRuntime = runtime;
             if (action == RuntimeAction.Repair && !SupportsRepair) throw new InvalidOperationException("This PIM version does not support repair. Update Python Install Manager and reconnect");
             using var operationLock = AcquireOperationLock();
             // Re-query under the lock: a card may be stale after changes made in another window or terminal.
-            var candidates = await ListAsync(online: action == RuntimeAction.Install, cancellationToken: operation?.Token ?? default);
+            var candidates = await ListAsync(online: action == RuntimeAction.Install, cancellationToken: operation?.Token ?? default, source: index);
             var current = candidates.SingleOrDefault(r => r.Id.Equals(runtime.Id, StringComparison.OrdinalIgnoreCase));
             if (current is null || current.Company != runtime.Company || current.Tag != runtime.Tag ||
                 (action != RuntimeAction.Install && (!current.IsManaged || !string.Equals(current.Prefix, runtime.Prefix, StringComparison.OrdinalIgnoreCase))))
                 throw new InvalidOperationException("This Python entry has changed. Refresh the list before trying again.");
             var resolutionArgs = new List<string> { "list", "--format=json", runtime.Selector };
-            if (action == RuntimeAction.Install) resolutionArgs.Add("--online");
+            if (action == RuntimeAction.Install) resolutionArgs.Add(index is null ? "--online" : "--source=" + index);
             using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(operation?.Token ?? default))
             {
                 timeout.CancelAfter(TimeSpan.FromSeconds(120));
@@ -133,7 +144,7 @@ public sealed partial class PimClient(IProcessRunner runner, string? mutationLoc
             CommandResult result;
             if (Network is not null && action != RuntimeAction.Uninstall)
             {
-                var available = action == RuntimeAction.Install ? current : (await ListAsync(true, operation?.Token ?? default)).SingleOrDefault(r => r.Id == runtime.Id);
+                var available = action == RuntimeAction.Install ? current : (await ListAsync(true, operation?.Token ?? default, index)).SingleOrDefault(r => r.Id == runtime.Id && r.Company == runtime.Company && r.Tag == runtime.Tag);
                 if (available is null) throw new IOException("This Python version is no longer available from the catalog");
                 LastExpectedRuntime = available;
                 if (action == RuntimeAction.Update && RuntimeCatalog.CompareVersions(available.Version, runtime.Version) <= 0)
@@ -144,7 +155,7 @@ public sealed partial class PimClient(IProcessRunner runner, string? mutationLoc
                 try
                 {
                     using var http = Network().CreateClient(ProxyPassword?.Invoke());
-                    var bundle = await PackageDownload.FetchAsync(available, directory, http, operation);
+                    var bundle = await PackageDownload.FetchAsync(available, directory, http, operation, ConfirmDownloadOrigin);
                     using var prepared = await bundle.PrepareAsync(bundle.Runtimes.Single(), operation?.Token ?? default);
                     // PIM consumes a verified bundled cache while retaining its original online source.
                     // A temporary offline source would otherwise be persisted in __install__.json.
@@ -152,7 +163,9 @@ public sealed partial class PimClient(IProcessRunner runner, string? mutationLoc
                     var cached = Path.Combine(directory, available.Id + "-" + available.Version + ".zip");
                     File.Copy(prepared.ArchivePath, cached, false);
                     var config = Path.Combine(directory, "download-config.json");
-                    AtomicJson.Write(config, new System.Text.Json.Nodes.JsonObject { ["bundled_dir"] = directory }.ToJsonString());
+                    var downloadConfig = new System.Text.Json.Nodes.JsonObject { ["bundled_dir"] = directory };
+                    if (index is not null) downloadConfig["install"] = new System.Text.Json.Nodes.JsonObject { ["fallback_source"] = index };
+                    AtomicJson.Write(config, downloadConfig.ToJsonString());
                     try
                     {
                         var localArgs = args.Concat(["--config=" + config]).ToArray();

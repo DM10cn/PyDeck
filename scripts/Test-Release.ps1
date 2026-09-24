@@ -71,6 +71,13 @@ try {
     if ((Read-MsiProperty 'ProductVersion') -ne $metadata.version -or (Read-MsiProperty 'ProductName') -ne 'PyDeck') { throw 'Unexpected MSI version or name.' }
     if ((Read-MsiProperty 'UpgradeCode') -ne '{D43AFAF7-DFE0-4AC1-A0A3-8F73AD6F89CA}') { throw 'MSI upgrade identity changed.' }
     if (Read-MsiProperty 'ALLUSERS') { throw 'MSI must remain per-user.' }
+    $sequences = @{}
+    foreach ($action in @('InstallInitialize', 'RemoveExistingProducts', 'InstallFiles')) {
+        $view = $database.OpenView(('SELECT `Sequence` FROM `InstallExecuteSequence` WHERE `Action` = ''' + $action + ''''))
+        try { [void]$view.Execute(); $row = $view.Fetch(); if (!$row) { throw "Missing upgrade action: $action" }; $sequences[$action] = $row.IntegerData(1) }
+        finally { [void]$view.Close() }
+    }
+    if ($sequences.RemoveExistingProducts -le $sequences.InstallInitialize -or $sequences.RemoveExistingProducts -ge $sequences.InstallFiles) { throw 'MSI must use transactional replacement upgrades.' }
     foreach ($shortcut in @('LaunchPyDeck', 'DesktopPyDeck')) {
         $view = $database.OpenView(('SELECT `Name`, `Target` FROM `Shortcut` WHERE `Shortcut` = ''' + $shortcut + ''''))
         try {

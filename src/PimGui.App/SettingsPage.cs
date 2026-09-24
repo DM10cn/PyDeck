@@ -109,6 +109,9 @@ public sealed partial class MainWindow
         about.Children.Add(palette.Label("Independent project. Not affiliated with the Python Software Foundation.", 12, muted: true));
         about.Children.Add(palette.Label("Built with WinUI 3. .NET and Windows App Runtime are installed separately.", 12, muted: true));
         about.Children.Add(palette.Label("No analytics. Preferences stay on this computer; activity logs stay in this session.", 12, muted: true));
+        var update = palette.Action("Check PyDeck updates", "\uE895", compact: true); update.IsEnabled = !busy;
+        update.Click += async (_, _) => await CheckAppUpdateAsync(); about.Children.Add(update);
+        var releases = palette.Action("GitHub releases", "\uE8A7", compact: true); releases.Click += (_, _) => OpenUrl(AppUpdates.ReleasesPage); about.Children.Add(releases);
         var docs = palette.Action("Python documentation", "\uE8A7", compact: true); docs.Click += (_, _) => OpenUrl("https://docs.python.org/3/using/windows.html");
         about.Children.Add(docs); body.Children.Add(palette.CardBox(about));
         settingsScroll = new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };

@@ -7,6 +7,8 @@ namespace PimGui.App;
 
 public sealed partial class MainWindow
 {
+    private string distributionFilter = "All";
+    private readonly HashSet<string> expandedSeries = [];
     private Grid PageGrid(params GridLength[] rows)
     {
         var grid = new Grid { RowSpacing = palette.Tokens.SectionSpacing };
@@ -78,7 +80,7 @@ public sealed partial class MainWindow
         var layout = PageGrid(GridLength.Auto, GridLength.Auto, GridLength.Auto, new(1, GridUnitType.Star), GridLength.Auto);
         var refresh = palette.Action("Refresh catalog", "\uE72C", compact: true); refresh.IsEnabled = !busy && (OfflineSource ? offlineBundle is not null : connected);
         refresh.Click += async (_, _) => { if (OfflineSource && offlineBundle is not null) await LoadOfflineFolderAsync(offlineBundle.DirectoryPath); else await LoadCatalogAsync(); };
-        At(layout, Header("FIND YOUR NEXT VERSION", "Install Python", "Official releases, installed by Python Install Manager.", refresh), 0);
+        At(layout, Header("FIND YOUR NEXT VERSION", "Install Python", "Python releases, installed by Python Install Manager", refresh), 0);
         At(layout, CatalogSourceBar(), 1);
         At(layout, FilterBar(true), 2);
         runtimeRows = new StackPanel { Spacing = 10 };
@@ -175,7 +177,37 @@ public sealed partial class MainWindow
             HorizontalContentAlignment = HorizontalAlignment.Stretch, Content = rows, IsExpanded = expanded,
             CornerRadius = new(palette.Radius), Margin = new(0, 6, 0, 0) };
         palette.ApplySurfaceResources(group);
-        void Populate() { if (rows.Children.Count == 0) foreach (var release in releases) rows.Children.Add(RuntimeCard(release, true)); }
+        void Populate()
+        {
+            if (rows.Children.Count != 0) return;
+            var seriesRows = new StackPanel { Spacing = 8 };
+            void PopulateSeries()
+            {
+                seriesRows.Children.Clear();
+                var selected = releases.Where(r => title != "Other distributions" || RuntimeCatalog.MatchesDistribution(r, distributionFilter));
+                foreach (var series in selected.GroupBy(RuntimeCatalog.MinorSeries).OrderByDescending(g => g.Key, Comparer<string>.Create(RuntimeCatalog.CompareVersions)))
+                {
+                    var key = title + "/" + series.Key;
+                    var items = new StackPanel { Spacing = 8 };
+                    var section = new Expander { Header = "Python " + series.Key, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                        Content = items, IsExpanded = expandedSeries.Contains(key) || search.Length > 0, CornerRadius = new(palette.Radius) };
+                    palette.ApplySurfaceResources(section);
+                    void PopulateItems() { if (items.Children.Count == 0) foreach (var release in series) items.Children.Add(RuntimeCard(release, true)); }
+                    if (section.IsExpanded) PopulateItems();
+                    section.Expanding += (_, _) => { expandedSeries.Add(key); PopulateItems(); };
+                    section.Collapsed += (_, _) => expandedSeries.Remove(key);
+                    seriesRows.Children.Add(section);
+                }
+                if (seriesRows.Children.Count == 0) seriesRows.Children.Add(palette.Label("No matching versions", 13, muted: true));
+            }
+            if (title == "Other distributions")
+            {
+                var filter = Choice([("All", "All package types"), ("FreeThreaded", "Free-threaded"), ("Embedded", "Embeddable"), ("Tests", "With tests"), ("Other", "Other types")],
+                    distributionFilter, value => { distributionFilter = value; PopulateSeries(); }, "Package type");
+                filter.HorizontalAlignment = HorizontalAlignment.Left; rows.Children.Add(filter);
+            }
+            rows.Children.Add(seriesRows); PopulateSeries();
+        }
         if (expanded) Populate();
         group.Expanding += (_, _) => Populate();
         return group;
@@ -184,9 +216,8 @@ public sealed partial class MainWindow
     private Border RuntimeCard(PythonRuntime runtime, bool online)
     {
         var grid = new Grid { ColumnSpacing = 16 };
-        grid.ColumnDefinitions.Add(new() { Width = new(44) }); grid.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); grid.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
-        var monogram = new Border { Width = 44, Height = 48, CornerRadius = new(palette.Tokens.IconRadius), Background = Palette.Brush(palette.AccentContainer), VerticalAlignment = VerticalAlignment.Center,
-            Child = new TextBlock { Text = "py", FontFamily = new("Cascadia Code, Consolas"), FontSize = 19, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Foreground = Palette.Brush(palette.Accent), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } };
+        grid.ColumnDefinitions.Add(new() { Width = new(52) }); grid.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); grid.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
+        var monogram = RuntimeIcon(runtime);
         grid.Children.Add(monogram);
         var details = new StackPanel { Spacing = 5, VerticalAlignment = VerticalAlignment.Center };
         var title = palette.Label(RuntimeTitle(runtime), 16, true); title.TextWrapping = TextWrapping.NoWrap; title.TextTrimming = TextTrimming.CharacterEllipsis;

@@ -24,10 +24,12 @@
     <AssemblyName>PyDeck</AssemblyName>
     <RootNamespace>PimGui.App</RootNamespace>
     <DefaultLanguage>en-US</DefaultLanguage>
-    <Version>0.6.0</Version>
+    <Version>0.6.1</Version>
   </PropertyGroup>
   <ItemGroup>
     <Content Include="Assets\AppIcon.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\Python.svg" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\Variant*.svg" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <!-- Reference the UI components, not the umbrella package's unused AI/ML stack. -->
     <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.3.9" />

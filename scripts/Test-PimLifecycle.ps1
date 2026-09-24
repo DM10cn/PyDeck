@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$SeedBundleDirectory, [string]$InstallerDirectory)
+param([string]$SeedBundleDirectory, [string]$InstallerDirectory, [switch]$T3Only)
 $ErrorActionPreference='Stop'
 $repo=Split-Path -Parent $PSScriptRoot
 $output=Join-Path $repo ('artifacts\pim-e2e-'+(Get-Date -Format 'yyyyMMdd-HHmmss'))
@@ -40,18 +40,18 @@ if($SeedBundleDirectory) {
     $index | ConvertTo-Json -Depth 40 | Set-Content (Join-Path $fixture 'index.json') -Encoding utf8
 }
 $inside=@'
-param([string]$HostComputer)
+param([string]$HostComputer, [switch]$T3Only)
 $ErrorActionPreference='Stop'
 if($env:COMPUTERNAME -eq $HostComputer){throw 'Refusing lifecycle tests on the host'}
 try {
     New-Item -ItemType Directory C:\PyDeckE2E -Force | Out-Null
     Set-Content C:\PyDeckE2E\ISOLATED $env:COMPUTERNAME
-    foreach($version in @('25.2','26.3')) {
+    foreach($version in $(if($T3Only){@('26.3')}else{@('25.2','26.3')})) {
         $installer=Start-Process msiexec.exe -ArgumentList @('/i',"C:\PyDeckResults\pim-$version.msi",'/qn','/norestart','/L*v',"C:\PyDeckResults\pim-$version-install.log") -WindowStyle Hidden -PassThru
         if(!$installer.WaitForExit(180000) -or $installer.ExitCode -notin @(0,3010)){throw "PIM $version setup failed"}
         $manager='C:\Program Files\PyManager\pymanager.exe'
         if(!(Test-Path $manager)){throw 'PIM MSI installation layout changed'}
-        $phase=if($version -eq '25.2'){'seed'}else{'upgraded'}
+        $phase=if($T3Only){'t3'}elseif($version -eq '25.2'){'seed'}else{'upgraded'}
         & C:\HostDotnet\dotnet.exe C:\PyDeckResults\harness\PimGui.E2E.dll $manager $phase "C:\PyDeckResults\$phase.json" > "C:\PyDeckResults\$phase-output.txt" 2>&1
         if($LASTEXITCODE -ne 0){throw "PIM $phase checks failed"}
     }
@@ -70,6 +70,7 @@ try {
     wsb share --id $sandboxId -f $dotnetRoot -s C:\HostDotnet --raw
     if($LASTEXITCODE -ne 0){throw 'Sandbox test runtime mapping failed'}
     $command='powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\PyDeckResults\run.ps1 -HostComputer '+$env:COMPUTERNAME
+    if($T3Only){$command+=' -T3Only'}
     wsb exec --id $sandboxId --run-as System --command $command --raw
     if(!(Test-Path (Join-Path $output 'complete.txt'))){throw "Lifecycle checks did not complete: $output"}
     Write-Output "PASS isolated lifecycle acceptance: $output"

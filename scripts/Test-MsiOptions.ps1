@@ -15,17 +15,24 @@ $packageSource = (Get-Content -LiteralPath (Join-Path $repoRoot 'packaging\msi\P
     Replace('D43AFAF7-DFE0-4AC1-A0A3-8F73AD6F89CA', [Guid]::NewGuid().ToString()).
     Replace('Software\DM10cn\PyDeck\Installer', $key)
 $packageFile = Join-Path $work 'Package.wxs'
+$packageSource = $packageSource.Replace('<MediaTemplate', '<CustomAction Id="FixtureFailure" Error="Intentional upgrade rollback test" /><MediaTemplate').Replace('</InstallExecuteSequence>', '<Custom Action="FixtureFailure" After="InstallFiles" Condition="PYDECK_TEST_FAIL = &quot;1&quot;" /></InstallExecuteSequence>')
 [IO.File]::WriteAllText($packageFile, $packageSource, [Text.UTF8Encoding]::new($false))
 [xml]$payloadSource = (Get-Content -LiteralPath (Join-Path $release 'work\Payload.wxs') -Raw).Replace('Software\DM10cn\PyDeck\Installer', $key)
 foreach ($component in $payloadSource.Wix.Fragment.ComponentGroup.Component) { $component.Guid = [Guid]::NewGuid().ToString() }
 $payloadFile = Join-Path $work 'Payload.wxs'
 $payloadSource.Save($payloadFile)
+$legacy = Join-Path $work 'legacy-only.txt'
+[IO.File]::WriteAllText($legacy, 'Old installer-owned payload; must disappear after upgrade.')
+$basePayload = Join-Path $work 'BasePayload.wxs'
+$legacyComponent = '<Component Id="FixtureLegacy" Directory="INSTALLFOLDER" Guid="' + [Guid]::NewGuid().ToString() + '"><File Id="FixtureLegacyFile" Source="' + [Security.SecurityElement]::Escape($legacy) + '" /><RegistryValue Root="HKCU" Key="' + $key + '\Files" Name="Legacy" Type="integer" Value="1" KeyPath="yes" /></Component>'
+[IO.File]::WriteAllText($basePayload, $payloadSource.OuterXml.Replace('</ComponentGroup>', $legacyComponent + '</ComponentGroup>'))
 $baseVersion = [version]$metadata.version
 $upgradeVersion = '{0}.{1}.{2}' -f $baseVersion.Major, $baseVersion.Minor, ($baseVersion.Build + 1)
 $packages = @{}
 foreach ($version in @($metadata.version, $upgradeVersion)) {
     $path = Join-Path $work ("Check-$version.msi")
-    & $WixCommand build $packageFile (Join-Path $repoRoot 'packaging\msi\InstallOptions.wxs') $payloadFile -arch x64 -ext WixToolset.UI.wixext/7.0.0 -d "ProductVersion=$version" -d "PayloadDir=$($metadata.payload)" -d ('LicenseRtf=' + (Join-Path $release 'work\License.rtf')) -d ('InstallerActions=' + (Join-Path $release 'work\native\PyDeck.InstallerActions.dll')) -pdbtype none -intermediatefolder (Join-Path $work "wix-$version") -o $path
+    $versionPayload = if ($version -eq $metadata.version) { $basePayload } else { $payloadFile }
+    & $WixCommand build $packageFile (Join-Path $repoRoot 'packaging\msi\InstallOptions.wxs') $versionPayload -arch x64 -ext WixToolset.UI.wixext/7.0.0 -d "ProductVersion=$version" -d "PayloadDir=$($metadata.payload)" -d ('LicenseRtf=' + (Join-Path $release 'work\License.rtf')) -d ('InstallerActions=' + (Join-Path $release 'work\native\PyDeck.InstallerActions.dll')) -pdbtype none -intermediatefolder (Join-Path $work "wix-$version") -o $path
     if ($LASTEXITCODE -ne 0) { throw 'Installer fixture build failed.' }
     $packages[$version] = $path
 }
@@ -34,12 +41,21 @@ $menuFolder = Join-Path ([Environment]::GetFolderPath('Programs')) $name
 $menu = Join-Path $menuFolder ($name + '.lnk')
 if ((Test-Path -LiteralPath $desktop) -or (Test-Path -LiteralPath $menuFolder)) { throw 'Fixture shortcut collision.' }
 $script:step = 0
-function Invoke-Msi([string]$Verb, [string]$Package, [string[]]$Properties = @()) {
+function Assert-RegisteredVersion([string]$Package, [string]$Version) {
+    $installer = New-Object -ComObject WindowsInstaller.Installer
+    $database = $installer.OpenDatabase($Package, 0)
+    $view = $database.OpenView('SELECT `Value` FROM `Property` WHERE `Property` = ''ProductCode''')
+    try {
+        [void]$view.Execute(); $code = $view.Fetch().StringData(1)
+        if ($installer.ProductInfo($code, 'VersionString') -ne $Version) { throw 'Installed product registration was not retained.' }
+    } finally { [void]$view.Close(); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($database); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($installer) }
+}
+function Invoke-Msi([string]$Verb, [string]$Package, [string[]]$Properties = @(), [int]$ExpectedExit = 0) {
     $script:step++
     $arguments = @($Verb, ('"' + $Package + '"'), '/qn', '/norestart', '/l*v', ('"' + (Join-Path $work "step-$script:step.log") + '"')) + $Properties
     $process = Start-Process msiexec.exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
-    if (!$process.WaitForExit(60000)) { throw "MSI fixture is still running as $($process.Id); inspect $work" }
-    if ($process.ExitCode -ne 0) { throw "MSI $Verb failed: $($process.ExitCode); inspect step-$script:step.log" }
+    if (!$process.WaitForExit(240000)) { throw "MSI fixture is still running as $($process.Id); inspect $work" }
+    if ($process.ExitCode -ne $ExpectedExit) { throw "MSI $Verb returned $($process.ExitCode), expected $ExpectedExit; inspect step-$script:step.log" }
 }
 function Assert-Installation([string]$Folder, [int]$DesktopEnabled, [int]$MenuEnabled) {
     if (!(Test-Path -LiteralPath (Join-Path $Folder 'PyDeck.Launcher.exe'))) { throw 'Custom install folder was not used.' }
@@ -78,10 +94,19 @@ foreach ($case in $cases) {
             Invoke-Msi '/fa' $active
             Assert-Installation $folder 1 0
             Write-Output 'PASS repair retains installation folder and shortcut choices'
+            Invoke-Msi '/i' $packages[$upgradeVersion] @('PYDECK_TEST_FAIL=1') 1603
+            Assert-Installation $folder 1 0
+            if (!(Test-Path -LiteralPath (Join-Path $folder 'legacy-only.txt'))) { throw 'Rollback did not restore old payload.' }
+            Assert-RegisteredVersion $packages[$metadata.version] $metadata.version
+            if ((Get-Content -LiteralPath $sentinel -Raw) -ne 'This unrelated file must survive uninstall.') { throw 'Rollback changed user files.' }
+            Write-Output 'PASS failed major upgrade rolls back the old installation and preserves user files'
             Invoke-Msi '/i' $packages[$upgradeVersion]
             $active = $packages[$upgradeVersion]
             Assert-Installation $folder 1 0
+            if (Test-Path -LiteralPath (Join-Path $folder 'legacy-only.txt')) { throw 'Upgrade left obsolete installer-owned files.' }
+            if ((Get-Content -LiteralPath $sentinel -Raw) -ne 'This unrelated file must survive uninstall.') { throw 'Upgrade changed user files.' }
             Write-Output 'PASS major upgrade retains installation folder and shortcut choices'
+            Write-Output 'PASS full MSI replacement removes obsolete payload and retains unrelated user files'
         }
     } finally { if ($active) { Invoke-Msi '/x' $active } }
     if ((Test-Path -LiteralPath $desktop) -or (Test-Path -LiteralPath $menu) -or (Test-Path -LiteralPath (Join-Path $folder 'PyDeck.Launcher.exe')) -or (Test-Path -LiteralPath ('HKCU:\' + $key))) { throw 'Uninstall left fixture payload, shortcuts or installer preferences.' }

@@ -134,12 +134,13 @@ public sealed partial class MainWindow : Window
     }
     private void RenderPage()
     {
+        RefreshDatabaseButton.IsEnabled = !busy && !confirmationOpen;
         if (settingsScroll?.IsLoaded == true) settingsOffset = settingsScroll.VerticalOffset;
         settingsScroll = null;
         logBox = null;
         runtimeRows = null;
         resultLabel = null;
-        foreach (var button in new[] { RuntimesNav, CatalogNav, ActivityNav, SettingsNav })
+        foreach (var button in new[] { RuntimesNav, CatalogNav, EnvironmentsNav, ActivityNav, SettingsNav })
         {
             bool selected = (string)button.Tag == page;
             button.Background = selected ? Palette.Brush(palette.Tokens.NavigationSelected) : new SolidColorBrush(Colors.Transparent);
@@ -154,7 +155,7 @@ public sealed partial class MainWindow : Window
         PageHost.Children.Add(page switch
         {
             "catalog" => BuildCatalogPage(), "activity" => BuildActivityPage(),
-            "settings" => BuildSettingsPage(), _ => BuildRuntimesPage()
+            "settings" => BuildSettingsPage(), "environments" => BuildEnvironmentsPage(), _ => BuildRuntimesPage()
         });
     }
 
@@ -311,7 +312,8 @@ public sealed partial class MainWindow : Window
         try
         {
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps ||
-                !new[] { "www.python.org", "docs.python.org", "learn.microsoft.com" }.Contains(uri.Host))
+                !(new[] { "www.python.org", "docs.python.org", "learn.microsoft.com" }.Contains(uri.Host) ||
+                  (uri.Host == "github.com" && uri.AbsolutePath.StartsWith("/DM10cn/PyDeck/releases", StringComparison.Ordinal) && uri.UserInfo.Length == 0 && uri.IsDefaultPort)))
                 throw new ArgumentException("This link is not a supported documentation address.");
             Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
         }

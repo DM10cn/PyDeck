@@ -425,6 +425,7 @@ await CheckAsync("Cancellation keeps the operation lock until the child task fin
     await second.ChangeAsync(RuntimeAction.Install, runtime, _ => { });
 });
 await ManagementChecks.RunAsync(Check, CheckAsync, scratch);
+await T3Checks.RunAsync(Check, CheckAsync, scratch);
 if (args.Contains("--live"))
 {
     await CheckAsync("Live PIM read-only integration", async () =>

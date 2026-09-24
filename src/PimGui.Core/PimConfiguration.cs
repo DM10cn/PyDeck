@@ -8,7 +8,7 @@ public sealed record PimConfigurationSnapshot(string Path, string? Original, Jso
 
 public static class PimConfiguration
 {
-    public static readonly string[] Editable = ["default_tag", "default_platform", "automatic_install", "include_unmanaged"];
+    public static readonly string[] Editable = ["default_tag", "default_platform", "automatic_install", "include_unmanaged", "shebang_can_run_anything", "shebang_templates"];
     public static string UserPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Python", "pymanager.json");
     public static PimConfigurationSnapshot Read(string? path = null, bool inspectOverrides = true)
     {
@@ -21,7 +21,7 @@ public static class PimConfiguration
     public static IReadOnlyList<string> Overrides()
     {
         var result = new List<string>();
-        foreach (var name in new[] { "PYTHON_MANAGER_CONFIG", "PYTHON_MANAGER_DEFAULT", "PYTHON_MANAGER_DEFAULT_PLATFORM", "PYTHON_MANAGER_AUTOMATIC_INSTALL", "PYTHON_MANAGER_INCLUDE_UNMANAGED" })
+        foreach (var name in new[] { "PYTHON_MANAGER_CONFIG", "PYTHON_MANAGER_DEFAULT", "PYTHON_MANAGER_DEFAULT_PLATFORM", "PYTHON_MANAGER_AUTOMATIC_INSTALL", "PYTHON_MANAGER_INCLUDE_UNMANAGED", "PYTHON_MANAGER_SHEBANG_CAN_RUN_ANYTHING" })
             if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(name))) result.Add(name);
         if (OperatingSystem.IsWindows())
         {
@@ -38,7 +38,8 @@ public static class PimConfiguration
         {
             if (!Editable.Contains(item.Key)) throw new ArgumentException("This setting is not editable here");
             if (item.Value is null) { root.Remove(item.Key); continue; }
-            if (item.Key is "automatic_install" or "include_unmanaged") _ = item.Value.GetValue<bool>();
+            if (item.Key == "shebang_templates") ShebangRules.ValidateChanges(snapshot.Values[item.Key], item.Value);
+            else if (item.Key is "automatic_install" or "include_unmanaged" or "shebang_can_run_anything") _ = item.Value.GetValue<bool>();
             else
             {
                 var value = item.Value.GetValue<string>();

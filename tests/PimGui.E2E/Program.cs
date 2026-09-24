@@ -45,6 +45,18 @@ try
     }
     else
     {
+        string? offline = null;
+        PythonRuntime current;
+        if (phase == "t3")
+        {
+            offline = @"C:\PyDeckResults\seed-fixture";
+            var seed = OfflineBundle.Load(offline);
+            using var operation = new PimOperation();
+            await client.InstallOfflineAsync(seed, seed.Runtimes.Single(), Console.WriteLine, operation: operation);
+            current = (await client.ListAsync()).Single();
+        }
+        else
+        {
         await Check("Windows Credential Manager round-trip without JSON secrets", () =>
         {
             var password = Guid.NewGuid().ToString("N");
@@ -72,7 +84,7 @@ try
             var metadata = JsonNode.Parse(File.ReadAllText(Path.Combine(verified.Runtimes.Single().Prefix, "__install__.json")))!;
             Require(metadata["source"]?.GetValue<string>()?.StartsWith("https://") == true, "Temporary source persisted in installed metadata");
         });
-        var current = (await client.ListAsync()).Single();
+        current = (await client.ListAsync()).Single();
         await Check("Damage detection and exact-version PIM repair", async () =>
         {
             Require(current.Prefix.StartsWith(root + "\\", StringComparison.OrdinalIgnoreCase), "Unsafe damage fixture location");
@@ -95,7 +107,6 @@ try
             }
             Require(before.SequenceEqual(await client.ListAsync()), "Cancellation changed installed runtimes");
         });
-        string? offline = null;
         await Check("Real download bytes, speed and reusable offline bundle", async () =>
         {
             var events = new List<OperationProgress>();
@@ -117,6 +128,42 @@ try
             Require(executed.ExitCode == 0 && executed.Output.Trim().Equals(active.Executable, StringComparison.OrdinalIgnoreCase), "Default execution mismatch");
             await client.ChangeAsync(RuntimeAction.Uninstall, active, Console.WriteLine);
             Require((await RuntimeHealth.VerifyAsync(client, RuntimeAction.Uninstall, active)).Confirmed, "Second uninstall failed");
+        });
+        }
+        await Check("Custom HTTPS source install, retained origin repair and source switching", async () =>
+        {
+            await using var fixture = new HttpsFixture(offline!);
+            using (var http = new HttpClient()) Console.WriteLine("HTTPS fixture reachable: " + (await http.GetStringAsync(fixture.Index)).Length);
+            var selected = fixture.Index;
+            var custom = new PimClient(scope, Path.Combine(root, "operation.lock")) { Network = () => new NetworkSettings("Direct"), SelectedSource = () => selected };
+            Require(await custom.DiscoverAsync(manager), custom.LastDiscoveryError);
+            var candidate = (await custom.ListAsync(true)).Single();
+            Require(candidate.CatalogIndex == fixture.Index, "Source snapshot missing");
+            using var op = new PimOperation();
+            await custom.ChangeAsync(RuntimeAction.Install, candidate, Console.WriteLine, op);
+            var installedCustom = (await custom.ListAsync()).Single(r => r.Id == candidate.Id);
+            Require((await RuntimeHealth.CheckAsync(installedCustom)).Healthy && InstallationSource.Installed(installedCustom) == fixture.Index, "Custom install source or health");
+            selected = InstallationSource.Official;
+            await custom.ChangeAsync(RuntimeAction.Repair, installedCustom, Console.WriteLine, op);
+            Require(InstallationSource.Installed(installedCustom) == fixture.Index, "Repair silently changed source");
+            await custom.ChangeAsync(RuntimeAction.Update, installedCustom, Console.WriteLine, op);
+            Require((await custom.ListAsync()).Single(r => r.Id == candidate.Id).Version == installedCustom.Version, "Unexpected update");
+            await custom.ChangeAsync(RuntimeAction.Uninstall, installedCustom, Console.WriteLine);
+            Require((await RuntimeHealth.VerifyAsync(custom, RuntimeAction.Uninstall, installedCustom)).Confirmed, "Custom cleanup");
+        });
+        await Check("Real PIM Shebang mapping and virtual environment lifecycle", async () =>
+        {
+            var sample = Path.Combine(root, "controlled-shebang.py");
+            File.WriteAllText(sample, "#!/usr/bin/pydeck_e2e\nimport sys;print(sys.executable)\n");
+            PimConfiguration.Save(PimConfiguration.Read(scope.UserConfig, false), new JsonObject {
+                ["shebang_templates"] = new JsonObject { ["/usr/bin/pydeck_e2e"] = "py -V:" + current.Selector },
+                ["shebang_can_run_anything"] = false }, false);
+            var result = await scope.RunAsync(manager, ["exec", sample]);
+            Require(result.ExitCode == 0 && result.Output.Trim().Equals(current.Executable, StringComparison.OrdinalIgnoreCase), "Shebang mapping failed");
+            var environments = new VirtualEnvironments(Path.Combine(root, "environments")); using var op = new PimOperation();
+            var env = await environments.CreateAsync(current, root, "venv 中文", new ProcessRunner(), op);
+            Require(env.State == "Environment ready", env.State);
+            environments.Remember(env, true); Require(File.Exists(env.Executable), "Forget deleted files");
         });
         await Check("Uninstall and reinstall exclusively from offline files", async () =>
         {
@@ -170,7 +217,9 @@ sealed class ScopedRunner(string root) : IProcessRunner
         try
         {
             var network = BlockNetwork ? new NetworkSettings("Custom", "http://127.0.0.1:1") : new NetworkSettings("Direct");
-            return await new ProcessRunner(() => network).RunAsync(executable, args, output, cancellationToken, observe);
+            var result = await new ProcessRunner(() => network).RunAsync(executable, args, output, cancellationToken, observe);
+            if (result.ExitCode != 0) Console.WriteLine("PIM failure: " + result.ExitCode + " " + result.Output + " " + result.Error);
+            return result;
         }
         finally { Environment.SetEnvironmentVariable("PYTHON_MANAGER_CONFIG", previousConfig); File.Delete(path); }
     }

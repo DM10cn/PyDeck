@@ -87,3 +87,11 @@ powershell.exe -NoProfile -File .\scripts\Smoke-Packaged.ps1
 | MSIX 应用 ID | `App` |
 
 MSIX 为桌面应用禁用文件系统 / 注册表虚拟化，使 PIM 配置、解释器文件和跨实例锁能与非打包工具共享。两个格式均不内置 .NET、Windows App Runtime 或 PIM，MSI 与 MSIX 是独立安装渠道，不自动跨格式迁移
+
+## 🔁 从 0.6.1 起，每次发行必须验证 MSI 覆盖升级
+
+每版提供完整 MSI，不生成 MSP 或二进制差分包。运行新版 MSI，在同一次安装事务中替换旧版，无需用户先卸载。保留 UpgradeCode、每用户范围和稳定组件标识，在 InstallInitialize 后移除旧产品，失败时可回滚旧版；每次发行提高三段版本号
+
+每版必须运行 `Test-MsiOptions.ps1`，独立测试产品验证目录和快捷方式保留、旧版专属文件清理、无关用户文件保留，以及主动制造失败后的回滚。另用隔离安装验证上一正式 MSI → 新 MSI。应用设置和虚拟环境记录位于安装包之外，此规则仅适用于 MSI，MSIX 继续由 Windows 管理；完整包覆盖升级不宣称缩小下载量
+
+使用 `Test-MsiUpgrade.ps1 -ReleaseDirectory <新版> -PreviousReleaseDirectory <旧版>` 核对上一公开 MSI 覆盖升级后的文件哈希、应用数据与安装选项。脚本拒绝覆盖已有的 PyDeck 安装。一次性环境没有 WinUI 依赖时可加 `-SkipGui` 仅验收安装器，GUI 烟雾检查需单独执行，并注明这一边界

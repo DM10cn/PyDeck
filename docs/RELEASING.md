@@ -87,3 +87,11 @@ Starting with **0.6.0**, publish a normal GitHub release with an immutable `v<ve
 | MSIX application ID | `App` |
 
 MSIX filesystem/registry virtualization is disabled for the desktop app so PIM configuration, interpreter files, and the cross-instance lock remain shared with unpackaged tools. Neither format bundles .NET, Windows App Runtime, or PIM. MSI and MSIX are separate installation channels and do not perform automatic cross-format migration.
+
+## 🔁 MSI replacement upgrades — required from 0.6.1
+
+Every release ships a full MSI, not an MSP/binary-delta patch. Running a newer MSI upgrades in one installation transaction without requiring manual removal first. Keep the UpgradeCode, per-user scope and stable component identities; schedule old-product removal after InstallInitialize so a failed upgrade can restore it. Increment the three-part version for every release.
+
+Run `Test-MsiOptions.ps1` for every release. Its isolated fixtures verify retained folder/shortcuts, removed obsolete installer-owned files, preserved unrelated user files, and rollback after an intentional upgrade failure. Also validate the previous published MSI → new MSI on a disposable installation. App preferences and venv records remain outside the MSI payload. This policy applies to MSI only; MSIX remains managed by Windows. Do not call full-package replacement a reduced-size delta download.
+
+Use `Test-MsiUpgrade.ps1 -ReleaseDirectory <new> -PreviousReleaseDirectory <previous>` to compare installed file hashes and preserve application data / installer choices across the previous published MSI. It refuses to overwrite an existing PyDeck installation. `-SkipGui` permits installer-only checks in a disposable system without WinUI prerequisites; run GUI smoke checks separately and report that boundary.

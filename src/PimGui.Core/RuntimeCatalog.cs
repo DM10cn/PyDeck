@@ -2,6 +2,16 @@ namespace PimGui.Core;
 
 public static class RuntimeCatalog
 {
+    public static string MinorSeries(PythonRuntime runtime)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(runtime.Version, @"\A\d+\.\d+");
+        return match.Success ? match.Value : runtime.Tag;
+    }
+    public static bool MatchesDistribution(PythonRuntime runtime, string filter) => filter switch
+    {
+        "FreeThreaded" => runtime.IsFreeThreaded, "Embedded" => runtime.IsEmbeddable, "Tests" => runtime.IncludesTests,
+        "Other" => runtime.IsSpecialized && !runtime.IsFreeThreaded && !runtime.IsEmbeddable && !runtime.IncludesTests, _ => true
+    };
     public static int CompareVersions(string left, string right)
     {
         var result = SortVersion(left).CompareTo(SortVersion(right));

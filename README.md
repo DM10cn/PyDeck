@@ -10,11 +10,13 @@
 
 PyDeck is a native **WinUI 3** companion for **Python Install Manager**. Browse interpreters, install a version, choose your default, and keep offline packages close at hand — in a desktop interface with **Windows Fluent** and **Material 3 Expressive** styles.
 
-📦 **Stable release · 0.6.0** · 🪟 **Windows 11 x64** · 📄 **MIT**
+📦 **Stable release · 0.6.1** · 🪟 **Windows 11 x64** · 📄 **MIT**
 
 ## 📦 Download
 
 Get **MSI**, **MSIX**, and the **standalone dependency helper** from [GitHub Releases](https://github.com/DM10cn/PyDeck/releases). For source, use GitHub's automatic **Source code (zip)** / **Source code (tar.gz)** links in Assets. Follow the [installation guide](docs/INSTALL.md) for dependencies, installer choices, and MSIX certificate trust.
+
+New in **0.6.1**: 🧰 virtual environments, 🌐 custom HTTPS installation sources, 📜 Shebang rules, and 🔔 app update checks that open GitHub in your browser. Python settings expand inline; the catalog filters package types and groups minor versions. Python icons carry independent variant and EAP badges. The footer refreshes local and catalog data. MSI downloads perform full-package replacement upgrades while retaining settings and installer choices.
 
 ## ✨ What you can do
 

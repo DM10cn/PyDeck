@@ -2,7 +2,7 @@
 
 **English** · [简体中文](MANAGEMENT.zh-CN.md) · [🏠 Home](../README.md)
 
-These features are available in **0.6.0**. The published 0.5.1 installers do not contain them.
+This guide covers **0.6.1**, including the management features introduced in 0.6.0. Python management settings now expand inline in Settings.
 
 ## ✅ Operations and verification
 
@@ -14,9 +14,9 @@ An exit code of zero is not sufficient for a green success message. Missing file
 
 Open **Settings → Python management → PIM configuration** to change the default interpreter, default platform, automatic installation, or inclusion of unmanaged Python. **PIM default** removes the corresponding user override.
 
-The editor targets the standard user configuration, `%AppData%\Python\pymanager.json`. It preserves other fields, shows a change review, creates a backup, rejects concurrent edits, and replaces the file atomically. Backups created here can be restored from the same dialog. Environment overrides or administrator policies block editing until reviewed; custom configuration locations are not silently rewritten.
+The editor targets the standard user configuration, `%AppData%\Python\pymanager.json`. It preserves other fields, shows a change review, creates a backup, rejects concurrent edits, and replaces the file atomically. Backups created here can be restored from the same section. Environment overrides or administrator policies block editing until reviewed; custom configuration locations are not silently rewritten.
 
-These preferences also affect PIM outside PyDeck. PyDeck continues to disable implicit automatic installation in its own child processes. Installation-directory migration, custom sources, and shebang settings are outside this editor's scope.
+These preferences also affect PIM outside PyDeck. PyDeck continues to disable implicit automatic installation in its own child processes. Installation-directory migration remains outside this editor. Custom sources and Shebang rules have separate expandable sections.
 
 ## 🔎 PATH and aliases
 
@@ -32,7 +32,7 @@ The diagnostic opens Windows app execution alias settings without changing PATH.
 
 Proxy passwords are stored as a current-user generic credential in **Windows Credential Manager**, tied to the proxy address and username. Ordinary preferences contain only the mode, address, and username. Passwords and credential-bearing URLs are redacted from captured PIM output and error messages. Leaving the password blank retains a matching saved credential; **Clear saved password** removes it.
 
-For official Python packages, PyDeck measures bytes while downloading metadata-selected archives, validates SHA-256 and archive paths, and passes a verified temporary bundle cache to PIM. **PIM performs the installation and repair**, and online installs retain their original online source. Offline installation continues to use only the verified local source.
+For official and explicitly trusted custom HTTPS packages, PyDeck measures bytes while downloading metadata-selected archives, validates SHA-256 and archive paths, and passes a verified temporary bundle cache to PIM. **PIM performs the installation and repair**, and online installs retain their original online source. Offline installation continues to use only the verified local source.
 
 Transfers show KB below 1 MB and MB from 1 MB upward, using 1 KB = 1,024 bytes. Speed is smoothed; remaining time appears only with a known total and enough observations. Broken transfers may resume with checked HTTP ranges and are always validated against the full checksum. Missing data stays unknown. Extraction remains a separate, approximate PIM stage.
 
@@ -44,7 +44,7 @@ Use a managed version's **⋯ → Check installation** for a basic interpreter c
 
 Writing Python installations requires **PIM 26.3 or later**. Older or unrecognized versions remain available for compatible read-only queries; reconnect after upgrading to refresh capabilities. Testing found registration failures with `install --by-id` in both PIM 25.2 and 26.3. PyDeck uses selectors instead, verifies that a selector resolves to exactly the expected ID before mutation, and validates the installed result. The tested mutation baseline is 26.3; this is not a claim that every later PIM release has been tested.
 
-Core checks cover config conflicts, secret handling, command resolution, transfer validation and resumption, proxy failure, and capability changes. GUI smoke checks exercise the four languages and settings dialogs. The destructive lifecycle harness is **only for a disposable Windows Sandbox**:
+Core checks cover config conflicts, secret handling, command resolution, transfer validation and resumption, proxy failure, and capability changes. GUI smoke checks exercise the four languages and inline settings. The destructive lifecycle harness is **only for a disposable Windows Sandbox**:
 
 ```powershell
 .\scripts\Build.ps1 -Checks -Publish
@@ -54,4 +54,26 @@ Core checks cover config conflicts, secret handling, command resolution, transfe
 
 The lifecycle script verifies official PIM installers, creates its own headless sandbox, tests PIM 25.2 → 26.3 with an older official Python fixture, and writes per-case results under `artifacts/`. It stops only the sandbox it created. A fixture must be older than the online candidate for the actual update case to pass; `-SeedBundleDirectory` accepts a prepared flat offline bundle. Failures and unexecuted cases must not be counted as passes.
 
-📋 Current results and remaining validation boundaries are recorded in [feature status](FEATURES.md). venv, custom-source editing, and shebang management remain deferred.
+📋 Current results and remaining validation boundaries are recorded in [feature status](FEATURES.md). venv, source selection, and Shebang rules are available in 0.6.1; pip, uv/conda, environment deletion, and script-file editing remain outside this scope.
+
+## 🧰 Virtual environments
+
+Use **Virtual environments** to create an environment with an installed interpreter or import a folder containing `pyvenv.cfg`. Creation uses `python -I -m venv` in a new, exclusively reserved folder. Existing folders are never overwritten. Cancellation and failure retain partial files and an incomplete record. **Remove from list** removes only PyDeck's record.
+
+Import and Refresh inspect metadata without running Python. Check and Terminal first show the interpreter path and ask before executing a bounded probe. Terminal sets `VIRTUAL_ENV` and puts Scripts first in PATH without running the environment's activation script. Probing an imported environment executes its interpreter and normal site initialization, so import only environments you trust. A missing base interpreter is reported explicitly.
+
+## 🌐 Installation sources
+
+Expand **Settings → Python management → Installation source**. Leave the URL empty to use the official source, or explicitly trust a custom HTTPS PIM index. This preference applies only to PyDeck, not pip/PyPI or other terminals. Source changes invalidate the catalog; stale cards cannot start an installation.
+
+Only HTTPS URLs without credentials, query strings or fragments are accepted in this first version. Packages require SHA-256 and retain size/path checks, proxy support, cancellation, speed and ETA. A different package origin or cross-origin package redirect requires confirmation before connecting. PIM handles catalog resolution and its existing signature rules remain in force. A checksum proves integrity, not publisher identity.
+
+Update and Repair read the installation's original HTTPS index from PIM metadata, even if a different browsing source is selected. Missing or local-only original sources fail explicitly instead of silently choosing another publisher. Use the existing local offline-bundle flow for offline installs.
+
+## 📜 Shebang rules
+
+Expand **Shebang rules** with PIM 26.3 or later. Choose default/allow/block for launching non-Python programs; map templates to the default or an installed Python with `py` / `pyw`. Add or replace a rule by entering its template. Existing advanced entries remain untouched unless explicitly removed or replaced. Review differences before saving; backups, policy checks and conflict detection apply. PyDeck does not edit or execute project scripts to test rules.
+
+## 🔔 PyDeck updates
+
+**Settings → About → Check PyDeck updates** checks this repository's latest stable release through GitHub, using the app's network preferences. It excludes drafts, prereleases and beta-tagged history. When newer, **Open release page** launches the fixed PyDeck GitHub destination in your default browser. The app neither downloads installers silently nor replaces itself while running.

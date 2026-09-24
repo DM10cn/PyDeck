@@ -10,6 +10,8 @@ Python 及 Python 标志是 Python Software Foundation 的商标或注册商标�
 
 ## 🪟 平台与依赖
 
+版本卡使用 [PSF Python 标志 SVG](https://www.python.org/static/community_logos/python-logo-generic.svg) 中未修改的双蛇路径，仅裁去文字和阴影。嵌入式、自由线程、测试套件 SVG 角标为 PyDeck 绘制，EAP 角标独立表示预发布版本，不代表与 JetBrains 有关联。
+
 PyDeck 与 Microsoft 不存在隶属或背书关系，Windows、.NET、WinUI 等产品名称归各自权利人所有
 
 项目通过 NuGet 还原 Microsoft .NET / Windows App SDK 组件，依赖清单见项目文件及 `packages.lock.json`，各依赖保留自己的许可证和声明。源码仓库不内置还原后的包与运行时二进制文件

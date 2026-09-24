@@ -2,7 +2,7 @@
 
 **English** · [简体中文](FEATURES.zh-CN.md) · [🏠 Home](../README.md)
 
-**Stable release 0.6.0** — this page is the reference for feature and acceptance status. “Implemented” means the code and UI exist; completed checks are recorded below. A feature can be implemented while its full acceptance testing remains outstanding. Ideas under consideration are not commitments.
+**Version 0.6.1** — this page is the reference for feature and acceptance status. “Implemented” means the code and UI exist; completed checks are recorded below. A feature can be implemented while its full acceptance testing remains outstanding. Ideas under consideration are not commitments.
 
 ## ✅ Implemented
 
@@ -15,7 +15,7 @@
 | 📥 Runtime actions | Uniquely resolved selector install, update, repair, uninstall, default selection, terminal, folder, and path copy; mutation baseline PIM 26.3 |
 | 📦 Offline installation | Local `index.json` and ZIP bundle, required SHA-256, verified staging copy, and local sources |
 | 💾 Offline download | New bundle subfolder without overwriting existing bundles |
-| ⏳ Progress | Measured official-package bytes, smoothed speed, reliable ETA, KB / MB units; approximate extraction and indeterminate unknown phases |
+| ⏳ Progress | Measured package bytes, smoothed speed, reliable ETA, KB / MB units; approximate extraction and indeterminate unknown phases |
 | 🛑 Cancellation | Installation, updates, offline installation, and offline download; confirmation for install changes; partial files may remain |
 | ✅ Result consistency | Refreshed PIM inventory, exact version and interpreter health checks; unresolved results remain warnings |
 | 🔎 PATH / aliases | Default comparison, actual paths for trusted commands, shadowing, Windows settings, PIM registration refresh |
@@ -26,14 +26,22 @@
 | 🎨 Design and themes | Fluent / Material 3 Expressive semantic tokens, System / Light / Dark themes, bounded content width |
 | 🪟 Fluent materials | Mica / Acrylic; Use Windows setting / On / Off; translucent content layers; opaque fallback; controller preserved across unrelated changes |
 | 🌏 Languages | Main GUI: English default plus Simplified Chinese, Traditional Chinese (Taiwan), Japanese, with immediate switching and persistence; helper: same four choices, English on each launch; MSI wizard: English |
-| 🖼️ App identity | PyDeck icon in executable, window, title bar, and sidebar; About and dependency information |
+| 🖼️ App identity | PyDeck icon in executable, window, and sidebar; enlarged text-only title bar; About and dependency information |
 | 📋 Activity | Bounded session output, errors, exit codes, and explicit copy action |
 | 🔐 Safeguards | Argument validation, ownership and stale-state checks, cross-instance operation lock, bounded output, and atomic configuration writes |
-| 📦 Preview packaging | Per-user MSI, MSIX, local certificate signing, separate runtime prerequisites, and stable upgrade identities |
+| 📦 Packaging | Per-user MSI, MSIX, local certificate signing, separate runtime prerequisites, and stable upgrade identities |
 | 🗂️ MSI installation options | Editable folder, native folder browser, optional desktop / Start menu shortcuts, and choices preserved through repair and upgrades |
-| 🗜️ Source release archives | ZIP / tar.gz from the matching clean commit, bilingual install guide, and SHA-256 checksums |
+| 🗜️ Source release archives | GitHub-generated ZIP / tar.gz from the release tag; no duplicate uploaded source archives; separate bilingual install guides and asset checksums |
+| 🧰 Virtual environments | Create, import, inspect, explicitly check, activated terminal, open folder and forget; no project deletion |
+| 🌐 Installation source | App-local HTTPS PIM index, explicit trust, source snapshots, retained install origin for update / repair, cross-host download confirmation |
+| 📜 Shebang rules | Default / allow / block non-Python programs, reviewed template mappings to installed py / pyw selectors, backups and advanced-entry preservation |
+| 🔄 PyDeck updates | Stable-version check and official GitHub release page in the default browser |
+| 🪗 Inline settings | PIM configuration, PATH diagnostics, alias refresh, network, source and Shebang sections expand on the settings page |
+| 🐍 Catalog organization | Minor-version groups, independent special-distribution filters, Python SVG, variant badges and separate EAP label |
+| 🔃 Database refresh | Footer action refreshes installed inventory and the selected online catalog or offline bundle |
+| 🔁 MSI replacement upgrades | Full packages replace older versions transactionally, preserving folder, shortcuts and separate user data; no binary-delta claim |
 
-The table describes 0.6.0; 0.6.0 additions are documented in [Python management](MANAGEMENT.md) and are not in the 0.5.1 installers. Only PIM-managed Python runtimes can be updated, repaired, or removed. Python uninstallation inside the app does not expose mid-operation cancellation. See [Security](../SECURITY.md) for trust boundaries and [installation](INSTALL.md) for dependency and package requirements.
+The table describes 0.6.1. See [Python management](MANAGEMENT.md) for usage. Only PIM-managed Python runtimes can be updated, repaired, or removed. Python uninstallation inside the app does not expose mid-operation cancellation. See [Security](../SECURITY.md) for trust boundaries and [installation](INSTALL.md) for dependency and package requirements.
 
 ## 🛠️ Planned / awaiting acceptance
 
@@ -48,11 +56,20 @@ The table describes 0.6.0; 0.6.0 additions are documented in [Python management]
 | Idea | Notes |
 | --- | --- |
 | 📊 Persistent transfer history | Current activity remains session-only |
-| 🌐 Custom sources / shebang management | T3; no editing UI in this iteration |
-| 🧰 Virtual environments and pip | Outside the current interpreter-management scope |
+| 🧰 Package management | pip, uv, conda, environment migration and recursive deletion remain outside scope |
 | 💻 ARM64 application builds | Catalog architecture filtering does not mean the GUI has a native ARM64 build |
 
 ⏸️ **Windows 10 support is deferred**. Windows 7, 8, and 8.1 are outside the target scope.
+
+## 🧪 0.6.1 acceptance — 2026-09-24
+
+| Check | Result | Scope |
+| --- | --- | --- |
+| Core regressions | 64 passed | Includes a real temporary venv, source and redirect rejection, source snapshots, Shebang preservation and update metadata |
+| GUI | 18 groups passed | Four-language inline settings, environment page, Python / EAP / variant icons, package filters, minor-version grouping and existing appearance checks |
+| Disposable Sandbox lifecycle | 14 cases passed | Full earlier lifecycle plus real custom HTTPS source install / repair / origin retention, PIM Shebang mapping and venv creation |
+
+Installer and final signed-package results are recorded in the 0.6.1 release notes. The lifecycle harness runs under a disposable Sandbox System account. These results do not replace normal-user, clean-machine GUI, external accessibility or production MSIX certificate-trust acceptance.
 
 ## 🧪 0.6.0 acceptance — 2026-09-24
 

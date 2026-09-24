@@ -49,3 +49,7 @@ Logs and screenshots may reveal installation paths and manager output. Review th
 ## 🧪 Validation limits
 
 Regression checks exercise malformed identities, unmanaged and stale runtime rejection, concurrency, configuration preservation, path handling, excessive process output, observer failure, and offline archive checks. These checks are not an independent security audit. A disposable Sandbox harness covers the supported Python lifecycle. Arbitrary third-party PIM configuration, all account contexts, and future CLI versions remain outside that matrix. The [feature-status record](docs/FEATURES.md) distinguishes this work from completed PyDeck installer checks.
+
+## 🧰 T3 boundaries
+
+Custom installation sources are app-local HTTPS PIM indexes, not pip indexes. PyDeck does not disable PIM signature policy. SHA-256 proves byte integrity, not publisher identity. Cross-origin package downloads require confirmation; update and repair retain the installed origin. Virtual-environment import only reads metadata; explicit health checks and terminals execute the selected environment after showing its path. Forgetting an environment never removes its files. Shebang editing changes PIM configuration, never user scripts.

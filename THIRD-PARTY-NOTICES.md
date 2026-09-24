@@ -10,6 +10,8 @@ Python and the Python logos are trademarks or registered trademarks of the Pytho
 
 ## 🪟 Platform and dependencies
 
+Version cards use the unmodified snake paths from the [PSF Python logo SVG](https://www.python.org/static/community_logos/python-logo-generic.svg), cropped to omit the wordmark and shadow. The embedded, free-threaded, and test-package SVG badges are PyDeck artwork. The separate EAP label indicates a prerelease; it does not imply affiliation with JetBrains.
+
 PyDeck is not affiliated with or endorsed by Microsoft. Windows, .NET, WinUI, and related product names belong to their respective owners.
 
 The project restores Microsoft .NET / Windows App SDK components through NuGet. Dependencies are listed in the project files and `packages.lock.json`; each dependency retains its own license and notices. Restored packages and runtime binaries are not vendored in this source repository.

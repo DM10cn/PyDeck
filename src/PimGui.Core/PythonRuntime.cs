@@ -7,6 +7,7 @@ public sealed record PythonRuntime(string Id, string Company, string Tag, string
     string DisplayName, string Executable, string Prefix, bool IsDefault, bool IsManaged = false)
 {
     public string? DownloadMetadata { get; init; }
+    public string? CatalogIndex { get; init; }
     public string Architecture => Tag.Contains("arm64", StringComparison.OrdinalIgnoreCase) ? "ARM64"
         : Tag.EndsWith("-32", StringComparison.OrdinalIgnoreCase) ? "x86" : "x64";
     public bool IsPrerelease => Regex.IsMatch(Version, @"\d(?:a|b|rc)\d", RegexOptions.IgnoreCase)

@@ -17,6 +17,7 @@ public sealed record AppSettings
     public bool ShowSpecializedPackages { get; init; }
     public bool ConfirmBeforeUninstall { get; init; } = true;
     public NetworkSettings Network { get; init; } = new();
+    public string InstallationIndex { get; init; } = "";
 
     public AppSettings Normalize() => this with
     {
@@ -28,6 +29,7 @@ public sealed record AppSettings
         DefaultArchitecture = DefaultArchitecture is "x64" or "ARM64" or "x86" ? DefaultArchitecture : "x64",
         CatalogSource = CatalogSource is "Online" or "Offline" ? CatalogSource : "Online",
         ManagerPath = ManagerPath?.Trim() ?? "",
+        InstallationIndex = string.IsNullOrWhiteSpace(InstallationIndex) ? "" : InstallationSource.Validate(InstallationIndex),
         Network = Network ?? new()
     };
 }
@@ -45,7 +47,7 @@ public sealed class SettingsStore(string directory)
             if (!File.Exists(FilePath)) return new();
             return (JsonSerializer.Deserialize<AppSettings>(SafeFiles.ReadText(FilePath)) ?? throw new JsonException("Empty settings.")).Normalize();
         }
-        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or ArgumentException)
         { LoadWarning = "Your saved preferences could not be read. Defaults are in use. " + ex.Message; return new(); }
     }
     public void Save(AppSettings settings)

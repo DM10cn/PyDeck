@@ -10,38 +10,51 @@ public sealed partial class MainWindow
     private string? ProxyPassword() => preferences.Network.Mode == "Custom"
         ? ProxyCredential.Load(preferences.Network.Address, preferences.Network.Username) : null;
     private PimClient CreateClient() => new(new ProcessRunner(() => preferences.Network, ProxyPassword))
-        { Network = () => preferences.Network, ProxyPassword = ProxyPassword };
+        { Network = () => preferences.Network, ProxyPassword = ProxyPassword,
+          SelectedSource = () => preferences.InstallationIndex, ConfirmDownloadOrigin = ConfirmDownloadOriginAsync };
 
+    private readonly HashSet<string> expandedSettings = [];
+    private PathReport? lastPathReport;
     private UIElement ManagementSettings()
     {
         var panel = new StackPanel { Spacing = 12 };
         panel.Children.Add(palette.Label("Python management", 19, true));
         panel.Children.Add(palette.Label(T("PIM version: {0}", client.ManagerVersion), 12, muted: true));
-        if (connected && !client.SupportsMutations) panel.Children.Add(palette.Label("Update to PIM 26.3 or later before changing Python installations", 12));
-        foreach (var (title, description, action) in new (string, string, Func<Task>)[]
+        foreach (var (title, build) in new (string, Func<UIElement>)[] {
+            ("PIM configuration", BuildPimEditor), ("PATH and aliases", BuildPathEditor), ("Refresh aliases", BuildAliasEditor),
+            ("Network", BuildNetworkEditor), ("Installation source", BuildSourceEditor), ("Shebang rules", BuildShebangEditor) })
         {
-            ("PIM configuration", "Default interpreter, platform, and automatic installation", EditPimConfigurationAsync),
-            ("PATH and aliases", "Compare command resolution with your default Python", ShowPathDiagnosticsAsync),
-            ("Refresh aliases", "Ask PIM to rebuild registrations and global aliases for all managed versions", RefreshAliasesAsync),
-            ("Network", "System settings, direct connection, or an HTTP proxy", EditNetworkAsync)
-        })
-        {
-            var button = palette.Action("Open", "\uE713", compact: true);
-            button.IsEnabled = !busy && (connected || title == "Network");
-            button.Click += async (_, _) => await action();
-            panel.Children.Add(SettingRow(title, description, button));
+            var section = new Expander { Header = T(title), Tag = "Management:" + title, IsExpanded = expandedSettings.Contains(title),
+                HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                CornerRadius = new(palette.Radius), IsEnabled = !busy && (connected || title is "Network" or "Installation source") && (title != "Shebang rules" || client.SupportsMutations) };
+            palette.ApplySurfaceResources(section);
+            void Populate() { try { section.Content = build(); } catch (Exception ex) { section.Content = palette.Label(T(ex.Message), 13); } }
+            if (section.IsExpanded) Populate();
+            section.Expanding += (_, _) => { expandedSettings.Add(title); if (section.Content is null) Populate(); };
+            section.Collapsed += (_, _) => expandedSettings.Remove(title);
+            panel.Children.Add(section);
         }
         return palette.CardBox(panel);
     }
-    private async Task EditNetworkAsync()
+    private void InlineAction(StackPanel body, string label, Func<Task> action, bool enabled = true)
     {
-        if (busy || confirmationOpen) return;
-        confirmationOpen = true;
-        try
-        {
+        var button = palette.Action(label, compact: true); button.IsEnabled = enabled && !busy;
+        button.HorizontalAlignment = HorizontalAlignment.Left;
+        button.Click += async (_, _) => await SaveInlineAsync(action); body.Children.Add(button);
+    }
+    private async Task SaveInlineAsync(Func<Task> action)
+    {
+        if (busy || confirmationOpen) return; confirmationOpen = true;
+        SetBusy(true);
+        try { await action(); }
+        catch (Exception ex) { ShowError(new IOException(SensitiveText.Redact(ex.Message))); }
+        finally { confirmationOpen = false; SetBusy(false); }
+    }
+    private UIElement BuildNetworkEditor()
+    {
             var previous = preferences;
             var mode = preferences.Network.Mode;
-            var body = new StackPanel { Spacing = 12, MinWidth = 420 };
+            var body = new StackPanel { Spacing = 12 };
             var address = new TextBox { Header = T("Proxy address"), Text = preferences.Network.Address, PlaceholderText = "http://localhost:7890" };
             var username = new TextBox { Header = T("Username"), Text = preferences.Network.Username };
             var password = new PasswordBox { Header = T("Password"), PlaceholderText = T("Leave blank to keep the saved password") };
@@ -51,8 +64,7 @@ public sealed partial class MainWindow
             UpdateFields();
             body.Children.Add(address); body.Children.Add(username); body.Children.Add(password); body.Children.Add(clear);
             body.Children.Add(palette.Label("Passwords are stored in Windows Credential Manager", 12, muted: true));
-            var dialog = Dialog("Network", "", "Save"); dialog.Content = body;
-            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        InlineAction(body, "Save", async () => {
             var settings = new NetworkSettings(mode, address.Text.Trim(), username.Text.Trim()).Validate();
             var secret = clear.IsChecked == true ? "" : password.Password.Length > 0 ? password.Password : ProxyCredential.Load(settings.Address, settings.Username) ?? "";
             var next = preferences with { Network = settings };
@@ -61,19 +73,14 @@ public sealed partial class MainWindow
             catch { store.Save(previous); throw; }
             preferences = next;
             catalog = null;
-            Notify("Network settings saved", InfoBarSeverity.Success);
-        }
-        catch (Exception ex) { ShowError(new IOException(SensitiveText.Redact(ex.Message))); }
-        finally { confirmationOpen = false; RenderPage(); }
+            Notify("Network settings saved", InfoBarSeverity.Success);            await Task.CompletedTask;
+        });
+        return body;
     }
-    private async Task EditPimConfigurationAsync()
+    private UIElement BuildPimEditor()
     {
-        if (busy || !connected || confirmationOpen) return;
-        confirmationOpen = true;
-        try
-        {
             var snapshot = PimConfiguration.Read();
-            var body = new StackPanel { Spacing = 12, MinWidth = 440 };
+            var body = new StackPanel { Spacing = 12 };
             body.Children.Add(palette.Label(snapshot.Path, 12, muted: true));
             var edits = new JsonObject();
             var defaults = new List<(string, string)> { ("", "PIM default") };
@@ -95,9 +102,8 @@ public sealed partial class MainWindow
                 body.Children.Add(palette.Label("Restore backup", 14, true));
                 body.Children.Add(Choice(new[] { ("", "Choose a backup") }.Concat(backups.Select(p => (p, Path.GetFileName(p)))).ToArray(), "", value => backup = value.Length > 0 ? value : null, "Restore backup"));
             }
-            var dialog = Dialog("PIM configuration", "", "Review changes"); dialog.Content = new ScrollViewer { Content = body, MaxHeight = 520 };
-            dialog.IsPrimaryButtonEnabled = snapshot.Overrides.Count == 0;
-            if (await dialog.ShowAsync() != ContentDialogResult.Primary || (edits.Count == 0 && backup is null)) return;
+        InlineAction(body, "Review changes", async () => {
+            if (edits.Count == 0 && backup is null) return;
             string SettingName(string key) => T(key switch { "default_tag" => "Default interpreter", "default_platform" => "Default platform", "automatic_install" => "Automatic installation", _ => "Include unmanaged Python" });
             string DisplayValue(JsonNode? value) => value is null ? T("PIM default") : value.ToJsonString() switch
                 { "true" => T("On"), "false" => T("Off"), "\"-64\"" => "x64", "\"-32\"" => "x86", "\"-arm64\"" => "ARM64", _ => value.ToString() };
@@ -111,20 +117,18 @@ public sealed partial class MainWindow
             installed = await client.ListAsync(); catalog = null;
             if (edits["default_tag"] is { } requested && installed.FirstOrDefault(r => r.IsDefault)?.Selector != requested.GetValue<string>())
                 Notify("Your preference was saved, but PIM reports a different effective default. A custom configuration or policy may override it.", InfoBarSeverity.Warning);
-            else Notify("Configuration saved and Python list refreshed", InfoBarSeverity.Success);
-        }
-        catch (Exception ex) { try { installed = await client.ListAsync(); } catch { installed = []; } ShowError(ex); }
-        finally { confirmationOpen = false; RenderPage(); }
+            else Notify("Configuration saved and Python list refreshed", InfoBarSeverity.Success);        }, snapshot.Overrides.Count == 0);
+        return body;
     }
-    private async Task ShowPathDiagnosticsAsync()
+    private UIElement BuildPathEditor()
     {
-        if (busy || !connected || confirmationOpen) return;
-        confirmationOpen = true;
-        try
-        {
+        var body = new StackPanel { Spacing = 12 };
+        InlineAction(body, "Run diagnostics", async () => {
             installed = await client.ListAsync();
-            var report = await PathDiagnostics.ProbeKnownAsync(PathDiagnostics.Inspect(installed, client.Executable), installed, client.Executable);
-            var body = new StackPanel { Spacing = 12, MinWidth = 460 };
+            lastPathReport = await PathDiagnostics.ProbeKnownAsync(PathDiagnostics.Inspect(installed, client.Executable), installed, client.Executable);
+        });
+        if (lastPathReport is not { } report) return body;
+
             body.Children.Add(palette.Label(T("PyDeck default: {0}", report.DefaultVersion ?? T("Not found")), 16, true));
             foreach (var entry in report.Commands)
             {
@@ -139,11 +143,15 @@ public sealed partial class MainWindow
             body.Children.Add(palette.Label("Unknown commands are not executed. Shell functions and virtual environments may resolve differently", 12, muted: true));
             var aliases = palette.Action("Windows app execution aliases", "\uE713");
             aliases.Click += (_, _) => { try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:appsfeatures-app") { UseShellExecute = true }); } catch (Exception ex) { ShowError(ex); } }; body.Children.Add(aliases);
-            var dialog = Dialog("PATH and aliases", ""); dialog.Content = new ScrollViewer { Content = body, MaxHeight = 520 };
-            await dialog.ShowAsync();
-        }
-        catch (Exception ex) { installed = []; ShowError(ex); }
-        finally { confirmationOpen = false; RenderPage(); }
+        return body;
+    }
+    private UIElement BuildAliasEditor()
+    {
+        var body = new StackPanel { Spacing = 12 };
+        body.Children.Add(palette.Label("Ask PIM to rebuild registrations and global aliases for all managed versions", 13));
+        var button = palette.Action("Refresh aliases", compact: true); button.IsEnabled = client.SupportsMutations && !busy;
+        button.Click += async (_, _) => await RefreshAliasesAsync(); body.Children.Add(button);
+        return body;
     }
     private async Task RefreshAliasesAsync()
     {

@@ -18,7 +18,7 @@ public sealed partial class MainWindow
         // Reading the online catalog can be cancelled. Installation cannot.
         source.IsEnabled = !busy || catalogCancellation is not null;
         row.Children.Add(source);
-        var location = palette.Label(OfflineSource ? offlineBundle?.DirectoryPath ?? T("No folder selected") : T("Python release catalog"), 12, muted: true);
+        var location = palette.Label(OfflineSource ? offlineBundle?.DirectoryPath ?? T("No folder selected") : T("Python release catalog") + " · " + new Uri(InstallationSource.Validate(preferences.InstallationIndex)).Host, 12, muted: true);
         location.VerticalAlignment = VerticalAlignment.Center; location.TextWrapping = TextWrapping.NoWrap;
         location.TextTrimming = TextTrimming.CharacterEllipsis;
         ToolTipService.SetToolTip(location, location.Text);

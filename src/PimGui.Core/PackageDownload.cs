@@ -15,14 +15,14 @@ public static class TransferUnits
 /// <summary>PIM supplies and validates catalog metadata; PIM still performs all installations.</summary>
 public static class PackageDownload
 {
-    public static async Task<OfflineBundle> FetchAsync(PythonRuntime runtime, string directory, HttpClient client, PimOperation? operation)
+    public static async Task<OfflineBundle> FetchAsync(PythonRuntime runtime, string directory, HttpClient client, PimOperation? operation, Func<Uri, Task<bool>>? confirmOrigin = null)
     {
         _ = PimClient.BuildArguments(RuntimeAction.Install, runtime);
         var metadata = JsonNode.Parse(runtime.DownloadMetadata ?? throw new IOException("Download details are unavailable"))!.AsObject();
-        var url = new Uri(metadata["url"]!.GetValue<string>());
-        // Custom feeds remain PIM's responsibility; never forward proxy credentials to a package origin.
-        if (url.Scheme != "https" || url.UserInfo.Length > 0 || url.Host is not ("www.python.org" or "python.org"))
-            throw new IOException("Detailed downloads currently require an official Python package");
+        var url = new Uri(InstallationSource.Validate(metadata["url"]!.GetValue<string>()));
+        var origin = new Uri(runtime.CatalogIndex ?? InstallationSource.Official);
+        if (!InstallationSource.SameOrigin(origin, url) && !(runtime.CatalogIndex is null && url.Host is "python.org" or "www.python.org") &&
+            (confirmOrigin is null || !await confirmOrigin(url))) throw new InvalidDataException("The download source was not approved");
         var expected = metadata["hash"]?["sha256"]?.GetValue<string>() ?? "";
         if (!Regex.IsMatch(expected, "\\A[0-9a-fA-F]{64}\\z")) throw new IOException("The package has no valid SHA-256 checksum");
         SafeFiles.RequireNoLinks(directory);
@@ -44,11 +44,9 @@ public static class PackageDownload
                 token.ThrowIfCancellationRequested();
                 try
                 {
-                    using var request = new HttpRequestMessage(HttpMethod.Get, url);
-                    if (received > 0) request.Headers.Range = new RangeHeaderValue(received, null);
                     using var headersTimeout = CancellationTokenSource.CreateLinkedTokenSource(token);
                     headersTimeout.CancelAfter(TimeSpan.FromMinutes(2));
-                    using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, headersTimeout.Token);
+                    using var response = await SendAsync(client, url, received, confirmOrigin, headersTimeout.Token);
                     response.EnsureSuccessStatusCode();
                     if (received > 0 && response.StatusCode == HttpStatusCode.PartialContent)
                     {
@@ -104,5 +102,22 @@ public static class PackageDownload
         var bundle = OfflineBundle.Load(directory);
         using var verified = await bundle.PrepareAsync(bundle.Runtimes.Single(), token);
         return bundle;
+    }
+    private static async Task<HttpResponseMessage> SendAsync(HttpClient client, Uri url, long received, Func<Uri, Task<bool>>? confirm, CancellationToken token)
+    {
+        for (var hop = 0; hop < 6; hop++)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            if (received > 0) request.Headers.Range = new RangeHeaderValue(received, null);
+            var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
+            if ((int)response.StatusCode is not (301 or 302 or 303 or 307 or 308)) return response;
+            var location = response.Headers.Location; response.Dispose();
+            if (location is null) throw new IOException("Invalid download redirect");
+            var next = new Uri(InstallationSource.Validate(new Uri(url, location).AbsoluteUri));
+            if (!InstallationSource.SameOrigin(url, next) && (confirm is null || !await confirm(next)))
+                throw new InvalidDataException("The download source was not approved");
+            token.ThrowIfCancellationRequested(); url = next;
+        }
+        throw new IOException("Too many download redirects");
     }
 }

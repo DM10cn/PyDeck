@@ -38,10 +38,10 @@ public sealed partial class MainWindow
             Navigate("runtimes");
             await CaptureAsync(Path.Combine(directory, "01-material-dark-runtimes.png"));
             if (BrandMark.Child is not Image { Source: BitmapImage { PixelWidth: > 0 } } ||
-                Descendants(TitleBar).OfType<Image>().Single().Source is not BitmapImage { PixelWidth: > 0 } ||
+                Descendants(TitleBar).OfType<Image>().Any() ||
                 !File.Exists(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico")))
                 throw new InvalidOperationException("Selected app icon was not loaded.");
-            checks.Add("Selected icon decoded in title bar and sidebar; Windows ICO is present.");
+            checks.Add("Sidebar icon decoded; title bar has no redundant icon; Windows ICO is present.");
             search = "no-such-python-version-19d7"; PopulateRuntimes();
             if (VisibleRuntimeCount != 0) throw new InvalidOperationException("Runtime search did not filter the list.");
             checks.Add("Runtime search: no-match state verified.");
@@ -75,7 +75,7 @@ public sealed partial class MainWindow
             SavePreferences(preferences with { ShowPreviewReleases = false, ShowSpecializedPackages = false, DefaultArchitecture = "x64" });
             checks.Add("Python defaults drive catalog filtering and expansion; manager location is read-only.");
             await CheckManagementSettingsAsync(directory);
-            checks.Add("Four-language network / PIM configuration dialogs, read-only PATH diagnostics, and actual byte progress rendered without saving user settings.");
+            checks.Add("Four-language inline management settings, read-only PATH diagnostics, virtual environments, runtime badges, catalog grouping and actual byte progress rendered without saving user settings.");
             SaveAppearance("Fluent", "Dark"); Navigate("runtimes"); architecture = "All architectures"; RenderPage();
             await CaptureAsync(Path.Combine(directory, "04-fluent-dark-runtimes.png"));
             SavePreferences(preferences with { Transparency = "Off" });
@@ -220,17 +220,17 @@ public sealed partial class MainWindow
         foreach (var language in Strings.Languages)
         {
             SavePreferences(preferences with { Language = language }); Navigate("settings");
-            var editing = EditNetworkAsync();
-            var dialog = await WaitForCancellationDialogAsync("Network");
-            if (!Descendants(dialog).OfType<PasswordBox>().Any() || !Descendants(dialog).OfType<TextBlock>().Any(t => t.Text == T("Passwords are stored in Windows Credential Manager")))
-                throw new IOException("Network dialog missing protected credential UI");
-            await CaptureAsync(Path.Combine(directory, "15-network-" + language + ".png"), dialog);
-            dialog.Hide(); await editing;
-            editing = EditPimConfigurationAsync();
-            dialog = await WaitForCancellationDialogAsync("PIM configuration");
-            if (Descendants(dialog).OfType<ComboBox>().Count() < 4) throw new IOException("Configuration choices missing");
-            await CaptureAsync(Path.Combine(directory, "16-pim-config-" + language + ".png"), dialog);
-            dialog.Hide(); await editing;
+            foreach (var title in new[] { "Network", "PIM configuration", "Installation source", "Shebang rules" })
+            {
+                expandedSettings.Clear(); expandedSettings.Add(title); RenderPage(); Root.UpdateLayout();
+                var section = Descendants(PageHost).OfType<Expander>().Single(e => e.Tag as string == "Management:" + title);
+                if (!section.IsExpanded || section.Content is not StackPanel) throw new IOException("Inline settings not rendered: " + title);
+                if (title == "Network" && !Descendants(section).OfType<PasswordBox>().Any()) throw new IOException("Protected credential UI missing");
+                if (title == "PIM configuration" && Descendants(section).OfType<ComboBox>().Count() < 4) throw new IOException("Configuration choices missing");
+                await CaptureAsync(Path.Combine(directory, "15-" + title.Replace(" ", "-") + "-" + language + ".png"), section);
+            }
+            Navigate("environments");
+            await CaptureAsync(Path.Combine(directory, "16-environments-" + language + ".png"));
             var operation = BeginOperation("Download", download: true);
             operation.Transfer(2 * 1024 * 1024, 4 * 1024 * 1024, 1024 * 1024, TimeSpan.FromSeconds(2));
             UpdateOperationPanel();
@@ -238,10 +238,28 @@ public sealed partial class MainWindow
             FinishOperation(operation);
         }
         SavePreferences(preferences with { Language = "en-US" });
-        var inspecting = ShowPathDiagnosticsAsync();
-        var diagnostics = await WaitForCancellationDialogAsync("PATH and aliases");
-        await CaptureAsync(Path.Combine(directory, "17-path-diagnostics.png"), diagnostics);
-        diagnostics.Hide(); await inspecting;
+        lastPathReport = await PathDiagnostics.ProbeKnownAsync(PathDiagnostics.Inspect(installed, client.Executable), installed, client.Executable);
+        expandedSettings.Clear(); expandedSettings.Add("PATH and aliases"); Navigate("settings"); Root.UpdateLayout();
+        await CaptureAsync(Path.Combine(directory, "17-path-diagnostics.png"), Descendants(PageHost).OfType<Expander>().Single(e => e.Tag as string == "Management:PATH and aliases"));
+        expandedSettings.Clear();
+        var sample = installed.First();
+        var gallery = new StackPanel { Spacing = 8, Width = 480 };
+        foreach (var r in new[] { sample, sample with { Version = "3.15.0rc1" }, sample with { Company = "PythonEmbed" }, sample with { Tag = "3.14t-64" }, sample with { Company = "PythonTest", Version = "3.15.0b1" } })
+        {
+            var icon = RuntimeIcon(r);
+            if (Descendants(icon).OfType<Border>().Any(b => b.Tag as string == "EapBadge") != r.IsPrerelease) throw new IOException("EAP badge mismatch");
+            gallery.Children.Add(icon);
+        }
+        PageHost.Children.Clear(); PageHost.Children.Add(gallery);
+        await CaptureAsync(Path.Combine(directory, "18-runtime-icons.png"));
+        Navigate("catalog"); specializedExpanded = true; RenderPage(); Root.UpdateLayout();
+        var group = Descendants(PageHost).OfType<Expander>().Single(e => e.Header as string == T("Other distributions"));
+        var filter = Descendants(group).OfType<ComboBox>().Single();
+        filter.SelectedItem = filter.Items.Cast<ComboBoxItem>().Single(i => i.Tag as string == "Embedded");
+        var series = Descendants(group).OfType<Expander>().First(); series.IsExpanded = true; Root.UpdateLayout();
+        if (!Descendants(series).OfType<TextBlock>().Any(t => t.Text.Contains("Embeddable", StringComparison.OrdinalIgnoreCase))) throw new IOException("Distribution filter did not populate versions");
+        await CaptureAsync(Path.Combine(directory, "19-filtered-minor-series.png"));
+        distributionFilter = "All";
     }
     private async Task<ContentDialog> WaitForCancellationDialogAsync(string title = "Stop this installation?")
     {

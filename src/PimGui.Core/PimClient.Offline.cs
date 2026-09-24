@@ -33,7 +33,10 @@ public sealed partial class PimClient
             parentDirectory = ExecutionPaths.LocalPath(parentDirectory);
             SafeFiles.RequireNoLinks(parentDirectory);
             using var operationLock = AcquireOperationLock();
-            var current = (await ListAsync(true, operation?.Token ?? default)).SingleOrDefault(r => r.Id == runtime.Id && r.Version == runtime.Version && r.Company == runtime.Company);
+            var index = SelectedSource is null ? null : InstallationSource.Validate(SelectedSource());
+            if (index is not null && runtime.CatalogIndex != index)
+                throw new IOException("The installation source changed. Reload the catalog");
+            var current = (await ListAsync(true, operation?.Token ?? default, index)).SingleOrDefault(r => r.Id == runtime.Id && r.Version == runtime.Version && r.Company == runtime.Company);
             if (current is null) throw new InvalidOperationException("This Python entry has changed. Refresh the list before trying again.");
             var directory = Path.Combine(parentDirectory, "Python-offline-" + runtime.Id + "-" + Guid.NewGuid().ToString("N")[..8]);
             if (Directory.Exists(directory) || File.Exists(directory)) throw new IOException("Choose another download folder.");
@@ -41,7 +44,7 @@ public sealed partial class PimClient
             if (Network is not null)
             {
                 using var http = Network().CreateClient(ProxyPassword?.Invoke());
-                await PackageDownload.FetchAsync(current, directory, http, operation);
+                await PackageDownload.FetchAsync(current, directory, http, operation, ConfirmDownloadOrigin);
                 return directory;
             }
             string[] arguments = ["install", "--yes", "--by-id", "--download=" + directory, runtime.Id];

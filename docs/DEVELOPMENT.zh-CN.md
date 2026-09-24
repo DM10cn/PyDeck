@@ -115,3 +115,9 @@ dotnet run --project tests/PimGui.Checks -- --offline-fixture "C:\TestBundles\Py
 请勿提交构建产物、缓存、凭据、签名密钥、私有配置、个人日志、截图或规划笔记。`.gitignore` 覆盖常见情况，但仍应检查暂存区内容，参见 [安全说明](SECURITY.zh-CN.md)
 
 图标原图位于 `src/PimGui.App/Assets/AppIcon.Source.png`，可运行 `scripts/Build-Icon.ps1` 重新生成 PNG / ICO。修改品牌素材前请查看 [第三方声明](THIRD-PARTY-NOTICES.zh-CN.md)
+
+## 🧰 T3 检查
+
+核心检查覆盖正式版本信息、源地址与跨站重定向确认、过期源快照、Shebang 保留与冲突，以及未完成环境的保留。将 `PYDECK_TEST_VENV_PYTHON` 设为可信的本机 Python 路径，可追加真实临时 venv 创建、检查和移除记录测试，测试文件留在已忽略的 artifacts 目录
+
+`Test-PimLifecycle.ps1 -T3Only` 在一次性 Windows Sandbox 中运行安装源、Shebang 和 venv 验收。HTTPS 测试仅在沙箱内创建短期 localhost 证书，结束后移除其信任条目，不更改宿主机证书信任。不加 `-T3Only` 则运行完整生命周期
