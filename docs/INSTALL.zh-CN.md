@@ -37,7 +37,7 @@ MSIX 缺少框架时可能在包内启动器运行前就被阻止安装，可先
 
 ### 🐍 连接 Python Install Manager
 
-**0.6.0**修改 Python 安装需要 PIM **26.3 或更高版本**，旧版或无法识别的管理器仅支持兼容的只读查询，升级后请重新连接。详见 [Python 管理](MANAGEMENT.zh-CN.md)，已发布的 0.5.1 安装包尚无这项能力限制
+**0.6.0** 修改 Python 安装需要 PIM **26.3 或更高版本**，旧版或无法识别的管理器仅支持兼容的只读查询，升级后请重新连接。详见 [Python 管理](https://github.com/DM10cn/PyDeck/blob/v0.6.0/docs/MANAGEMENT.zh-CN.md)，已发布的 0.5.1 安装包尚无这项能力限制
 
 GUI 运行时齐全后，可在未安装 PIM 时打开 PyDeck。在未连接页面或设置中选择**下载 Python Install Manager**，从 Python 官方 Windows 页面手动安装，再点击**重新检查**或**自动检测**，也可在设置中选择管理器文件。按钮只打开下载页面或重新连接，不自行安装 PIM；重连无需重启 PyDeck
 

@@ -39,7 +39,6 @@ The table describes 0.6.0; 0.6.0 additions are documented in [Python management]
 
 | Item | Scope |
 | --- | --- |
-| 🧪 Full Python runtime lifecycle acceptance | End-to-end Python install, update, uninstall, and effective-default changes in a disposable environment; the corresponding features already exist |
 | ♿ Desktop acceptance | External keyboard and screen-reader testing, DPI behavior, and native backdrop appearance |
 | 🔏 Production signing | Publicly trusted signing and clean-machine verification of the certificate-trust installation path |
 | 🧼 Clean-machine deployment | Verify external runtime prerequisites and startup on a clean Windows 11 installation |
@@ -55,6 +54,17 @@ The table describes 0.6.0; 0.6.0 additions are documented in [Python management]
 
 ⏸️ **Windows 10 support is deferred**. Windows 7, 8, and 8.1 are outside the target scope.
 
+## 🧪 0.6.0 acceptance — 2026-09-24
+
+| Check | Result | Scope |
+| --- | --- | --- |
+| Core regressions | 54 passed | Includes credentials, real loopback proxy authentication / failure, resume / checksum checks, config conflicts, and ETA sampling |
+| GUI | 18 groups passed | Four languages, new settings dialogs, read-only actual PATH resolution, progress, cancellation controls, and existing appearance / layout checks |
+| Disposable Sandbox lifecycle | 12 cases passed | Official PIM 25.2 → 26.3; Python 3.14.6 → 3.14.7; damage / repair; cancellation; measured offline bundle; Python 3.13.15 install and actual default execution; uninstall; offline reinstall with network blocked; alias refresh and final cleanup |
+| MSI options | Passed | Four shortcut combinations, Unicode / spaced directories, repair, upgrade retention, and unrelated-file preservation with isolated test identities |
+
+The lifecycle harness uses a disposable Windows Sandbox System account. GUI checks are in-app state/render checks; they are not external mouse, keyboard, or screen-reader automation. The E2E fixtures exercise real PIM and official Python archives; no daily Python installation is damaged or removed. Final package-specific evidence is reported in the release notes. Clean-machine GUI deployment and the production MSIX certificate-trust path remain outside this matrix.
+
 ## 🔬 Verification boundary
 
 The following records local checks for the **0.5.1 release**. See [development](DEVELOPMENT.md) and [releasing](RELEASING.md) for commands.
@@ -67,7 +77,7 @@ The following records local checks for the **0.5.1 release**. See [development](
 | 🔁 MSI options and lifecycle | Isolated test products exercised all four shortcut combinations, Unicode / spaced folders, repair, upgrade retention, and preservation of unrelated files on uninstall | This validates PyDeck setup, not Python interpreter operations |
 | 📦 Final MSI | Installation, 53 installed-file hash comparisons, 17 GUI check groups, and uninstall cleanup | Local Windows environment only |
 | 🪟 Final MSIX | Signature and block-map checks, development registration, real package activation, 17 GUI check groups, and cleanup | Production certificate-trust installation still untested |
-| 🐍 PIM integration | Read-only live queries, isolated offline extraction, and test-download cancellation exercised during development | Full managed-Python lifecycle remains pending |
+| 🐍 PIM integration | Read-only live queries, isolated offline extraction, and test-download cancellation exercised during development | Full lifecycle was not part of the 0.5.1 matrix |
 | 🎨 Appearance | GUI state / render checks, controller retention, and wide / compact layouts | Native compositor appearance, external keyboard / screen-reader use, and all DPI settings remain pending |
 
 Existing daily-use Python environments were not used for destructive acceptance tests. These historical 0.5.1 results do not claim full Python lifecycle or clean-machine GUI acceptance; current-source results are recorded separately.

@@ -144,6 +144,20 @@ static class ManagementChecks
             }
             finally { listener.Stop(); }
         });
+        await checkAsync("Connection latency is excluded from speed and ETA sampling", async () =>
+        {
+            using var memory = new MemoryStream();
+            using (var zip = new System.IO.Compression.ZipArchive(memory, System.IO.Compression.ZipArchiveMode.Create, true))
+            { using var entry = zip.CreateEntry("python.exe").Open(); entry.Write(System.Security.Cryptography.RandomNumberGenerator.GetBytes(8192)); }
+            var bytes = memory.ToArray();
+            var metadata = new JsonObject { ["id"] = "pythoncore-3.13-64", ["company"] = "PythonCore", ["tag"] = "3.13-64", ["sort-version"] = "3.13.15", ["url"] = "https://www.python.org/test.zip", ["hash"] = new JsonObject { ["sha256"] = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)) } };
+            var runtime = RuntimeParser.Parse(new JsonObject { ["versions"] = new JsonArray(metadata) }.ToJsonString()).Single();
+            var samples = new List<OperationProgress>(); using var operation = new PimOperation(samples.Add);
+            using var http = new HttpClient(new LatencyHandler(bytes));
+            await PackageDownload.FetchAsync(runtime, Path.Combine(scratch, "latency-transfer"), http, operation);
+            var transferring = samples.Where(p => p.DownloadedBytes > 0 && p.DownloadedBytes < p.TotalBytes).ToArray();
+            Require(transferring.Length > 0 && transferring.All(p => p.Remaining is null), "Connection wait was mistaken for transfer observations");
+        });
         await checkAsync("Custom proxy authenticates after a real HTTP challenge", async () =>
         {
             var listener = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0); listener.Start();
@@ -172,6 +186,23 @@ static class ManagementChecks
     private sealed class BytesHandler(byte[] bytes) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) });
+    }
+    private sealed class LatencyHandler(byte[] bytes) : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+        {
+            await Task.Delay(2100, token);
+            var content = new StreamContent(new PacedStream(bytes)); content.Headers.ContentLength = bytes.Length;
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = content };
+        }
+    }
+    private sealed class PacedStream(byte[] bytes) : MemoryStream(bytes)
+    {
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken token = default)
+        {
+            await Task.Delay(300, token);
+            return await base.ReadAsync(buffer[..Math.Min(buffer.Length, 4096)], token);
+        }
     }
     private sealed class ResumeHandler(byte[] bytes) : HttpMessageHandler
     {

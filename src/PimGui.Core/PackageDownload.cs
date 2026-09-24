@@ -34,7 +34,7 @@ public static class PackageDownload
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         long received = 0, previousBytes = 0;
         double? speed = null;
-        var clock = Stopwatch.StartNew(); var previousTime = 0.0;
+        var clock = Stopwatch.StartNew(); var previousTime = 0.0; var transferStart = 0.0;
         operation?.Transfer(0, total, null, null);
         await using (var destination = new FileStream(archive, FileMode.CreateNew, FileAccess.Write, FileShare.None, 65536, true))
         {
@@ -62,6 +62,9 @@ public static class PackageDownload
                         total = response.Content.Headers.ContentLength;
                     }
                     if (total > maximum) throw new InvalidDataException("This package is too large");
+                    // Connection setup and retry pauses are not a sample of transfer speed.
+                    transferStart = previousTime = clock.Elapsed.TotalSeconds;
+                    previousBytes = received; speed = null;
                     await using var source = await response.Content.ReadAsStreamAsync(token);
                     while (true)
                     {
@@ -80,7 +83,7 @@ public static class PackageDownload
                             speed = speed is null ? sample : speed * 0.7 + sample * 0.3;
                             previousTime = elapsed; previousBytes = received;
                             operation?.Transfer(received, total, speed,
-                                elapsed >= 2 && total >= received && speed > 0 ? TimeSpan.FromSeconds(Math.Min(86400 * 365, (total.Value - received) / speed.Value)) : null);
+                                elapsed - transferStart >= 2 && total >= received && speed > 0 ? TimeSpan.FromSeconds(Math.Min(86400 * 365, (total.Value - received) / speed.Value)) : null);
                         }
                     }
                     if (total is { } expectedLength && received != expectedLength) throw new IOException("The download is incomplete");

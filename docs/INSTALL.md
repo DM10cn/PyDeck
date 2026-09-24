@@ -37,7 +37,7 @@ The optional `Test-Prerequisites.ps1` asset is a supplementary read-only checkli
 
 ### 🐍 Connect Python Install Manager
 
-Version **0.6.0** requires PIM **26.3 or later** for installation changes. Older or unrecognized managers are limited to compatible read-only queries; reconnect after upgrading. See [Python management](MANAGEMENT.md). Published 0.5.1 installers predate this capability gate.
+Version **0.6.0** requires PIM **26.3 or later** for installation changes. Older or unrecognized managers are limited to compatible read-only queries; reconnect after upgrading. See [Python management](https://github.com/DM10cn/PyDeck/blob/v0.6.0/docs/MANAGEMENT.md). Published 0.5.1 installers predate this capability gate.
 
 Once the GUI runtimes are ready, you can open PyDeck without PIM. Choose **Download Python Install Manager** in the empty state or Settings, install it from Python's official Windows page, then choose **Check again** or **Auto-detect**. You can also select its executable in Settings. These buttons open the download page or reconnect; they do not install PIM themselves, and reconnect does not require restarting PyDeck.
 
