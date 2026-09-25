@@ -89,6 +89,8 @@ public sealed partial class MainWindow
             await CheckManagementSettingsAsync(directory);
             checks.Add("Four-language inline management settings, read-only PATH diagnostics, virtual environments, runtime badges, catalog grouping and actual byte progress rendered without saving user settings.");
             await CheckPageLayoutsAsync(directory);
+            await CheckBuildUiAsync(directory);
+            checks.Add("Build page: four languages, both designs, x64-only options, scrollbar clearance, retained scroll positions/drafts, cancellation after navigation and local runtime actions without PIM verified.");
             checks.Add("Four languages and both designs at normal/compact widths: shared header geometry, action metrics, settings rows, environment actions, structured activity and historical micro identities verified.");
             SaveAppearance("Fluent", "Dark"); Navigate("runtimes"); architecture = "All architectures"; RenderPage();
             await CaptureAsync(Path.Combine(directory, "04-fluent-dark-runtimes.png"));

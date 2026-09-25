@@ -39,7 +39,7 @@ public sealed partial class MainWindow
         SetBusy(true, "Refreshing database");
         try
         {
-            installed = await client.ListAsync();
+            installed = await ListInstalledAsync();
             if (OfflineSource && offlineBundle is not null) offlineBundle = await Task.Run(() => OfflineBundle.Load(offlineBundle.DirectoryPath));
             else if (!OfflineSource) catalog = await client.ListCatalogAsync();
             MessageBar.IsOpen = false; StatusText.Text = T("Up to date · {0}", DateTime.Now.ToString("t"));

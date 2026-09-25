@@ -2,7 +2,7 @@ using System.Text;
 
 namespace PimGui.Core;
 
-public enum OperationPhase { Preparing, Downloading, Verifying, Extracting, Finalizing, Stopping }
+public enum OperationPhase { Preparing, Downloading, Verifying, Extracting, Finalizing, Stopping, Compiling, Assembling, Testing, Training }
 public sealed record OperationProgress(OperationPhase Phase, int? Percent = null, bool Approximate = false,
     long? DownloadedBytes = null, long? TotalBytes = null, double? BytesPerSecond = null, TimeSpan? Remaining = null);
 

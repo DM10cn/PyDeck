@@ -6,6 +6,9 @@ namespace PimGui.Core;
 public sealed record PythonRuntime(string Id, string Company, string Tag, string Version,
     string DisplayName, string Executable, string Prefix, bool IsDefault, bool IsManaged = false)
 {
+    public string? LocalBuildId { get; init; }
+    public BuildOptions? BuildConfiguration { get; init; }
+    public bool IsLocalBuild => LocalBuildId is not null;
     public string? DownloadMetadata { get; init; }
     public string? CatalogIndex { get; init; }
     // PIM intentionally reuses an ID across micro releases. Catalog identity must not.

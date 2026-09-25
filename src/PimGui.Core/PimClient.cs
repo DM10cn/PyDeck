@@ -97,6 +97,7 @@ public sealed partial class PimClient(IProcessRunner runner, string? mutationLoc
 
     public static IReadOnlyList<string> BuildArguments(RuntimeAction action, PythonRuntime runtime)
     {
+        if (runtime.IsLocalBuild) throw new InvalidOperationException("Local builds are not managed by Python Install Manager");
         if (action is RuntimeAction.Update or RuntimeAction.Uninstall or RuntimeAction.Repair && !runtime.IsManaged)
             throw new InvalidOperationException("This Python installation is not managed by Python Install Manager.");
         if (runtime.Id.Length > 256 || !System.Text.RegularExpressions.Regex.IsMatch(runtime.Id, @"\A[A-Za-z0-9][A-Za-z0-9_.-]*\z"))

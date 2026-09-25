@@ -4,8 +4,10 @@ namespace PimGui.Core;
 
 public sealed record VirtualEnvironment(string Path, string State = "Not checked", string Version = "", string BasePath = "")
 {
+    public string? BaseRuntimeId { get; init; }
     public string Name => System.IO.Path.GetFileName(Path);
-    public string Executable => System.IO.Path.Combine(Path, "Scripts", "python.exe");
+    public string Executable => System.IO.Path.Combine(Path, "Scripts",
+        !File.Exists(System.IO.Path.Combine(Path, "Scripts", "python.exe")) && File.Exists(System.IO.Path.Combine(Path, "Scripts", "python_d.exe")) ? "python_d.exe" : "python.exe");
 }
 
 public sealed class VirtualEnvironments(string dataDirectory)
@@ -28,7 +30,13 @@ public sealed class VirtualEnvironments(string dataDirectory)
         using var lease = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None);
         var previous = File.Exists(RegistryPath) ? SafeFiles.ReadText(RegistryPath) : null;
         var entries = Read().Where(e => !e.Path.Equals(environment.Path, StringComparison.OrdinalIgnoreCase)).ToList();
-        if (!remove) entries.Add(environment);
+        if (!remove)
+        {
+            var previousEntry = Read().FirstOrDefault(e => e.Path.Equals(environment.Path, StringComparison.OrdinalIgnoreCase));
+            if (environment.BaseRuntimeId is null && string.Equals(environment.BasePath, previousEntry?.BasePath, StringComparison.OrdinalIgnoreCase))
+                environment = environment with { BaseRuntimeId = previousEntry?.BaseRuntimeId };
+            entries.Add(environment);
+        }
         AtomicJson.Write(RegistryPath, JsonSerializer.Serialize(entries), previous, checkOriginal: true);
     }
     public async Task<bool> RefreshAsync(IProcessRunner runner, Func<IReadOnlyList<VirtualEnvironment>, Task<bool>> confirmRecheck)
@@ -70,7 +78,7 @@ public sealed class VirtualEnvironments(string dataDirectory)
         if (!File.Exists(result.Executable)) return result with { State = "Incomplete environment" };
         try { home = ExecutionPaths.LocalPath(home); SafeFiles.RequireNoLinks(home); }
         catch (Exception ex) when (ex is ArgumentException or IOException) { return result with { State = "Base interpreter missing" }; }
-        if (!File.Exists(System.IO.Path.Combine(home, "python.exe"))) return result with { State = "Base interpreter missing" };
+        if (!File.Exists(System.IO.Path.Combine(home, "python.exe")) && !File.Exists(System.IO.Path.Combine(home, "python_d.exe"))) return result with { State = "Base interpreter missing" };
         return result;
     }
     public async Task<VirtualEnvironment> CreateAsync(PythonRuntime runtime, string parent, string name, IProcessRunner runner, PimOperation operation)
@@ -87,14 +95,14 @@ public sealed class VirtualEnvironments(string dataDirectory)
         if (!CreateDirectoryExclusive(path, IntPtr.Zero)) throw new IOException("The environment folder could not be reserved");
         SafeFiles.RequireNoLinks(path);
         // Record intent before starting Python. Cancellation never deletes a project directory.
-        var environment = new VirtualEnvironment(path, "Incomplete environment", runtime.Version, runtime.Prefix);
+        var environment = new VirtualEnvironment(path, "Incomplete environment", runtime.Version, runtime.Prefix) { BaseRuntimeId = runtime.Id };
         Remember(environment);
         try
         {
             operation.Token.ThrowIfCancellationRequested();
-            var result = await runner.RunAsync(runtime.Executable, ["-I", "-m", "venv", path], cancellationToken: operation.Token);
+            var result = await runner.RunAsync(runtime.Executable, runtime.BuildConfiguration?.IncludePip == false ? ["-I", "-m", "venv", "--without-pip", path] : ["-I", "-m", "venv", path], cancellationToken: operation.Token);
             if (result.ExitCode != 0 || result.OutputTruncated) throw new IOException("Environment creation failed; partial files were kept");
-            environment = await CheckAsync(path, runner, operation.Token);
+            environment = (await CheckAsync(path, runner, operation.Token)) with { BaseRuntimeId = runtime.Id };
             return environment;
         }
         finally { Remember(environment); }
@@ -105,7 +113,7 @@ public sealed class VirtualEnvironments(string dataDirectory)
         if (environment.State != "Not checked") return environment;
         SafeFiles.RequireNoLinks(environment.BasePath);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token); timeout.CancelAfter(TimeSpan.FromSeconds(15));
-        const string probe = "import sys,json,encodings,ssl;print(json.dumps({'prefix':sys.prefix,'base':sys.base_prefix,'version':'.'.join(map(str,sys.version_info[:3]))}))";
+        const string probe = "import sys,json,encodings;print(json.dumps({'prefix':sys.prefix,'base':sys.base_prefix,'version':'.'.join(map(str,sys.version_info[:3]))}))";
         try
         {
             var result = await runner.RunAsync(environment.Executable, ["-I", "-c", probe], cancellationToken: timeout.Token);

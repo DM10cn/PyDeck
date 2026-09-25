@@ -16,6 +16,14 @@ public sealed partial class MainWindow
         return grid;
     }
     private static void At(Grid grid, UIElement element, int row) { Grid.SetRow((FrameworkElement)element, row); grid.Children.Add(element); }
+    private static ScrollViewer PageScroll(UIElement content) => new()
+    {
+        // WinUI scrollbars overlay their viewport. Reserve a full gutter even while the thumb is hidden.
+        Content = new Border { Child = content, Padding = new(0, 8, 28, 20), Tag = "ScrollContentGutter" },
+        VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+        HorizontalScrollMode = ScrollMode.Disabled, IsHorizontalRailEnabled = false, IsVerticalRailEnabled = true,
+        VerticalContentAlignment = VerticalAlignment.Top, Tag = "PageScroll"
+    };
     private Grid Header(string eyebrow, string title, string description, FrameworkElement? action = null)
     {
         var grid = new Grid { ColumnSpacing = 20, RowSpacing = 4, Tag = "PageHeader" };
@@ -55,7 +63,7 @@ public sealed partial class MainWindow
         var layout = PageGrid(GridLength.Auto, GridLength.Auto, new(1, GridUnitType.Star));
         var install = palette.Action("Install Python", "\uE710", true); install.Click += (_, _) => Navigate("catalog");
         At(layout, Header("YOUR WORKSPACE", "My Python", "Manage your installed Python versions", install), 0);
-        if (!connected)
+        if (!connected && !installed.Any(r => r.IsLocalBuild))
         {
             At(layout, ManagerSetup(), 2);
             return layout;
@@ -150,14 +158,14 @@ public sealed partial class MainWindow
         if (runtimeRows is null) return;
         runtimeRows.Children.Clear();
         var online = page == "catalog";
-        IEnumerable<PythonRuntime> source = online ? (OfflineSource ? offlineBundle?.Runtimes : catalog) ?? [] : installed;
+        IEnumerable<PythonRuntime> source = online ? (OfflineSource ? offlineBundle?.Runtimes : catalog) ?? [] : installed.Where(r => connected || r.IsLocalBuild);
         var filtered = RuntimeCatalog.Filter(source, architecture, !online || preferences.ShowPreviewReleases, search)
             .Where(r => !online || (distributionFilter == "Standard" ? !r.IsSpecialized : RuntimeCatalog.MatchesDistribution(r, distributionFilter))).ToArray();
         VisibleRuntimeCount = filtered.Length;
         if (resultLabel is not null) resultLabel.Text = online ? T(OfflineSource ? "Offline packages" : "RELEASE CATALOG") : T("INSTALLED VERSIONS  /  {0}", filtered.Length);
         if (online && OfflineSource && offlineBundle is null)
             runtimeRows.Children.Add(Empty("\uE8B7", "Install from an offline bundle", "Choose a folder containing index.json and the Python packages.", "Choose folder…", () => _ = PickOfflineFolderAsync()));
-        else if (!connected)
+        else if (online && !connected)
             runtimeRows.Children.Add(ManagerSetup());
         else if (online && !OfflineSource && catalog is null)
             runtimeRows.Children.Add(Empty("\uE896", busy ? "Checking the release catalog…" : "Your next Python starts here", "Available versions are loaded from the selected catalog", busy ? null : "Load releases", () => _ = LoadCatalogAsync()));
@@ -240,7 +248,7 @@ public sealed partial class MainWindow
         var badges = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
         if (runtime.IsDefault && !online) badges.Children.Add(palette.Chip("Default", true));
         if (runtime.IsPrerelease) badges.Children.Add(palette.Chip("Preview"));
-        if (!online && !runtime.IsManaged) badges.Children.Add(palette.Chip("External"));
+        if (!online && !runtime.IsManaged) badges.Children.Add(palette.Chip(runtime.IsLocalBuild ? "Local build" : "External"));
         Grid.SetColumn(badges, 1); titleLine.Children.Add(badges); details.Children.Add(titleLine);
         details.Children.Add(palette.Label($"{runtime.Company}  ·  {runtime.Architecture}", 12, muted: true));
         if (!online)
@@ -278,14 +286,15 @@ public sealed partial class MainWindow
             var menu = RuntimeMenu();
             MenuFlyoutItem Item(string text, string glyph, Action action, bool enabled = true)
             { var item = new MenuFlyoutItem { Text = T(text), Icon = new FontIcon { Glyph = glyph }, IsEnabled = enabled }; item.Click += (_, _) => action(); menu.Items.Add(item); return item; }
-            Item("Set as default", "\uE735", () => _ = SetDefaultAsync(runtime), !runtime.IsDefault);
+            Item("Set as default", "\uE735", () => _ = SetDefaultAsync(runtime), !runtime.IsDefault && !runtime.IsLocalBuild && connected);
             Item("Check for updates", "\uE895", () => _ = ChangeRuntimeAsync(RuntimeAction.Update, runtime), runtime.IsManaged && client.SupportsMutations);
             Item("Open installation folder", "\uE8B7", () => OpenFolder(runtime));
             Item("Copy executable path", "\uE8C8", () => Copy(runtime.Executable));
-            Item("Check installation", "\uE73E", () => _ = CheckRuntimeAsync(runtime), runtime.IsManaged);
+            Item("Check installation", "\uE73E", () => _ = CheckRuntimeAsync(runtime), runtime.IsManaged || runtime.IsLocalBuild);
             Item("Reinstall to repair", "\uE90F", () => _ = ChangeRuntimeAsync(RuntimeAction.Repair, runtime), runtime.IsManaged && client.SupportsRepair && client.SupportsMutations);
             menu.Items.Add(new MenuFlyoutSeparator());
-            Item("Uninstall…", "\uE74D", () => _ = ChangeRuntimeAsync(RuntimeAction.Uninstall, runtime), runtime.IsManaged && client.SupportsMutations);
+            if (runtime.IsLocalBuild) Item("Remove from list", "\uE74D", () => _ = RemoveLocalRuntimeAsync(runtime));
+            else Item("Uninstall…", "\uE74D", () => _ = ChangeRuntimeAsync(RuntimeAction.Uninstall, runtime), runtime.IsManaged && client.SupportsMutations);
             more.Flyout = menu; actions.Children.Add(more);
         }
         Grid.SetColumn(actions, 2); grid.Children.Add(actions);

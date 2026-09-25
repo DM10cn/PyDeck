@@ -54,6 +54,8 @@ public sealed partial class MainWindow
         {
             OperationPhase.Downloading => "Downloading", OperationPhase.Verifying => "Checking files",
             OperationPhase.Extracting => "Extracting files", OperationPhase.Finalizing => "Finishing up",
+            OperationPhase.Compiling => "Compiling CPython", OperationPhase.Assembling => "Assembling runtime", OperationPhase.Testing => "Testing runtime",
+            OperationPhase.Training => "Training PGO",
             OperationPhase.Stopping => "Stopping…", _ => "Preparing"
         });
         OperationPhaseText.Text = progress.Percent is { } percent
@@ -99,7 +101,7 @@ public sealed partial class MainWindow
         operationCanCancel = false; UpdateOperationPanel();
         try
         {
-            installed = await client.ListAsync();
+            installed = await ListInstalledAsync();
             if (!download && target is not null && installed.FirstOrDefault(r => r.Id == target.Id) is { } current)
             {
                 var health = await RuntimeHealth.CheckAsync(current);
@@ -110,7 +112,7 @@ public sealed partial class MainWindow
         }
         catch (Exception ex)
         {
-            installed = [];
+            installed = localRuntimes;
             Log("Post-cancellation refresh failed: " + ex.Message);
             Notify("Stopped, but the version list could not be refreshed. Refresh it before trying again.", InfoBarSeverity.Warning);
         }

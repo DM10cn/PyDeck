@@ -10,13 +10,13 @@
 
 PyDeck is a native **WinUI 3** companion for **Python Install Manager**. Browse interpreters, install a version, choose your default, and keep offline packages close at hand — in a desktop interface with **Windows Fluent** and **Material 3 Expressive** styles.
 
-📦 **Stable release · 0.6.2** · 🪟 **Windows 11 x64** · 📄 **MIT**
+📦 **Stable release · 0.6.3** · 🪟 **Windows 11 x64** · 📄 **MIT**
 
 ## 📦 Download
 
 Get **MSI**, **MSIX**, and the **standalone dependency helper** from [GitHub Releases](https://github.com/DM10cn/PyDeck/releases). For source, use GitHub's automatic **Source code (zip)** / **Source code (tar.gz)** links in Assets. Follow the [installation guide](docs/INSTALL.md) for dependencies, installer choices, and MSIX certificate trust.
 
-New in **0.6.2**: 🕰️ browse historical micro versions and install or repair the exact version, 🔎 keep architecture / package-type / preview filters together on Install Python with saved selections, 🧭 use a consistent page layout and control sizing, and 📋 filter a structured activity viewer. Notification text, Shebang validation and environment browsing are also improved. See the [release notes](docs/releases/0.6.2.md).
+New in **0.6.3**: 🛠️ build your own x64 CPython with Standard / Performance / Debug / Minimal presets, source selection and import, component choices, cancellation and reusable history. Compact build controls and scrollbar spacing are improved. See the [release notes](docs/releases/0.6.3.md) and [Build Python guide](docs/BUILD_PYTHON.md).
 
 Features introduced in **0.6.1** remain available: 🧰 virtual environments, 🌐 custom HTTPS installation sources, 📜 Shebang rules, 🔔 browser-based app update checks, inline Python settings, Python / variant / EAP icons, and database refresh. MSI uses full-package replacement upgrades while retaining settings and installer choices.
 

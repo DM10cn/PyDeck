@@ -108,7 +108,7 @@ public sealed partial class MainWindow
             body.Children.Add(palette.Label(snapshot.Path, 12, muted: true));
             var edits = new JsonObject();
             var defaults = new List<(string, string)> { ("", "PIM default") };
-            defaults.AddRange(installed.Select(r => (r.Selector, RuntimeTitle(r) + " · " + r.Architecture)));
+            defaults.AddRange(installed.Where(r => !r.IsLocalBuild).Select(r => (r.Selector, RuntimeTitle(r) + " · " + r.Architecture)));
             var savedTag = snapshot.Values["default_tag"]?.GetValue<string>() ?? "";
             if (savedTag.Length > 0 && !defaults.Any(p => p.Item1 == savedTag)) defaults.Add((savedTag, savedTag));
             body.Children.Add(SettingRow("Default interpreter", null, Choice(defaults.ToArray(), savedTag, value => edits["default_tag"] = value.Length > 0 ? JsonValue.Create(value) : null, "Default interpreter")));
@@ -138,7 +138,7 @@ public sealed partial class MainWindow
                 if (backup is null) PimConfiguration.Save(snapshot, edits); else PimConfiguration.Restore(snapshot, backup);
             }
             result.Applied = true;
-            installed = await client.ListAsync(); catalog = null;
+            installed = await ListInstalledAsync(); catalog = null;
             if (edits["default_tag"] is { } requested && installed.FirstOrDefault(r => r.IsDefault)?.Selector != requested.GetValue<string>())
                 Notify("Your preference was saved, but PIM reports a different effective default. A custom configuration or policy may override it.", InfoBarSeverity.Warning);
             else Notify("Configuration saved and Python list refreshed", InfoBarSeverity.Success);        }, snapshot.Overrides.Count == 0);
@@ -148,7 +148,7 @@ public sealed partial class MainWindow
     {
         var body = new StackPanel { Spacing = 12 };
         InlineAction(body, "Run diagnostics", async result => {
-            installed = await client.ListAsync();
+            installed = await ListInstalledAsync();
             lastPathReport = await PathDiagnostics.ProbeKnownAsync(PathDiagnostics.Inspect(installed, client.Executable), installed, client.Executable);
             result.Applied = true;
         });
@@ -187,10 +187,10 @@ public sealed partial class MainWindow
             if (await Dialog("Refresh aliases", "PIM will rebuild registrations and global aliases for all managed versions", "Refresh").ShowAsync() != ContentDialogResult.Primary) return;
             SetBusy(true, "Checking files");
             await client.RefreshRegistrationsAsync(line => DispatcherQueue.TryEnqueue(() => Log(line, origin: ActivityOrigin.PythonManager)));
-            installed = await client.ListAsync();
+            installed = await ListInstalledAsync();
             Notify("Registrations refreshed. Run PATH diagnostics to check command resolution", InfoBarSeverity.Informational);
         }
-        catch (Exception ex) { try { installed = await client.ListAsync(); } catch { installed = []; } ShowError(ex); }
+        catch (Exception ex) { try { installed = await ListInstalledAsync(); } catch { installed = localRuntimes; } ShowError(ex); }
         finally { confirmationOpen = false; SetBusy(false); RenderPage(); }
     }
     private async Task CheckRuntimeAsync(PythonRuntime runtime)
@@ -199,7 +199,7 @@ public sealed partial class MainWindow
         SetBusy(true, "Checking files");
         try
         {
-            installed = await client.ListAsync();
+            installed = await ListInstalledAsync();
             var current = installed.SingleOrDefault(r => r.Id == runtime.Id && r.Prefix == runtime.Prefix);
             if (current is null) throw new IOException("This Python entry has changed. Refresh the list before trying again.");
             var health = await RuntimeHealth.CheckAsync(current);
@@ -213,11 +213,11 @@ public sealed partial class MainWindow
         try
         {
             var result = await RuntimeHealth.VerifyAsync(client, action, runtime);
-            installed = result.Runtimes;
+            installed = MergeLocal(result.Runtimes);
             Notify(result.Message, result.Confirmed ? InfoBarSeverity.Success : InfoBarSeverity.Warning);
             StatusText.Text = T(result.Confirmed ? "Operation verified" : "Result not confirmed");
         }
         catch (Exception ex)
-        { installed = []; Log(SensitiveText.Redact(ex.Message)); Notify("Result not confirmed. Refresh before trying again", InfoBarSeverity.Warning); StatusText.Text = T("Result not confirmed"); }
+        { installed = localRuntimes; Log(SensitiveText.Redact(ex.Message)); Notify("Result not confirmed. Refresh before trying again", InfoBarSeverity.Warning); StatusText.Text = T("Result not confirmed"); }
     }
 }

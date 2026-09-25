@@ -12,7 +12,7 @@ public sealed partial class MainWindow
     {
         var layout = PageGrid(GridLength.Auto, new(1, GridUnitType.Star));
         At(layout, Header("MAKE IT YOURS", "Settings", "Appearance, language, and Python preferences."), 0);
-        var body = new StackPanel { Spacing = 28, Padding = new(0, 0, 8, 16) };
+        var body = new StackPanel { Spacing = 28 };
         var appearance = palette.Section("Appearance");
         var choices = new Grid { ColumnSpacing = 8, MinWidth = 300, MaxWidth = 380 };
         choices.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); choices.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
@@ -105,7 +105,7 @@ public sealed partial class MainWindow
         var docs = palette.Action("Python documentation", "\uE8A7", compact: true); docs.HorizontalAlignment = HorizontalAlignment.Left; docs.Click += (_, _) => OpenUrl("https://docs.python.org/3/using/windows.html");
         about.Children.Add(Toolbar(update, releases));
         about.Children.Add(docs); body.Children.Add(about);
-        settingsScroll = new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        settingsScroll = PageScroll(body);
         settingsScroll.Loaded += (sender, _) => ((ScrollViewer)sender).ChangeView(null, settingsOffset, null, true);
         At(layout, settingsScroll, 1);
         return layout;
@@ -183,7 +183,7 @@ public sealed partial class MainWindow
             if (!await candidate.DiscoverAsync(path)) throw new InvalidOperationException(candidate.LastDiscoveryError);
             var versions = await candidate.ListAsync();
             var changed = preferences with { ManagerPath = path }; store.Save(changed);
-            preferences = changed; client = candidate; installed = versions; catalog = null; connected = true;
+            preferences = changed; client = candidate; installed = MergeLocal(versions); catalog = null; connected = true;
             MessageBar.IsOpen = false; StatusText.Text = T("Connected on this computer");
             Log("Connected to " + candidate.Executable);
         }
@@ -193,7 +193,7 @@ public sealed partial class MainWindow
 
     private async Task SetDefaultAsync(PythonRuntime runtime)
     {
-        if (busy) return;
+        if (busy || runtime.IsLocalBuild || !connected) return;
         SetBusy(true, T("Setting {0} as default…", runtime.DisplayName));
         try
         {
@@ -209,7 +209,7 @@ public sealed partial class MainWindow
             var config = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Python", "pymanager.json");
             var backup = PimConfiguration.Save(PimConfiguration.Read(config), new System.Text.Json.Nodes.JsonObject { ["default_tag"] = runtime.Selector });
             Log($"Saved default_tag = {runtime.Selector}." + (backup.Length > 0 ? $" Backup: {backup}" : ""));
-            installed = await client.ListAsync();
+            installed = await ListInstalledAsync();
             var active = installed.FirstOrDefault(r => r.IsDefault);
             if (active?.Id == runtime.Id)
             {
@@ -219,7 +219,7 @@ public sealed partial class MainWindow
             }
             else Notify("Your preference was saved, but PIM reports a different effective default. A custom configuration or policy may override it.", InfoBarSeverity.Warning);
         }
-        catch (Exception ex) { try { installed = await client.ListAsync(); } catch { installed = []; } ShowError(ex); }
+        catch (Exception ex) { try { installed = await ListInstalledAsync(); } catch { installed = localRuntimes; } ShowError(ex); }
         finally { SetBusy(false); UpdateConnection(); RenderPage(); }
     }
 

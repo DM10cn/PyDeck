@@ -2,9 +2,11 @@
 
 **English** · [简体中文](FEATURES.zh-CN.md) · [🏠 Home](../README.md)
 
-**Current version: 0.6.2** — this page is the reference for feature and acceptance status. “Implemented” means the code and UI exist; completed checks are recorded below. A feature can be implemented while its full acceptance testing remains outstanding. Ideas under consideration are not commitments.
+**Current version: 0.6.3** — this page is the reference for feature and acceptance status. “Implemented” means the code and UI exist; completed checks are recorded below. A feature can be implemented while its full acceptance testing remains outstanding. Ideas under consideration are not commitments.
 
 ## ✨ New in 0.6.2
+
+> 🛠️ **New in 0.6.3:** [Build Python](BUILD_PYTHON.md) adds x64 source builds with version selection/import, Release/Debug/PGO presets, components, toolchain/output choices, cancellation and history. Versions remain subject to source/toolchain compatibility.
 
 Version 0.6.2 adds the following behavior to the 0.6.1 baseline. Application checks and final package checks are recorded separately; historical release results below do not certify the new packages. See the [0.6.2 GitHub release details](https://github.com/DM10cn/PyDeck/releases/tag/v0.6.2) for packaging validation.
 

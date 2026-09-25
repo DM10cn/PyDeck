@@ -65,7 +65,7 @@ public sealed partial class MainWindow
             feedback.Tag = "ShebangFeedback";
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetLiveSetting(feedback, Microsoft.UI.Xaml.Automation.Peers.AutomationLiveSetting.Polite);
             var targets = new List<(string, string)> { ("py", "Default interpreter"), ("pyw", "Default interpreter (windowed)") };
-            foreach (var runtime in installed) { targets.Add(("py -V:" + runtime.Selector, runtime.Selector)); targets.Add(("pyw -V:" + runtime.Selector, runtime.Selector + " · " + T("Windowed"))); }
+            foreach (var runtime in installed.Where(r => !r.IsLocalBuild)) { targets.Add(("py -V:" + runtime.Selector, runtime.Selector)); targets.Add(("pyw -V:" + runtime.Selector, runtime.Selector + " · " + T("Windowed"))); }
             string selected = "py"; body.Children.Add(template); body.Children.Add(feedback);
             body.Children.Add(SettingRow("Python version", null, Choice(targets.ToArray(), selected, value => selected = value, "Python version")));
             bool changed = false;

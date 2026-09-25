@@ -39,6 +39,7 @@
      </Button>
      <Button x:Name="CatalogNav" Tag="catalog" Click="Nav_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"><StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE896;" FontSize="18"/><TextBlock Tag="ShellLabel" Text="Install Python" VerticalAlignment="Center"/></StackPanel></Button>
      <Button x:Name="EnvironmentsNav" Tag="environments" Click="Nav_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"><StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE8B7;" FontSize="18"/><TextBlock Tag="ShellLabel" Text="Virtual environments" VerticalAlignment="Center"/></StackPanel></Button>
+     <Button x:Name="BuildNav" Tag="build" Click="Nav_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"><StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE90F;" FontSize="18"/><TextBlock Tag="ShellLabel" Text="Build Python" VerticalAlignment="Center"/></StackPanel></Button>
      <Button x:Name="ActivityNav" Tag="activity" Click="Nav_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"><StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE9D9;" FontSize="18"/><TextBlock Tag="ShellLabel" Text="Activity" VerticalAlignment="Center"/></StackPanel></Button>
     </StackPanel>
     <StackPanel Grid.Row="2" Spacing="16">

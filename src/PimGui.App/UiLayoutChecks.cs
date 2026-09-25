@@ -58,7 +58,7 @@ public sealed partial class MainWindow
                 SavePreferences(preferences with { Design = design, Language = language, Transparency = "Off" });
                 var scale = Root.XamlRoot.RasterizationScale;
                 AppWindow.Resize(new SizeInt32((int)((compact ? 930 : 1180) * scale), (int)((compact ? 620 : 850) * scale)));
-                foreach (var destination in new[] { "runtimes", "catalog", "environments", "activity", "settings" })
+                foreach (var destination in new[] { "runtimes", "catalog", "environments", "build", "activity", "settings" })
                 {
                     Navigate(destination); Root.UpdateLayout(); await Task.Delay(80); Root.UpdateLayout();
                     var context = $"{design}/{language}/{(compact ? "compact" : "normal")}/{destination}";

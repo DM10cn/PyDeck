@@ -156,8 +156,7 @@ public sealed partial class MainWindow
         string? parent = null, name = null; PythonRuntime? runtime = null;
         try
         {
-            if (!connected) { Notify("Connect to Python Install Manager first.", InfoBarSeverity.Warning); return; }
-            installed = await client.ListAsync();
+            installed = await ListInstalledAsync();
             var available = installed.Where(r => !r.IsEmbeddable).ToArray();
             if (available.Length == 0) { Notify("Install a Python version first", InfoBarSeverity.Warning); return; }
             parent = await PickFolderAsync(); if (parent is null) return;
@@ -177,7 +176,7 @@ public sealed partial class MainWindow
         SetBusy(true, "Creating environment");
         try
         {
-            using var lease = client.AcquireConfigurationLock();
+            using var lease = runtime.IsLocalBuild ? null : client.AcquireConfigurationLock();
             var environment = await Environments.CreateAsync(runtime, parent, name, new ProcessRunner(), operation);
             Notify(environment.State, environment.State == "Environment ready" ? InfoBarSeverity.Success : InfoBarSeverity.Warning);
         }

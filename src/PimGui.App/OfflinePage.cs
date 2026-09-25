@@ -89,7 +89,7 @@ public sealed partial class MainWindow
         string? expectedInstalledVersion = null;
         try
         {
-            installed = await client.ListAsync();
+            installed = await ListInstalledAsync();
             var previous = installed.SingleOrDefault(r => r.Id.Equals(runtime.Id, StringComparison.OrdinalIgnoreCase));
             var replacement = previous is not null && previous.Version != runtime.Version
                 ? "\n\n" + T("Python {0} will be replaced with Python {1}. These versions share an installation folder", previous.Version, runtime.Version)
@@ -112,7 +112,7 @@ public sealed partial class MainWindow
             await VerifyOperationAsync(RuntimeAction.Install, runtime);
         }
         catch (OperationCanceledException) when (operation.IsCancellationRequested) { await ReconcileCancelledOperationAsync(target: runtime); }
-        catch (Exception ex) { try { installed = await client.ListAsync(); } catch { installed = []; } ShowError(ex); }
+        catch (Exception ex) { try { installed = await ListInstalledAsync(); } catch { installed = localRuntimes; } ShowError(ex); }
         finally { FinishOperation(operation); SetBusy(false); UpdateConnection(); RenderPage(); }
     }
     private async Task DownloadOfflineRuntimeAsync(PythonRuntime runtime)

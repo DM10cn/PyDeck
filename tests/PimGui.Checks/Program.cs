@@ -1,6 +1,37 @@
 using PimGui.Core;
 using System.Text.Json.Nodes;
 
+// Opt-in integration harness. Uses only the caller's isolated directory and never mutates PIM installations.
+if (args.Length is 3 or 4 && args[0] is "--build-python" or "--build-python-cancel")
+{
+    var builds = new BuildStore(Path.GetFullPath(args[1]));
+    var tools = await BuildToolchain.DetectAsync(Path.GetFullPath(args[2]));
+    using var operation = new PimOperation(progress => Console.WriteLine("STAGE " + progress.Phase));
+    using var stop = new Timer(_ => operation.Cancel(), null, Timeout.Infinite, Timeout.Infinite);
+    var options = args.Length == 4 ? System.Text.Json.JsonSerializer.Deserialize<BuildOptions>(File.ReadAllText(args[3]))! : new();
+    var result = await new CPythonBuilder(builds).BuildAsync(options, tools, operation, record =>
+    {
+        Console.WriteLine("JOB " + record.Id + " " + record.State);
+        if (args[0] == "--build-python-cancel" && record.State == BuildState.Compiling) stop.Change(5000, Timeout.Infinite);
+    });
+    Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result));
+    Console.WriteLine("RUNTIME " + builds.RuntimeDirectory(result));
+    return result.State == (args[0] == "--build-python" ? BuildState.Ready : BuildState.Cancelled) ? 0 : 1;
+}
+if (args.Length == 2 && args[0] == "--verify-built-python")
+{
+    var directory = Path.GetFullPath(args[1]);
+    var builds = new BuildStore(directory); var builtRuntime = builds.Runtimes().Single();
+    var health = await RuntimeHealth.CheckAsync(builtRuntime);
+    if (!health.Healthy) throw new IOException(health.Message);
+    var environments = new VirtualEnvironments(Path.Combine(directory, "app-venv-check"));
+    using var operation = new PimOperation();
+    var environment = await environments.CreateAsync(builtRuntime, directory, "app-venv-" + Guid.NewGuid().ToString("N"), new ProcessRunner(), operation);
+    if (environment.State != "Environment ready" || environments.Read().Single().BaseRuntimeId != builtRuntime.Id) throw new IOException("Local runtime venv integration failed");
+    Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(environment));
+    return 0;
+}
+
 if (args.Contains("--emit-long-output")) { Console.Write(new string('x', 9 * 1024 * 1024)); return 0; }
 if (args.Contains("--emit-proxy-secret")) { Console.WriteLine(new string('x', 2040) + "boundary-secret-value"); Console.WriteLine("boundary-secret-value"); return 0; }
 if (args.Contains("--wait-child")) { await Task.Delay(TimeSpan.FromSeconds(45)); return 0; }
@@ -476,6 +507,7 @@ await CheckAsync("Cancellation keeps the operation lock until the child task fin
 await ManagementChecks.RunAsync(Check, CheckAsync, scratch);
 await T3Checks.RunAsync(Check, CheckAsync, scratch);
 await HistoricalChecks.RunAsync(Check, CheckAsync, scratch);
+await BuildChecks.RunAsync(Check, CheckAsync, scratch);
 if (args.Contains("--live-history"))
 {
     await CheckAsync("Official paginated history contains earlier micros without changing installed Python", async () =>

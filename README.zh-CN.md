@@ -10,13 +10,13 @@
 
 PyDeck 是 **Python Install Manager** 的原生 **WinUI 3** 图形界面，支持查看解释器、安装版本、设置默认版本和管理离线包，并提供 **Windows Fluent** 与 **Material 3 Expressive** 两种界面风格
 
-📦 **正式版 · 0.6.2** · 🪟 **Windows 11 x64** · 📄 **MIT**
+📦 **正式版 · 0.6.3** · 🪟 **Windows 11 x64** · 📄 **MIT**
 
 ## 📦 下载
 
 从 [GitHub Releases](https://github.com/DM10cn/PyDeck/releases) 获取 **MSI**、**MSIX** 和 **独立依赖工具**，源码使用 Assets 中 GitHub 自动提供的 **Source code (zip)** / **Source code (tar.gz)** 链接。依赖要求、安装选项与 MSIX 证书信任步骤统一见 [安装说明](docs/INSTALL.zh-CN.md)
 
-**0.6.2 新增**：🕰️ 浏览历史 micro 并精确安装或修复，🔎 架构、包类型与预览版筛选统一放在安装页并记住选择，🧭 统一页面布局和控件尺寸，📋 结构化活动记录及级别筛选，同时改善提示条文字、Shebang 校验和环境浏览。详见[发行说明](docs/releases/0.6.2.md#简体中文)
+**0.6.3 新增**：🛠️ 从源码构建自己的 x64 CPython，提供标准 / 性能 / 调试 / 精简预设、版本选择与源码导入、组件选择、取消与历史复用，同时优化构建页密度和滚动条间距。详见[发行说明](docs/releases/0.6.3.md#简体中文)与[构建指南](docs/BUILD_PYTHON.md#简体中文)
 
 **0.6.1 引入的功能继续保留**：🧰 虚拟环境、🌐 自定义 HTTPS 安装源、📜 Shebang 规则、🔔 在浏览器中打开的应用更新入口、页内 Python 设置、Python / 类型 / EAP 图标及数据库刷新。MSI 继续使用完整包覆盖升级，保留设置和安装选项
 

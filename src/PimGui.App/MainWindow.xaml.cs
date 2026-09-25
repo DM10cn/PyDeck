@@ -67,6 +67,7 @@ public sealed partial class MainWindow : Window
             ApplyLanguage();
             SizeForDisplay();
             ApplyAppearance();
+            try { Builds.RecoverInterrupted(); ReloadLocalRuntimes(); } catch (Exception ex) { ShowError(ex); }
             await ConnectAsync();
             if (store.LoadWarning is { } warning) Notify(warning, InfoBarSeverity.Warning);
             if (smokeDirectory is not null) await RunSmokeTestAsync(smokeDirectory);
@@ -135,11 +136,13 @@ public sealed partial class MainWindow : Window
     {
         RefreshDatabaseButton.IsEnabled = !busy && !confirmationOpen;
         if (settingsScroll?.IsLoaded == true) settingsOffset = settingsScroll.VerticalOffset;
+        if (buildScroll?.IsLoaded == true) buildOffset = buildScroll.VerticalOffset;
+        buildScroll = null;
         settingsScroll = null;
         activityList = null; activityEmpty = null;
         runtimeRows = null;
         resultLabel = null;
-        foreach (var button in new[] { RuntimesNav, CatalogNav, EnvironmentsNav, ActivityNav, SettingsNav })
+        foreach (var button in new[] { RuntimesNav, CatalogNav, EnvironmentsNav, BuildNav, ActivityNav, SettingsNav })
         {
             bool selected = (string)button.Tag == page;
             button.Background = selected ? Palette.Brush(palette.Tokens.NavigationSelected) : new SolidColorBrush(Colors.Transparent);
@@ -153,7 +156,7 @@ public sealed partial class MainWindow : Window
         PageHost.Children.Clear();
         PageHost.Children.Add(page switch
         {
-            "catalog" => BuildCatalogPage(), "activity" => BuildActivityPage(),
+            "build" => BuildPythonPage(), "catalog" => BuildCatalogPage(), "activity" => BuildActivityPage(),
             "settings" => BuildSettingsPage(), "environments" => BuildEnvironmentsPage(), _ => BuildRuntimesPage()
         });
     }
@@ -166,7 +169,7 @@ public sealed partial class MainWindow : Window
         {
             connected = await client.DiscoverAsync(preferences.ManagerPath);
             if (!connected) throw new InvalidOperationException(client.LastDiscoveryError);
-            installed = await client.ListAsync();
+            installed = await ListInstalledAsync();
             MessageBar.IsOpen = false;
             StatusText.Text = T("Up to date · {0}", DateTime.Now.ToString("t"));
             Log($"Connected. Found {installed.Count} installed Python runtimes.");
@@ -174,7 +177,7 @@ public sealed partial class MainWindow : Window
         catch (Exception ex)
         {
             connected = false;
-            installed = [];
+            installed = localRuntimes;
             ShowError(ex);
         }
         finally { SetBusy(false); UpdateConnection(); RenderPage(); }
@@ -185,7 +188,7 @@ public sealed partial class MainWindow : Window
         if (busy) return;
         if (!connected) { await ConnectAsync(); return; }
         SetBusy(true, "Refreshing your Python versions…");
-        try { installed = await client.ListAsync(); MessageBar.IsOpen = false; StatusText.Text = T("Up to date · {0}", DateTime.Now.ToString("t")); }
+        try { installed = await ListInstalledAsync(); MessageBar.IsOpen = false; StatusText.Text = T("Up to date · {0}", DateTime.Now.ToString("t")); }
         catch (Exception ex) { ShowError(ex); }
         finally { SetBusy(false); UpdateConnection(); RenderPage(); }
     }
@@ -213,14 +216,14 @@ public sealed partial class MainWindow : Window
 
     private async Task ChangeRuntimeAsync(RuntimeAction action, PythonRuntime runtime)
     {
-        if (busy || !connected || confirmationOpen) return;
+        if (busy || !connected || confirmationOpen || runtime.IsLocalBuild) return;
         string? expectedInstalledVersion = null;
         if (action == RuntimeAction.Install)
         {
             confirmationOpen = true;
             try
             {
-                installed = await client.ListAsync();
+                installed = await ListInstalledAsync();
                 var previous = installed.SingleOrDefault(r => r.Id.Equals(runtime.Id, StringComparison.OrdinalIgnoreCase));
                 if (previous is not null && previous.Version != runtime.Version)
                 {
@@ -259,7 +262,7 @@ public sealed partial class MainWindow : Window
             await VerifyOperationAsync(action, client.LastExpectedRuntime ?? runtime);
         }
         catch (OperationCanceledException) when (operation?.IsCancellationRequested == true) { await ReconcileCancelledOperationAsync(target: runtime); }
-        catch (Exception ex) { try { installed = await client.ListAsync(); } catch { installed = []; } ShowError(ex); }
+        catch (Exception ex) { try { installed = await ListInstalledAsync(); } catch { installed = localRuntimes; } ShowError(ex); }
         finally { FinishOperation(operation); SetBusy(false); UpdateConnection(); RenderPage(); }
     }
 
@@ -311,7 +314,7 @@ public sealed partial class MainWindow : Window
         args.Cancel = true;
         if (closeDialogOpen || confirmationOpen || cancelDialogOpen) return;
         closeDialogOpen = true;
-        try { await Dialog("An operation is still running", "Keep PyDeck open until the current operation finishes. You can follow its output in Activity.").ShowAsync(); }
+        try { await Dialog("An operation is still running", buildingPython ? "You can stop the build with Cancel or follow its output in Build Python" : "Keep PyDeck open until the current operation finishes. You can follow its output in Activity.").ShowAsync(); }
         catch (Exception ex) { ShowError(ex); }
         finally { closeDialogOpen = false; }
     }

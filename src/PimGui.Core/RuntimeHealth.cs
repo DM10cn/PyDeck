@@ -14,8 +14,10 @@ public static class RuntimeHealth
             ExecutionPaths.Runtime(runtime);
             SafeFiles.RequireNoLinks(runtime.Executable);
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            var modules = "import sys,json,encodings; " + (runtime.BuildConfiguration?.IncludeSsl != false ? "import ssl; " : "") +
+                (runtime.BuildConfiguration?.IncludeSqlite != false ? "import sqlite3; " : "") + (runtime.BuildConfiguration?.IncludeCtypes != false ? "import ctypes; " : "");
             var result = await (runner ?? new ProcessRunner()).RunAsync(runtime.Executable,
-                ["-I", "-S", "-c", "import sys,json,encodings,ssl,sqlite3,ctypes; print(json.dumps({'version':sys.version.split()[0],'executable':sys.executable,'bits':64 if sys.maxsize>2**32 else 32}))"], cancellationToken: timeout.Token);
+                ["-I", "-S", "-c", modules + "print(json.dumps({'version':sys.version.split()[0],'executable':sys.executable,'bits':64 if sys.maxsize>2**32 else 32}))"], cancellationToken: timeout.Token);
             if (result.ExitCode != 0 || result.OutputTruncated) return new(false, "The interpreter or a core module could not start");
             using var json = JsonDocument.Parse(result.Output.Trim());
             var version = json.RootElement.GetProperty("version").GetString();
