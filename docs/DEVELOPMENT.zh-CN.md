@@ -98,6 +98,8 @@ dotnet run --project tests/PimGui.Checks -- --offline-fixture "C:\TestBundles\Py
 
 覆盖官方 PIM 25.2 → 26.3、真实 Python 补丁更新、损坏与修复、下载统计、取消、默认切换、卸载和离线重装。`-SeedBundleDirectory` 可指定平铺的较旧官方离线包；`-InstallerDirectory` 可复用缓存的 `pim-25.2.msi` / `pim-26.3.msi`，仍检查 PSF Authenticode 签名。结果位于 `artifacts/pim-e2e-*`，某项失败会停止后续依赖项，未执行不能计为通过
 
+🕰️ **历史版本检查（0.6.2）**：`Test-PimLifecycle.ps1 -HistoryOnly` 创建自己的临时沙盒，安装 PIM 26.3，从实时官方历史目录选择同一系列的最新和前一稳定版 x64 micro，检查精确安装、替换确认、陈旧状态拒绝、损坏历史版本修复、实际解释器执行、原来源元数据保留和卸载清理。该模式跳过旧 PIM 种子，不可与 `-T3Only` 同用。定义测试项目不代表已经通过，请按实际逐项 JSON 结果报告
+
 不要在宿主机创建标记来运行测试。即使安装目录隔离，PIM 的注册清理仍有用户级影响。沙盒使用一次性的 System 账号，因此不能替代所有交互用户、Store 包、管理员策略或干净机器 GUI 验收。详见 [Python 管理](MANAGEMENT.zh-CN.md)
 
 ## 🎨 外观与本地化

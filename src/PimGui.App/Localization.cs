@@ -11,7 +11,9 @@ public sealed partial class MainWindow
     private readonly List<(TextBlock Element, string Key)> shellLabels = [];
     private void CollectShellLabels(DependencyObject node)
     {
-        if (node is TextBlock label && label != StatusText && label != StyleStatus && label != ConnectionText)
+        // Only our static XAML labels may be translated here. Assigning Text on
+        // template children (notably InfoBar) replaces their live bindings.
+        if (node is TextBlock { Tag: "ShellLabel" } label)
             shellLabels.Add((label, label.Text));
         for (var index = 0; index < VisualTreeHelper.GetChildrenCount(node); index++) CollectShellLabels(VisualTreeHelper.GetChild(node, index));
     }

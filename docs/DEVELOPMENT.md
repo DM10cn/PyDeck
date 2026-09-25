@@ -98,11 +98,15 @@ Use Windows 11 with the Windows Sandbox CLI (`wsb`). The script creates and stop
 
 It tests official PIM 25.2 → 26.3, an actual Python patch update, damage / repair, measured downloads, cancellation, default changes, uninstall, and offline reinstall. `-SeedBundleDirectory` accepts a flat older official offline bundle; `-InstallerDirectory` reuses cached `pim-25.2.msi` / `pim-26.3.msi`, still checking PSF Authenticode signatures. Results are written under `artifacts/pim-e2e-*`. A failed case stops dependent cases; unexecuted cases are not passes.
 
+🕰️ **Historical-version checks (0.6.2):** `Test-PimLifecycle.ps1 -HistoryOnly` creates its own disposable sandbox with PIM 26.3 and selects a latest / previous stable x64 micro pair from the live official history. It checks exact installation, replacement confirmation and stale-state rejection, damaged historical-version repair, interpreter execution, retained source metadata, and uninstall cleanup. This mode skips the old-PIM seed fixture and cannot be combined with `-T3Only`. Defining these cases does not mean they have passed; report the actual per-case JSON results.
+
 Do not run the harness by creating its marker on the host. PIM registration cleanup has user-wide effects even with a separate installation directory. The sandbox uses its disposable System account, so this does not replace all interactive-user, Store-package, policy, or clean-machine GUI acceptance. See [Python management](MANAGEMENT.md).
 
 ## 🎨 Appearance and localization
 
 Use `DesignTokens` and the appearance policy for semantic colors, spacing, and surfaces. Keep style-dependent decisions out of individual page layouts. Fluent can use Mica or Acrylic; Material 3 Expressive is opaque. Unrelated settings changes must preserve the active native backdrop controller.
+
+Page controls in 0.6.2 share a 32 DIP minimum height, 14 DIP label size, 16 DIP glyph size, 12 / 4 DIP horizontal / vertical padding, and 8 DIP icon-to-label spacing. Page titles use 28 DIP and section headings use 18 DIP. These are logical dimensions: Windows display scaling changes physical pixels, and larger text may increase a text button's height. `UiLayoutChecks` measures actual bounds, label clipping, title/action alignment, and compact layouts across both designs and all four languages.
 
 App strings are embedded JSON resources under `src/PimGui.Core/Strings`. Maintain the same keys in `en-US`, `zh-CN`, `zh-TW`, and `ja-JP`. English is the default. Prefer short, natural UI wording; avoid unnecessary sentence-ending punctuation in CJK labels. PIM identifiers and raw process output should not be translated.
 

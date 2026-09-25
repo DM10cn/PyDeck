@@ -8,51 +8,134 @@ namespace PimGui.App;
 public sealed partial class MainWindow
 {
     private VirtualEnvironments Environments => new(store.DirectoryPath);
+    private string environmentSearch = "";
+    private string environmentStatus = "All";
     private UIElement BuildEnvironmentsPage()
     {
-        var layout = PageGrid(GridLength.Auto, new(1, GridUnitType.Star));
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        foreach (var (title, action) in new (string, Func<Task>)[] {
-            ("Create environment", CreateEnvironmentAsync), ("Import environment", ImportEnvironmentAsync), ("Refresh", RefreshEnvironmentsAsync) })
+        var layout = PageGrid(GridLength.Auto, GridLength.Auto, GridLength.Auto, new(1, GridUnitType.Star));
+        Button Action(string title, string icon, Func<Task> action, bool primary = false)
         {
-            var button = palette.Action(title, compact: true); button.IsEnabled = !busy;
-            button.Click += async (_, _) => await action(); actions.Children.Add(button);
+            var button = palette.Action(title, icon, primary, compact: true); button.IsEnabled = !busy;
+            button.Click += async (_, _) => await action();
+            return button;
         }
-        At(layout, Header("YOUR PROJECTS", "Virtual environments", "Separate Python environments for your projects", actions), 0);
-        var rows = new StackPanel { Spacing = 12 };
+        IReadOnlyList<VirtualEnvironment> environments;
         try
         {
-            var environments = Environments.Read();
-            if (environments.Count == 0) rows.Children.Add(Empty("\uE8B7", "No environments yet", "Create an environment or import an existing folder"));
-            foreach (var environment in environments)
-            {
-                var body = new StackPanel { Spacing = 8 };
-                body.Children.Add(palette.Label(environment.Name + "  ·  " + environment.Version, 17, true));
-                var path = palette.Label(environment.Path, 12, muted: true); path.IsTextSelectionEnabled = true; body.Children.Add(path);
-                body.Children.Add(palette.Label(T("Base interpreter: {0}", environment.BasePath), 12, muted: true));
-                body.Children.Add(palette.Label(environment.State, 12));
-                var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-                foreach (var (title, action) in new (string, Func<Task>)[] {
-                    ("Check environment", () => CheckEnvironmentAsync(environment)),
-                    ("Terminal", () => OpenEnvironmentTerminalAsync(environment)),
-                    ("Open folder", () => { OpenFolder(new("", "", "", "", "", "", environment.Path, false)); return Task.CompletedTask; }),
-                    ("Remove from list", () => RemoveEnvironmentAsync(environment)) })
-                {
-                    var button = palette.Action(title, compact: true); button.IsEnabled = !busy;
-                    button.Click += async (_, _) => await action(); buttons.Children.Add(button);
-                }
-                body.Children.Add(buttons); rows.Children.Add(palette.CardBox(body));
-            }
+            environments = Environments.Read();
         }
-        catch (Exception ex) { rows.Children.Add(palette.Label(T("Environment list unavailable") + "\n" + ex.Message, 14)); }
-        At(layout, new ScrollViewer { Content = rows }, 1); return layout;
+        catch (Exception ex)
+        {
+            At(layout, Header("YOUR PROJECTS", "Virtual environments", "Separate Python environments for your projects"), 0);
+            At(layout, palette.Label(T("Environment list unavailable") + "\n" + SensitiveText.Redact(ex.Message), 14), 3);
+            return layout;
+        }
+        var create = Action("Create environment", "\uE710", CreateEnvironmentAsync, primary: true);
+        var import = Action("Import environment", "\uE8B5", ImportEnvironmentAsync);
+        At(layout, Header("YOUR PROJECTS", "Virtual environments", "Separate Python environments for your projects", environments.Count == 0 ? null : create), 0);
+        if (environments.Count == 0)
+        {
+            var empty = (StackPanel)Empty("\uE8B7", "No environments yet", "Create an environment or import an existing folder");
+            empty.Tag = "EnvironmentsEmpty";
+            var actions = Toolbar(create, import); actions.HorizontalAlignment = HorizontalAlignment.Center;
+            empty.Children.Add(actions);
+            At(layout, empty, 3);
+            return layout;
+        }
+
+        var rows = new StackPanel { Spacing = 8 };
+        var count = palette.Label("", palette.Tokens.CaptionFontSize, muted: true);
+        void Populate()
+        {
+            var matches = environments.Where(environment =>
+                (environment.Name + " " + environment.Path + " " + environment.Version + " " + environment.BasePath)
+                    .Contains(environmentSearch, StringComparison.OrdinalIgnoreCase) &&
+                (environmentStatus switch
+                {
+                    "Ready" => environment.State == "Environment ready",
+                    "Unchecked" => environment.State == "Not checked",
+                    "Attention" => environment.State is not "Environment ready" and not "Not checked",
+                    _ => true
+                })).OrderBy(environment => environment.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
+            rows.Children.Clear();
+            count.Text = T("{0} environments", matches.Length);
+            if (matches.Length == 0) rows.Children.Add(Empty("\uE721", "No environments match", "Try another search or status"));
+            foreach (var environment in matches) rows.Children.Add(EnvironmentRow(environment));
+        }
+        var search = new AutoSuggestBox { Text = environmentSearch, PlaceholderText = T("Search environments"), QueryIcon = new SymbolIcon(Symbol.Find),
+            FontSize = palette.Tokens.ControlFontSize, MinHeight = palette.Tokens.ControlHeight, MinWidth = 160 };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(search, T("Search environments"));
+        search.TextChanged += (sender, _) => { environmentSearch = sender.Text; Populate(); };
+        var status = Choice([("All", "All statuses"), ("Ready", "Ready"), ("Unchecked", "Not checked"), ("Attention", "Needs attention")],
+            environmentStatus, value => { environmentStatus = value; Populate(); }, "Environment status");
+        var toolbar = new Grid { RowSpacing = 8, ColumnSpacing = palette.Tokens.ToolbarSpacing, Tag = "PageToolbar" };
+        toolbar.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); toolbar.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
+        toolbar.RowDefinitions.Add(new() { Height = GridLength.Auto }); toolbar.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        toolbar.Children.Add(search); Grid.SetColumn(status, 1); toolbar.Children.Add(status);
+        var utilities = Toolbar(import, Action("Refresh", "\uE72C", RefreshEnvironmentsAsync));
+        Grid.SetRow(utilities, 1); Grid.SetColumnSpan(utilities, 2); toolbar.Children.Add(utilities);
+        At(layout, toolbar, 1); At(layout, count, 2);
+        At(layout, new ScrollViewer { Content = rows, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }, 3);
+        Populate();
+        return layout;
+    }
+    private UIElement EnvironmentRow(VirtualEnvironment environment)
+    {
+        var body = new Grid { ColumnSpacing = 12, RowSpacing = 8, Tag = "EnvironmentRow" };
+        body.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); body.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
+        body.RowDefinitions.Add(new() { Height = GridLength.Auto }); body.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        var details = new StackPanel { Spacing = 4 };
+        details.Children.Add(palette.Label(environment.Name, 16, true));
+        if (environment.Version.Length > 0) details.Children.Add(palette.Label("Python " + environment.Version, palette.Tokens.CaptionFontSize, muted: true));
+        var path = palette.Label(environment.Path, palette.Tokens.CaptionFontSize, muted: true); path.IsTextSelectionEnabled = true; details.Children.Add(path);
+        if (environment.BasePath.Length > 0)
+            details.Children.Add(palette.Label(T("Base interpreter: {0}", environment.BasePath), palette.Tokens.CaptionFontSize, muted: true));
+        Grid.SetColumnSpan(details, 2); body.Children.Add(details);
+        var state = palette.Label(environment.State, palette.Tokens.CaptionFontSize, muted: environment.State == "Not checked");
+        state.VerticalAlignment = VerticalAlignment.Center; Grid.SetRow(state, 1); body.Children.Add(state);
+        var terminal = palette.Action("Terminal", "\uE756", compact: true); terminal.IsEnabled = !busy;
+        terminal.Click += async (_, _) => await OpenEnvironmentTerminalAsync(environment);
+        var more = palette.IconAction(T("Environment actions") + " · " + environment.Name, "\uE712"); more.IsEnabled = !busy;
+        var menu = RuntimeMenu();
+        foreach (var (title, icon, action) in new (string, string, Func<Task>)[] {
+            ("Check environment", "\uE73E", async () => { await CheckEnvironmentAsync(environment); }),
+            ("Open folder", "\uE8B7", () => { OpenFolder(new("", "", "", "", "", "", environment.Path, false)); return Task.CompletedTask; }),
+            ("Remove from list", "\uE74D", () => RemoveEnvironmentAsync(environment)) })
+        {
+            var item = new MenuFlyoutItem { Text = T(title), Icon = new FontIcon { Glyph = icon, FontSize = palette.Tokens.ControlIconSize }, IsEnabled = !busy };
+            item.Click += async (_, _) => await action(); menu.Items.Add(item);
+        }
+        more.Flyout = menu;
+        var actions = Toolbar(terminal, more); Grid.SetColumn(actions, 1); Grid.SetRow(actions, 1); body.Children.Add(actions);
+        return palette.CardBox(body, palette.Tokens.RowPadding);
     }
     private async Task RefreshEnvironmentsAsync()
     {
-        if (busy) return;
-        try { foreach (var e in Environments.Read()) Environments.Remember(VirtualEnvironments.Inspect(e.Path)); }
+        if (busy || confirmationOpen) return;
+        confirmationOpen = true;
+        SetBusy(true, "Checking files");
+        try
+        {
+            await Environments.RefreshAsync(new ProcessRunner(), async verified =>
+            {
+                var content = new StackPanel { Spacing = 12 };
+                foreach (var environment in verified)
+                {
+                    var item = new StackPanel { Spacing = 4 };
+                    item.Children.Add(palette.Label(environment.Name, palette.Tokens.BodyFontSize, true));
+                    item.Children.Add(palette.Label("This runs the interpreter in the selected environment", palette.Tokens.CaptionFontSize, muted: true));
+                    var path = palette.Label(environment.Executable, palette.Tokens.CaptionFontSize, muted: true);
+                    path.IsTextSelectionEnabled = true; item.Children.Add(path); content.Children.Add(item);
+                }
+                var dialog = Dialog("Recheck environments", "", "Check");
+                dialog.Content = new ScrollViewer { Content = content, MaxHeight = 320,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+                return await dialog.ShowAsync() == ContentDialogResult.Primary;
+            });
+        }
         catch (Exception ex) { ShowError(ex); }
-        await Task.CompletedTask; RenderPage();
+        finally { confirmationOpen = false; SetBusy(false); }
     }
     private async Task ImportEnvironmentAsync()
     {

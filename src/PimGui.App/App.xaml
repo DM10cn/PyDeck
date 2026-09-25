@@ -5,13 +5,6 @@
  <Application.Resources>
   <ResourceDictionary>
    <ResourceDictionary.MergedDictionaries><controls:XamlControlsResources /></ResourceDictionary.MergedDictionaries>
-   <Style x:Key="MaterialAction" TargetType="Button">
-    <Setter Property="CornerRadius" Value="22" />
-    <Setter Property="Padding" Value="20,11" />
-    <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="MinHeight" Value="44" />
-    <Setter Property="HorizontalContentAlignment" Value="Center" />
-   </Style>
   </ResourceDictionary>
  </Application.Resources>
 </Application>

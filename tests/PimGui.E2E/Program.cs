@@ -6,6 +6,8 @@ using System.Text.Json.Nodes;
 if (args.Length != 3 || !File.Exists(@"C:\PyDeckE2E\ISOLATED") || Environment.MachineName != File.ReadAllText(@"C:\PyDeckE2E\ISOLATED").Trim())
     throw new InvalidOperationException("Run scripts/Test-PimLifecycle.ps1 in a disposable sandbox");
 var manager = args[0]; var phase = args[1]; var output = args[2];
+if (phase is not "seed" and not "upgraded" and not "t3" and not "history")
+    throw new ArgumentException("Unknown lifecycle phase");
 var root = @"C:\PyDeckE2E";
 var results = new List<object>();
 var failed = false;
@@ -41,6 +43,96 @@ try
             var selected = verified.Runtimes.Single();
             PimConfiguration.Save(PimConfiguration.Read(scope.UserConfig, false), new JsonObject { ["default_tag"] = selected.Selector, ["automatic_install"] = false }, false);
             Require((await client.ListAsync()).Single().IsDefault, "Old manager default failed");
+        });
+    }
+    else if (phase == "history")
+    {
+        PythonRuntime latest = null!, previous = null!, current = null!;
+        var evidence = new List<object>();
+        async Task<PythonRuntime> VerifyHistoricalAsync(PythonRuntime expected, string step)
+        {
+            var verified = await RuntimeHealth.VerifyAsync(client, RuntimeAction.Install, expected);
+            Require(verified.Confirmed, verified.Message);
+            var actual = verified.Runtimes.Single();
+            Require(actual.SameIdentity(expected), "Registered historical identity differs from the selection");
+            Require(actual.Prefix.StartsWith(root + "\\", StringComparison.OrdinalIgnoreCase), "Unsafe historical fixture location");
+            var executed = await new ProcessRunner().RunAsync(actual.Executable,
+                ["-I", "-S", "-c", "import sys,json;print(json.dumps({'version':sys.version.split()[0],'executable':sys.executable}))"]);
+            Require(executed.ExitCode == 0 && !executed.OutputTruncated, "Historical interpreter execution failed");
+            var interpreter = JsonNode.Parse(executed.Output)!;
+            Require(interpreter["version"]?.GetValue<string>() == expected.Version, "Executed Python micro differs from the selected micro");
+            Require(string.Equals(interpreter["executable"]?.GetValue<string>(), actual.Executable, StringComparison.OrdinalIgnoreCase), "Historical executable path differs");
+            var metadata = JsonNode.Parse(File.ReadAllText(Path.Combine(actual.Prefix, "__install__.json")))!;
+            Require(metadata["sort-version"]?.GetValue<string>() == expected.Version, "Installed metadata contains a different micro");
+            Require(metadata["source"]?.GetValue<string>() == InstallationSource.Official && InstallationSource.Installed(actual) == InstallationSource.Official,
+                "Historical installation lost its official source or retained a temporary offline source");
+            evidence.Add(new { step, expected.Id, expected.Version, actual.Executable, source = metadata["source"]!.GetValue<string>() });
+            File.WriteAllText(Path.Combine(Path.GetDirectoryName(output)!, "history-evidence.json"),
+                JsonSerializer.Serialize(evidence, new JsonSerializerOptions { WriteIndented = true }));
+            return actual;
+        }
+        await Check("Official history exposes latest and previous stable micro with the same runtime ID", async () =>
+        {
+            Require(client.SupportsMutations && client.SupportsRepair, "History tests require PIM 26.3 or newer");
+            Require((await client.ListAsync()).Count == 0, "History-only phase requires an empty isolated Python installation directory");
+            var catalog = await client.ListCatalogAsync();
+            var series = catalog.Where(r => r.Company == "PythonCore" && r.Architecture == "x64" && !r.IsSpecialized && !r.IsPrerelease)
+                .GroupBy(r => r.Id, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.OrderByDescending(r => r.Version, Comparer<string>.Create(RuntimeCatalog.CompareVersions)).ToArray())
+                .Where(group => group.Length >= 2)
+                .OrderByDescending(group => group[0].Version, Comparer<string>.Create(RuntimeCatalog.CompareVersions)).FirstOrDefault();
+            Require(series is not null, "Official history does not contain a stable same-ID micro pair");
+            latest = series![0]; previous = series[1];
+            Require(latest.Id == previous.Id && RuntimeCatalog.MinorSeries(latest) == RuntimeCatalog.MinorSeries(previous) &&
+                RuntimeCatalog.CompareVersions(latest.Version, previous.Version) > 0, "Invalid historical micro pair");
+            Require(latest.CatalogIndex == InstallationSource.Official && previous.CatalogIndex == InstallationSource.Official,
+                "History selection did not retain its source snapshot");
+            Console.WriteLine($"History selection: {latest.Id}, {latest.Version} -> {previous.Version}, {previous.ExactSelector}");
+        });
+        await Check("Install the actual latest stable micro from the official source", async () =>
+        {
+            using var operation = new PimOperation();
+            await client.ChangeAsync(RuntimeAction.Install, latest, Console.WriteLine, operation);
+            current = await VerifyHistoricalAsync(latest, "latest installed");
+        });
+        await Check("Historical replacement requires explicit confirmation", async () =>
+        {
+            var rejected = false;
+            try { await client.ChangeAsync(RuntimeAction.Install, previous, Console.WriteLine); }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("confirm the replacement", StringComparison.OrdinalIgnoreCase)) { rejected = true; }
+            Require(rejected, "Unconfirmed historical replacement was not rejected");
+            current = await VerifyHistoricalAsync(latest, "unconfirmed replacement rejected");
+        });
+        await Check("Confirmed downgrade executes the exact historical micro and retains its official source", async () =>
+        {
+            using var operation = new PimOperation();
+            await client.ChangeAsync(RuntimeAction.Install, previous, Console.WriteLine, operation, expectedInstalledVersion: current.Version);
+            current = await VerifyHistoricalAsync(previous, "previous micro installed");
+        });
+        await Check("Stale historical replacement confirmation is rejected without changing the installed interpreter", async () =>
+        {
+            var before = System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(current.Executable));
+            var rejected = false;
+            try { await client.ChangeAsync(RuntimeAction.Install, latest, Console.WriteLine, expectedInstalledVersion: latest.Version); }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("changed after confirmation", StringComparison.OrdinalIgnoreCase)) { rejected = true; }
+            Require(rejected, "Stale historical confirmation was not rejected");
+            Require(before.SequenceEqual(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(current.Executable))), "Stale confirmation changed the interpreter file");
+            current = await VerifyHistoricalAsync(previous, "stale confirmation rejected");
+        });
+        await Check("Repair restores the historical interpreter without upgrading its micro", async () =>
+        {
+            Require(current.Prefix.StartsWith(root + "\\", StringComparison.OrdinalIgnoreCase), "Unsafe historical damage fixture location");
+            File.Move(current.Executable, current.Executable + ".damaged");
+            Require(!(await RuntimeHealth.CheckAsync(current)).Healthy, "Historical damage was not detected");
+            using var operation = new PimOperation();
+            await client.ChangeAsync(RuntimeAction.Repair, current, Console.WriteLine, operation);
+            current = await VerifyHistoricalAsync(previous, "historical micro repaired");
+        });
+        await Check("Historical uninstall removes its registration, executable and installation directory", async () =>
+        {
+            await client.ChangeAsync(RuntimeAction.Uninstall, current, Console.WriteLine);
+            var verified = await RuntimeHealth.VerifyAsync(client, RuntimeAction.Uninstall, current);
+            Require(verified.Confirmed && verified.Runtimes.Count == 0, verified.Message);
         });
     }
     else

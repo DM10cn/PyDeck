@@ -18,8 +18,9 @@ public static class RuntimeCatalog
         if (result != 0) return result;
         (int Stage, int Number) Suffix(string value)
         {
-            var match = System.Text.RegularExpressions.Regex.Match(value, @"(?:\d)(a|b|rc)(\d+)");
-            return match.Success ? (match.Groups[1].Value switch { "a" => 0, "b" => 1, _ => 2 }, int.Parse(match.Groups[2].Value)) : (3, 0);
+            var match = System.Text.RegularExpressions.Regex.Match(value, @"(?:\d)(a|b|rc)(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            return match.Success ? (match.Groups[1].Value.ToLowerInvariant() switch { "a" => 0, "b" => 1, _ => 2 },
+                int.TryParse(match.Groups[2].Value, out var number) ? number : int.MaxValue) : (3, 0);
         }
         return Suffix(left).CompareTo(Suffix(right));
     }
@@ -27,11 +28,11 @@ public static class RuntimeCatalog
         source.Where(r => (architecture == "All architectures" || r.Architecture == architecture) &&
             (previews || !r.IsPrerelease) && (search.Length == 0 ||
             $"{r.DisplayName} {r.Tag} {r.Version} {r.Company} {r.Distribution}".Contains(search, StringComparison.OrdinalIgnoreCase)))
-        .OrderByDescending(r => SortVersion(r.Version)).ThenBy(r => r.IsPrerelease).ThenBy(r => r.IsSpecialized).ToArray();
+        .OrderByDescending(r => r.Version, Comparer<string>.Create(CompareVersions)).ThenBy(r => r.IsSpecialized).ToArray();
 
     public static PythonRuntime? Recommended(IEnumerable<PythonRuntime> source, string preferredArchitecture) =>
         source.Where(r => !r.IsPrerelease && !r.IsSpecialized)
-            .OrderByDescending(r => SortVersion(r.Version)).ThenByDescending(r => r.Architecture == preferredArchitecture).FirstOrDefault();
+            .OrderByDescending(r => r.Version, Comparer<string>.Create(CompareVersions)).ThenByDescending(r => r.Architecture == preferredArchitecture).FirstOrDefault();
 
     private static Version SortVersion(string value)
     {

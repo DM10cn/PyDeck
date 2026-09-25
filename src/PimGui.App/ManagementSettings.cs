@@ -17,16 +17,17 @@ public sealed partial class MainWindow
     private PathReport? lastPathReport;
     private UIElement ManagementSettings()
     {
-        var panel = new StackPanel { Spacing = 12 };
-        panel.Children.Add(palette.Label("Python management", 19, true));
+        var panel = palette.Section("Python management");
         panel.Children.Add(palette.Label(T("PIM version: {0}", client.ManagerVersion), 12, muted: true));
         foreach (var (title, build) in new (string, Func<UIElement>)[] {
             ("PIM configuration", BuildPimEditor), ("PATH and aliases", BuildPathEditor), ("Refresh aliases", BuildAliasEditor),
             ("Network", BuildNetworkEditor), ("Installation source", BuildSourceEditor), ("Shebang rules", BuildShebangEditor) })
         {
-            var section = new Expander { Header = T(title), Tag = "Management:" + title, IsExpanded = expandedSettings.Contains(title),
+            var section = new Expander { Header = palette.Label(title, palette.Tokens.BodyFontSize, true), Tag = "Management:" + title, IsExpanded = expandedSettings.Contains(title),
                 HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                CornerRadius = new(palette.Radius), IsEnabled = !busy && (connected || title is "Network" or "Installation source") && (title != "Shebang rules" || client.SupportsMutations) };
+                CornerRadius = new(palette.Tokens.ActionRadius), FontSize = palette.Tokens.ControlFontSize,
+                IsEnabled = !busy && (connected || title is "Network" or "Installation source") && (title != "Shebang rules" || client.SupportsMutations) };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(section, T(title));
             palette.ApplySurfaceResources(section);
             void Populate() { try { section.Content = build(); } catch (Exception ex) { section.Content = palette.Label(T(ex.Message), 13); } }
             if (section.IsExpanded) Populate();
@@ -34,37 +35,59 @@ public sealed partial class MainWindow
             section.Collapsed += (_, _) => expandedSettings.Remove(title);
             panel.Children.Add(section);
         }
-        return palette.CardBox(panel);
+        return panel;
     }
-    private void InlineAction(StackPanel body, string label, Func<Task> action, bool enabled = true)
+    private sealed class InlineEditResult { public bool Applied { get; set; } }
+    private void InlineAction(StackPanel body, string label, Func<InlineEditResult, Task> action, bool enabled = true)
     {
         var button = palette.Action(label, compact: true); button.IsEnabled = enabled && !busy;
         button.HorizontalAlignment = HorizontalAlignment.Left;
         button.Click += async (_, _) => await SaveInlineAsync(action); body.Children.Add(button);
     }
-    private async Task SaveInlineAsync(Func<Task> action)
+    private async Task SaveInlineAsync(Func<InlineEditResult, Task> action)
     {
         if (busy || confirmationOpen) return; confirmationOpen = true;
+        var originalPage = page;
+        var originalContent = PageHost.Children.ToArray();
+        var originalScroll = settingsScroll;
+        var originalFocus = Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(Root.XamlRoot) as Control;
+        var result = new InlineEditResult();
         SetBusy(true);
-        try { await action(); }
+        try { await action(result); }
         catch (Exception ex) { ShowError(new IOException(SensitiveText.Redact(ex.Message))); }
-        finally { confirmationOpen = false; SetBusy(false); }
+        finally
+        {
+            confirmationOpen = false; SetBusy(false);
+            // Busy rendering temporarily detaches the editor. A cancelled review or validation
+            // failure must return to those same controls and their unsaved draft. After a write,
+            // keep the rebuilt page even when a subsequent refresh fails.
+            if (!result.Applied && page == originalPage)
+            {
+                PageHost.Children.Clear();
+                foreach (var element in originalContent) PageHost.Children.Add(element);
+                settingsScroll = originalScroll;
+                Root.UpdateLayout();
+                if (originalFocus?.IsLoaded == true) originalFocus.Focus(FocusState.Programmatic);
+            }
+        }
     }
     private UIElement BuildNetworkEditor()
     {
             var previous = preferences;
             var mode = preferences.Network.Mode;
             var body = new StackPanel { Spacing = 12 };
-            var address = new TextBox { Header = T("Proxy address"), Text = preferences.Network.Address, PlaceholderText = "http://localhost:7890" };
-            var username = new TextBox { Header = T("Username"), Text = preferences.Network.Username };
-            var password = new PasswordBox { Header = T("Password"), PlaceholderText = T("Leave blank to keep the saved password") };
+            var address = new TextBox { Header = T("Proxy address"), Text = preferences.Network.Address, PlaceholderText = "http://localhost:7890", FontSize = palette.Tokens.ControlFontSize };
+            var username = new TextBox { Header = T("Username"), Text = preferences.Network.Username, FontSize = palette.Tokens.ControlFontSize };
+            var password = new PasswordBox { Header = T("Password"), PlaceholderText = T("Leave blank to keep the saved password"), FontSize = palette.Tokens.ControlFontSize };
             var clear = new CheckBox { Content = T("Clear saved password") };
-            void UpdateFields() { address.IsEnabled = username.IsEnabled = password.IsEnabled = mode == "Custom"; }
-            body.Children.Add(Choice([("System", "Use system settings"), ("Direct", "Direct connection"), ("Custom", "HTTP proxy")], mode, value => { mode = value; UpdateFields(); }, "Network"));
+            var credentials = new StackPanel { Spacing = 12 };
+            credentials.Children.Add(address); credentials.Children.Add(username); credentials.Children.Add(password); credentials.Children.Add(clear);
+            credentials.Children.Add(palette.Label("Passwords are stored in Windows Credential Manager", 12, muted: true));
+            void UpdateFields() { credentials.Visibility = mode == "Custom" ? Visibility.Visible : Visibility.Collapsed; }
+            body.Children.Add(SettingRow("Connection", null, Choice([("System", "Use system settings"), ("Direct", "Direct connection"), ("Custom", "HTTP proxy")], mode, value => { mode = value; UpdateFields(); }, "Network")));
             UpdateFields();
-            body.Children.Add(address); body.Children.Add(username); body.Children.Add(password); body.Children.Add(clear);
-            body.Children.Add(palette.Label("Passwords are stored in Windows Credential Manager", 12, muted: true));
-        InlineAction(body, "Save", async () => {
+            body.Children.Add(credentials);
+        InlineAction(body, "Save", async result => {
             var settings = new NetworkSettings(mode, address.Text.Trim(), username.Text.Trim()).Validate();
             var secret = clear.IsChecked == true ? "" : password.Password.Length > 0 ? password.Password : ProxyCredential.Load(settings.Address, settings.Username) ?? "";
             var next = preferences with { Network = settings };
@@ -73,6 +96,7 @@ public sealed partial class MainWindow
             catch { store.Save(previous); throw; }
             preferences = next;
             catalog = null;
+            result.Applied = true;
             Notify("Network settings saved", InfoBarSeverity.Success);            await Task.CompletedTask;
         });
         return body;
@@ -99,10 +123,9 @@ public sealed partial class MainWindow
             string? backup = null;
             if (backups.Length > 0)
             {
-                body.Children.Add(palette.Label("Restore backup", 14, true));
-                body.Children.Add(Choice(new[] { ("", "Choose a backup") }.Concat(backups.Select(p => (p, Path.GetFileName(p)))).ToArray(), "", value => backup = value.Length > 0 ? value : null, "Restore backup"));
+                body.Children.Add(SettingRow("Restore backup", null, Choice(new[] { ("", "Choose a backup") }.Concat(backups.Select(p => (p, Path.GetFileName(p)))).ToArray(), "", value => backup = value.Length > 0 ? value : null, "Restore backup")));
             }
-        InlineAction(body, "Review changes", async () => {
+        InlineAction(body, "Review changes", async result => {
             if (edits.Count == 0 && backup is null) return;
             string SettingName(string key) => T(key switch { "default_tag" => "Default interpreter", "default_platform" => "Default platform", "automatic_install" => "Automatic installation", _ => "Include unmanaged Python" });
             string DisplayValue(JsonNode? value) => value is null ? T("PIM default") : value.ToJsonString() switch
@@ -114,6 +137,7 @@ public sealed partial class MainWindow
             {
                 if (backup is null) PimConfiguration.Save(snapshot, edits); else PimConfiguration.Restore(snapshot, backup);
             }
+            result.Applied = true;
             installed = await client.ListAsync(); catalog = null;
             if (edits["default_tag"] is { } requested && installed.FirstOrDefault(r => r.IsDefault)?.Selector != requested.GetValue<string>())
                 Notify("Your preference was saved, but PIM reports a different effective default. A custom configuration or policy may override it.", InfoBarSeverity.Warning);
@@ -123,9 +147,10 @@ public sealed partial class MainWindow
     private UIElement BuildPathEditor()
     {
         var body = new StackPanel { Spacing = 12 };
-        InlineAction(body, "Run diagnostics", async () => {
+        InlineAction(body, "Run diagnostics", async result => {
             installed = await client.ListAsync();
             lastPathReport = await PathDiagnostics.ProbeKnownAsync(PathDiagnostics.Inspect(installed, client.Executable), installed, client.Executable);
+            result.Applied = true;
         });
         if (lastPathReport is not { } report) return body;
 
@@ -161,7 +186,7 @@ public sealed partial class MainWindow
         {
             if (await Dialog("Refresh aliases", "PIM will rebuild registrations and global aliases for all managed versions", "Refresh").ShowAsync() != ContentDialogResult.Primary) return;
             SetBusy(true, "Checking files");
-            await client.RefreshRegistrationsAsync(line => DispatcherQueue.TryEnqueue(() => Log(line)));
+            await client.RefreshRegistrationsAsync(line => DispatcherQueue.TryEnqueue(() => Log(line, origin: ActivityOrigin.PythonManager)));
             installed = await client.ListAsync();
             Notify("Registrations refreshed. Run PATH diagnostics to check command resolution", InfoBarSeverity.Informational);
         }

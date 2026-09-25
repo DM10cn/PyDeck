@@ -8,6 +8,11 @@ public sealed record PythonRuntime(string Id, string Company, string Tag, string
 {
     public string? DownloadMetadata { get; init; }
     public string? CatalogIndex { get; init; }
+    // PIM intentionally reuses an ID across micro releases. Catalog identity must not.
+    public string CatalogIdentity => Id.ToLowerInvariant() + "@" + Version.ToLowerInvariant();
+    public bool SameIdentity(PythonRuntime other) => Id.Equals(other.Id, StringComparison.OrdinalIgnoreCase) &&
+        Version.Equals(other.Version, StringComparison.OrdinalIgnoreCase) && Company.Equals(other.Company, StringComparison.OrdinalIgnoreCase);
+    public string ExactSelector => RuntimeSelection.ExactSelector(this);
     public string Architecture => Tag.Contains("arm64", StringComparison.OrdinalIgnoreCase) ? "ARM64"
         : Tag.EndsWith("-32", StringComparison.OrdinalIgnoreCase) ? "x86" : "x64";
     public bool IsPrerelease => Regex.IsMatch(Version, @"\d(?:a|b|rc)\d", RegexOptions.IgnoreCase)
@@ -23,7 +28,9 @@ public sealed record PythonRuntime(string Id, string Company, string Tag, string
 
 public static class RuntimeParser
 {
-    public static IReadOnlyList<PythonRuntime> Parse(string json)
+    public static IReadOnlyList<PythonRuntime> Parse(string json) => Parse(json, false);
+    public static IReadOnlyList<PythonRuntime> ParseCatalog(string json) => Parse(json, true);
+    private static IReadOnlyList<PythonRuntime> Parse(string json, bool catalog)
     {
         try
         {
@@ -46,7 +53,8 @@ public static class RuntimeParser
                 if (string.IsNullOrWhiteSpace(tag) || string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(company))
                     throw new FormatException("A Python entry is missing its ID, company, or version tag.");
                 var version = Get("sort-version");
-                if (!identities.Add(id)) throw new FormatException("Python Install Manager returned duplicate runtime IDs.");
+                if (!identities.Add(catalog ? id + "@" + version : id)) throw new FormatException(catalog
+                    ? "The Python catalog contains a duplicate runtime version." : "Python Install Manager returned duplicate runtime IDs.");
                 var title = Get("display-name");
                 result.Add(new(id, company, tag, version.Length > 0 ? version : tag,
                     title.Length > 0 ? title : $"{company} {tag}", Get("executable"), Get("prefix"),

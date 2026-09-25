@@ -7,6 +7,24 @@ static class T3Checks
     {
         void Require(bool value, string message) { if (!value) throw new Exception(message); }
         void Reject(Action action) { try { action(); } catch (ArgumentException) { return; } throw new Exception("Unsafe input accepted"); }
+        check("Activity levels filter explicit severity, preserve messages and bound storage", () =>
+        {
+            var log = new ActivityLog();
+            log.Add("Connected");
+            log.Add("\u001b[33m[WARNING] retrying\u001b[0m");
+            log.Add("ERROR: failed\ntrace details");
+            log.Add("Warning count: 0", ActivityLevel.Information);
+            log.Add("file C:/error/example.py");
+            Require(log.Entries.Count == 5 && log.Entries.Count(e => e.Level == ActivityLevel.Warning) == 1, "Wrong severity classification");
+            Require(log.Text(ActivityLevel.Error).Contains("trace details") && !log.Text(ActivityLevel.Error).Contains("Connected"), "Filtered text mismatch");
+            Require(!log.Text().Contains('\u001b') && log.Text(ActivityLevel.Information).Contains("Warning count"), "Explicit severity or ANSI cleanup lost");
+            Require(ActivityLog.Classify("No error occurred") == ActivityLevel.Information && ActivityLog.Classify("errorless operation") == ActivityLevel.Information, "Ordinary words misclassified");
+            Require(ActivityLog.Classify("header\nwarn: first\n[ERROR] second") == ActivityLevel.Error, "Multiline priority");
+            for (var i = 0; i < 2200; i++) log.Add("line " + i);
+            Require(log.Entries.Count == 2000 && !log.Text().Contains("Connected"), "Line bound");
+            for (var i = 0; i < 1000; i++) log.Add(new string('x', 3000), ActivityLevel.Warning);
+            Require(log.Entries.Sum(e => e.Format().Length) * sizeof(char) <= 1024 * 1024 && log.Entries.All(e => e.Message.Length < 2100), "Memory bounds");
+        });
         check("App updates compare numeric stable versions and pin browser destination", () =>
         {
             var json = "{\"tag_name\":\"v0.10.0\",\"draft\":false,\"prerelease\":false,\"html_url\":\"https://untrusted.example\"}";
@@ -40,6 +58,9 @@ static class T3Checks
             Require(JsonNode.DeepEquals(before.Values["shebang_templates"]!["custom"], after.Values["shebang_templates"]!["custom"]) && after.Values["unknown"]!.GetValue<int>() == 123, "Advanced settings changed");
             Reject(() => ShebangRules.ValidateMapping("/usr/bin/python", "cmd.exe /c anything"));
             Reject(() => ShebangRules.ValidateMapping("#!python", "py"));
+            foreach (var blank in new[] { "", " ", "\t" }) Reject(() => ShebangRules.ValidateMapping(blank, "py"));
+            foreach (var target in new[] { "py", "pyw", "py -V:PythonCore/3.14-64", "pyw -V:PythonCore/3.14t-64" })
+                ShebangRules.ValidateMapping("/usr/bin/my_python", target);
             File.AppendAllText(path, " ");
             try { PimConfiguration.Save(after, new() { ["shebang_can_run_anything"] = true }, false); throw new Exception("Stale config accepted"); } catch (IOException) { }
         });
@@ -84,6 +105,71 @@ static class T3Checks
             var env = VirtualEnvironments.Inspect(root); Require(env.State == "Base interpreter missing", "False health");
             var registry = new VirtualEnvironments(Path.Combine(scratch, "environments-state")); registry.Remember(env); registry.Remember(env, true);
             Require(registry.Read().Count == 0 && File.Exists(env.Executable), "Removal deleted files");
+        });
+        (VirtualEnvironments Registry, VirtualEnvironment Ready, VirtualEnvironment Imported, string RegistryFile) RefreshFixture(string suffix)
+        {
+            var fixture = Path.Combine(scratch, "environment-refresh-" + suffix);
+            var basePath = Path.Combine(fixture, "base"); Directory.CreateDirectory(basePath);
+            File.WriteAllText(Path.Combine(basePath, "python.exe"), "fixture");
+            VirtualEnvironment Make(string name, string state)
+            {
+                var path = Path.Combine(fixture, name); Directory.CreateDirectory(Path.Combine(path, "Scripts"));
+                File.WriteAllText(Path.Combine(path, "pyvenv.cfg"), "home = " + basePath + "\nversion = 3.14.7\n");
+                File.WriteAllText(Path.Combine(path, "Scripts", "python.exe"), "fixture");
+                return new(path, state, "3.14.7", basePath);
+            }
+            var ready = Make("verified", "Environment ready");
+            var imported = Make("imported", "Not checked");
+            var data = Path.Combine(fixture, "state"); var registry = new VirtualEnvironments(data);
+            registry.Remember(ready); registry.Remember(imported);
+            return (registry, ready, imported, Path.Combine(data, "environments.json"));
+        }
+        await checkAsync("Cancelling environment refresh preserves the registry and never executes an interpreter", async () =>
+        {
+            var fixture = RefreshFixture("cancel");
+            var original = File.ReadAllBytes(fixture.RegistryFile);
+            var prompts = 0;
+            var runner = new FakeRunner((_, _) => throw new Exception("Cancelled refresh executed Python"));
+            Require(!await fixture.Registry.RefreshAsync(runner, selected =>
+            {
+                prompts++; Require(selected.Count == 1 && selected[0] == fixture.Ready, "Recheck prompt included an unverified environment");
+                return Task.FromResult(false);
+            }), "Cancellation was ignored");
+            Require(prompts == 1 && original.SequenceEqual(File.ReadAllBytes(fixture.RegistryFile)), "Cancellation changed stored states");
+        });
+        await checkAsync("Confirmed refresh retains Ready only after a new successful probe and does not run imported environments", async () =>
+        {
+            var fixture = RefreshFixture("healthy");
+            var executions = 0;
+            var runner = new FakeRunner((exe, args) =>
+            {
+                Require(exe == fixture.Ready.Executable && args[0] == "-I", "Refresh executed an unexpected interpreter"); executions++;
+                return Task.FromResult(new CommandResult(0, new JsonObject { ["prefix"] = fixture.Ready.Path,
+                    ["base"] = fixture.Ready.BasePath, ["version"] = fixture.Ready.Version }.ToJsonString(), ""));
+            });
+            Require(await fixture.Registry.RefreshAsync(runner, _ => Task.FromResult(true)), "Confirmed refresh did not finish");
+            var refreshed = fixture.Registry.Read();
+            Require(executions == 1 && refreshed.Single(e => e.Path == fixture.Ready.Path).State == "Environment ready" &&
+                refreshed.Single(e => e.Path == fixture.Imported.Path).State == "Not checked", "Refresh lost verified health or trusted an import");
+        });
+        await checkAsync("Environment refresh removes Ready when the interpreter becomes broken or disappears", async () =>
+        {
+            var fixture = RefreshFixture("broken");
+            File.WriteAllText(fixture.Ready.Executable, "broken interpreter fixture");
+            var runner = new FakeRunner((exe, _) =>
+            {
+                Require(exe == fixture.Ready.Executable, "Refresh executed an unverified import");
+                return Task.FromResult(new CommandResult(1, "", "Cannot start Python"));
+            });
+            await fixture.Registry.RefreshAsync(runner, _ => Task.FromResult(true));
+            Require(fixture.Registry.Read().Single(e => e.Path == fixture.Ready.Path).State == "Environment check failed", "Broken interpreter kept Ready");
+            fixture.Registry.Remember(fixture.Ready); File.Delete(fixture.Ready.Executable);
+            await fixture.Registry.RefreshAsync(new FakeRunner((_, _) => throw new Exception("Missing interpreter was executed")), _ => Task.FromResult(true));
+            Require(fixture.Registry.Read().Single(e => e.Path == fixture.Ready.Path).State == "Incomplete environment", "Missing interpreter kept Ready");
+            var prompts = 0;
+            await fixture.Registry.RefreshAsync(new FakeRunner((_, _) => throw new Exception("Metadata-only refresh executed Python")),
+                _ => { prompts++; return Task.FromResult(false); });
+            Require(prompts == 0, "Metadata-only refresh requested execution consent");
         });
         await checkAsync("Venv cancellation retains incomplete directories and rejects overwrites", async () =>
         {

@@ -3,12 +3,23 @@
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  Title="PyDeck">
  <Grid x:Name="Root" RequestedTheme="Dark">
+  <Grid.Resources>
+   <DataTemplate x:Key="ActivityRowTemplate">
+    <Grid ColumnSpacing="12" Padding="0,7" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
+     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <TextBlock Text="{Binding Time}" FontSize="12" Foreground="{Binding MutedBrush}" MinWidth="60" Margin="0,3,0,0"/>
+     <TextBlock Grid.Column="1" Text="{Binding Level}" FontSize="12" FontWeight="SemiBold" Foreground="{Binding LevelBrush}" MinWidth="52" Margin="0,3,0,0"/>
+     <TextBlock Grid.Column="2" Text="{Binding Message}" FontSize="{Binding MessageSize}" FontFamily="{Binding MessageFont}" Foreground="{Binding TextBrush}" TextWrapping="Wrap" IsTextSelectionEnabled="True" Visibility="{Binding TextVisibility}"/>
+     <Expander Grid.Column="2" Header="{Binding Summary}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Visibility="{Binding DetailVisibility}">
+      <TextBlock Text="{Binding Message}" FontSize="13" FontFamily="{Binding MessageFont}" Foreground="{Binding TextBrush}" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
+     </Expander>
+    </Grid>
+   </DataTemplate>
+  </Grid.Resources>
   <Grid.RowDefinitions><RowDefinition Height="44"/><RowDefinition Height="*"/><RowDefinition Height="36"/></Grid.RowDefinitions>
   <Grid x:Name="TitleBar" Padding="20,0,150,0">
    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-    <TextBlock Text="PyDeck" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
-    <TextBlock Text="/" Opacity="0.35" Margin="8,0"/>
-    <TextBlock Text="Python Install Manager" FontSize="15" Opacity="0.65" VerticalAlignment="Center"/>
+    <TextBlock Tag="ShellLabel" Text="PyDeck" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
    </StackPanel>
   </Grid>
   <Grid Grid.Row="1">
@@ -19,23 +30,22 @@
      <Border x:Name="BrandMark" Width="44" Height="44" CornerRadius="14" HorizontalAlignment="Left">
       <Image Source="Assets/AppIcon.png" AutomationProperties.Name="PyDeck"/>
      </Border>
-     <TextBlock Text="A home for Python." FontSize="14" FontWeight="SemiBold" Margin="0,2,0,0"/>
-     <TextBlock Text="Your versions, in one place." FontSize="11" Opacity="0.6"/>
+     <TextBlock Tag="ShellLabel" Text="A home for Python." FontSize="14" FontWeight="SemiBold" Margin="0,2,0,0"/>
+     <TextBlock Tag="ShellLabel" Text="Your versions, in one place." FontSize="11" Opacity="0.6"/>
     </StackPanel>
     <StackPanel Grid.Row="1" Spacing="6" x:Name="NavPanel">
      <Button x:Name="RuntimesNav" Tag="runtimes" Click="Nav_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
-      <StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE8F1;" FontSize="18"/><TextBlock Text="My Python" VerticalAlignment="Center"/></StackPanel>
+      <StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE8F1;" FontSize="18"/><TextBlock Tag="ShellLabel" Text="My Python" VerticalAlignment="Center"/></StackPanel>
      </Button>
-     <Button x:Name="CatalogNav" Tag="catalog" Click="Nav_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"><StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE896;" FontSize="18"/><TextBlock Text="Install Python" VerticalAlignment="Center"/></StackPanel></Button>
-     <Button x:Name="EnvironmentsNav" Tag="environments" Click="Nav_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"><StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE8B7;" FontSize="18"/><TextBlock Text="Virtual environments" VerticalAlignment="Center"/></StackPanel></Button>
-     <Button x:Name="ActivityNav" Tag="activity" Click="Nav_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"><StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE9D9;" FontSize="18"/><TextBlock Text="Activity" VerticalAlignment="Center"/></StackPanel></Button>
+     <Button x:Name="CatalogNav" Tag="catalog" Click="Nav_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"><StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE896;" FontSize="18"/><TextBlock Tag="ShellLabel" Text="Install Python" VerticalAlignment="Center"/></StackPanel></Button>
+     <Button x:Name="EnvironmentsNav" Tag="environments" Click="Nav_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"><StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE8B7;" FontSize="18"/><TextBlock Tag="ShellLabel" Text="Virtual environments" VerticalAlignment="Center"/></StackPanel></Button>
+     <Button x:Name="ActivityNav" Tag="activity" Click="Nav_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"><StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE9D9;" FontSize="18"/><TextBlock Tag="ShellLabel" Text="Activity" VerticalAlignment="Center"/></StackPanel></Button>
     </StackPanel>
     <StackPanel Grid.Row="2" Spacing="16">
-     <Button x:Name="SettingsNav" Tag="settings" Click="Nav_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"><StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE713;" FontSize="18"/><TextBlock Text="Settings" VerticalAlignment="Center"/></StackPanel></Button>
-     <Border x:Name="ConnectionCard" Padding="14" CornerRadius="14">
-      <StackPanel Spacing="7">
+     <Button x:Name="SettingsNav" Tag="settings" Click="Nav_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"><StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE713;" FontSize="18"/><TextBlock Tag="ShellLabel" Text="Settings" VerticalAlignment="Center"/></StackPanel></Button>
+     <Border x:Name="ConnectionCard" Padding="12,6" CornerRadius="4">
+      <StackPanel Spacing="4">
        <StackPanel Orientation="Horizontal" Spacing="8"><Ellipse x:Name="ConnectionDot" Width="6" Height="6"/><TextBlock x:Name="ConnectionText" Text="Connecting…" FontSize="12" FontWeight="SemiBold"/></StackPanel>
-       <TextBlock Text="Powered by Python Install Manager" FontSize="10" Opacity="0.55" TextWrapping="Wrap"/>
       </StackPanel>
      </Border>
     </StackPanel>
@@ -66,7 +76,7 @@
   <Grid Grid.Row="2" Padding="26,0">
    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
     <TextBlock x:Name="StatusText" Text="Connecting to Python Install Manager…" FontSize="11" Opacity="0.65" VerticalAlignment="Center" MaxWidth="360" TextTrimming="CharacterEllipsis"/>
-    <Button x:Name="RefreshDatabaseButton" Click="RefreshDatabase_Click" Padding="8,2" Background="Transparent" BorderThickness="0"><StackPanel Orientation="Horizontal" Spacing="5"><FontIcon Glyph="&#xE72C;" FontSize="12"/><TextBlock Text="Refresh database" FontSize="11"/></StackPanel></Button>
+    <Button x:Name="RefreshDatabaseButton" Click="RefreshDatabase_Click" Padding="8,2" Background="Transparent" BorderThickness="0"><StackPanel Orientation="Horizontal" Spacing="5"><FontIcon Glyph="&#xE72C;" FontSize="12"/><TextBlock Tag="ShellLabel" Text="Refresh database" FontSize="11"/></StackPanel></Button>
    </StackPanel>
    <TextBlock x:Name="StyleStatus" Text="PyDeck" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="10" Opacity="0.5"/>
   </Grid>

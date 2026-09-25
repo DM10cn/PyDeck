@@ -85,6 +85,16 @@ public sealed partial class PimClient(IProcessRunner runner, string? mutationLoc
         return runtimes.Select(r => r with { IsManaged = managed.Contains(r.Id) }).ToArray();
     }
 
+    public async Task<IReadOnlyList<PythonRuntime>> ListCatalogAsync(CancellationToken cancellationToken = default, string? source = null)
+    {
+        RequireExecutable();
+        var index = InstallationSource.Validate(source ?? SelectedSource?.Invoke() ?? InstallationSource.Official);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromMinutes(3));
+        using var http = (Network?.Invoke() ?? new NetworkSettings()).CreateClient(ProxyPassword?.Invoke());
+        return await HistoricalCatalog.LoadAsync(http, index, ConfirmDownloadOrigin, timeout.Token);
+    }
+
     public static IReadOnlyList<string> BuildArguments(RuntimeAction action, PythonRuntime runtime)
     {
         if (action is RuntimeAction.Update or RuntimeAction.Uninstall or RuntimeAction.Repair && !runtime.IsManaged)
@@ -93,19 +103,22 @@ public sealed partial class PimClient(IProcessRunner runner, string? mutationLoc
             throw new ArgumentException("Invalid Python runtime ID.");
         if (runtime.Selector.Length > 256 || !System.Text.RegularExpressions.Regex.IsMatch(runtime.Selector, @"\A[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*\z"))
             throw new ArgumentException("Invalid Python selector");
+        if (action is RuntimeAction.Install or RuntimeAction.Repair && (runtime.ExactSelector.Length > 256 ||
+            !System.Text.RegularExpressions.Regex.IsMatch(runtime.ExactSelector, @"\A[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*\z")))
+            throw new ArgumentException("Invalid exact Python selector");
         // PIM 25.2 / 26.3 --by-id feeds strings into registration code expecting tags.
         // Resolve selectors to an exact identity under the lock before calling a mutation.
         return action switch
         {
-            RuntimeAction.Install => ["install", "--yes", runtime.Selector],
+            RuntimeAction.Install => ["install", "--yes", runtime.ExactSelector],
             RuntimeAction.Update => ["install", "--yes", "--update", runtime.Selector],
             RuntimeAction.Uninstall => ["uninstall", "--yes", runtime.Selector],
-            RuntimeAction.Repair => ["install", "--yes", "--force", runtime.Selector],
+            RuntimeAction.Repair => ["install", "--yes", "--force", runtime.ExactSelector],
             _ => throw new ArgumentOutOfRangeException(nameof(action))
         };
     }
 
-    public async Task<CommandResult> ChangeAsync(RuntimeAction action, PythonRuntime runtime, Action<string> output, PimOperation? operation = null)
+    public async Task<CommandResult> ChangeAsync(RuntimeAction action, PythonRuntime runtime, Action<string> output, PimOperation? operation = null, string? expectedInstalledVersion = null)
     {
         RequireMutationSupport();
         if (!await mutation.WaitAsync(0)) throw new InvalidOperationException("Another Python operation is already running.");
@@ -113,9 +126,9 @@ public sealed partial class PimClient(IProcessRunner runner, string? mutationLoc
         {
             var args = BuildArguments(action, runtime);
             string? index = null;
-            if (SelectedSource is not null && action != RuntimeAction.Uninstall)
+            if ((SelectedSource is not null || runtime.CatalogIndex is not null) && action != RuntimeAction.Uninstall)
             {
-                index = action == RuntimeAction.Install ? InstallationSource.Validate(SelectedSource()) : InstallationSource.Installed(runtime);
+                index = action == RuntimeAction.Install ? InstallationSource.Validate(SelectedSource?.Invoke() ?? runtime.CatalogIndex!) : InstallationSource.Installed(runtime);
                 if (action == RuntimeAction.Install && runtime.CatalogIndex != index)
                     throw new IOException("The installation source changed. Reload the catalog");
                 args = args.Concat(["--source=" + index]).ToArray();
@@ -124,33 +137,33 @@ public sealed partial class PimClient(IProcessRunner runner, string? mutationLoc
             if (action == RuntimeAction.Repair && !SupportsRepair) throw new InvalidOperationException("This PIM version does not support repair. Update Python Install Manager and reconnect");
             using var operationLock = AcquireOperationLock();
             // Re-query under the lock: a card may be stale after changes made in another window or terminal.
-            var candidates = await ListAsync(online: action == RuntimeAction.Install, cancellationToken: operation?.Token ?? default, source: index);
-            var current = candidates.SingleOrDefault(r => r.Id.Equals(runtime.Id, StringComparison.OrdinalIgnoreCase));
-            if (current is null || current.Company != runtime.Company || current.Tag != runtime.Tag ||
-                (action != RuntimeAction.Install && (!current.IsManaged || !string.Equals(current.Prefix, runtime.Prefix, StringComparison.OrdinalIgnoreCase))))
-                throw new InvalidOperationException("This Python entry has changed. Refresh the list before trying again.");
-            var resolutionArgs = new List<string> { "list", "--format=json", runtime.Selector };
-            if (action == RuntimeAction.Install) resolutionArgs.Add(index is null ? "--online" : "--source=" + index);
-            using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(operation?.Token ?? default))
+            if (action == RuntimeAction.Install)
+                await CheckReplacementAsync(runtime, expectedInstalledVersion, operation?.Token ?? default);
+            PythonRuntime? available = null;
+            if (action != RuntimeAction.Install)
             {
-                timeout.CancelAfter(TimeSpan.FromSeconds(120));
-                var resolved = await runner.RunAsync(RequireExecutable(), resolutionArgs, cancellationToken: timeout.Token);
-                EnsureSuccess(resolved);
-                var matches = RuntimeParser.Parse(resolved.Output);
-                if (matches.Count != 1 || matches[0].Id != runtime.Id) throw new InvalidOperationException("The Python selector is ambiguous. Refresh the list before trying again");
+                var candidates = await ListAsync(cancellationToken: operation?.Token ?? default);
+                var current = candidates.SingleOrDefault(r => r.Id.Equals(runtime.Id, StringComparison.OrdinalIgnoreCase));
+                if (current is null || !current.SameIdentity(runtime) || current.Tag != runtime.Tag || !current.IsManaged ||
+                    !string.Equals(current.Prefix, runtime.Prefix, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("This Python entry has changed. Refresh the list before trying again.");
+                await ResolveRuntimeAsync(runtime, online: false, exact: false, index, operation?.Token ?? default);
+            }
+            if (action != RuntimeAction.Uninstall)
+            {
+                // A raw history page is only for browsing. PIM re-reads and validates the
+                // configured source/signature policy before we trust any package metadata.
+                available = await ResolveRuntimeAsync(runtime, online: true, exact: action != RuntimeAction.Update, index, operation?.Token ?? default);
+                LastExpectedRuntime = available;
+                if (action == RuntimeAction.Update && RuntimeCatalog.CompareVersions(available.Version, runtime.Version) <= 0)
+                { LastExpectedRuntime = runtime; return new CommandResult(0, "No newer version is available", ""); }
             }
             output($"> pymanager {string.Join(' ', args)}");
             // No automatic timeout. Only an explicit user request can stop a mutation.
             CommandResult result;
             if (Network is not null && action != RuntimeAction.Uninstall)
             {
-                var available = action == RuntimeAction.Install ? current : (await ListAsync(true, operation?.Token ?? default, index)).SingleOrDefault(r => r.Id == runtime.Id && r.Company == runtime.Company && r.Tag == runtime.Tag);
                 if (available is null) throw new IOException("This Python version is no longer available from the catalog");
-                LastExpectedRuntime = available;
-                if (action == RuntimeAction.Update && RuntimeCatalog.CompareVersions(available.Version, runtime.Version) <= 0)
-                { LastExpectedRuntime = runtime; return new CommandResult(0, "No newer version is available", ""); }
-                if (action == RuntimeAction.Repair && available.Version != runtime.Version)
-                    throw new IOException("The installed version is no longer available for an exact repair. Use Update instead");
                 var directory = Path.Combine(Path.GetTempPath(), "PyDeck-download-" + Guid.NewGuid().ToString("N"));
                 try
                 {
@@ -169,17 +182,58 @@ public sealed partial class PimClient(IProcessRunner runner, string? mutationLoc
                     try
                     {
                         var localArgs = args.Concat(["--config=" + config]).ToArray();
+                        // The PyDeck lease does not lock an external PIM terminal. Downloads
+                        // can take minutes, so recheck the acknowledged replacement immediately
+                        // before starting the mutation, after all network and verification work.
+                        if (action == RuntimeAction.Install)
+                            await CheckReplacementAsync(runtime, expectedInstalledVersion, operation?.Token ?? default);
                         result = await runner.RunAsync(RequireExecutable(), localArgs, output, operation?.Token ?? default, operation is null ? null : operation.Observe);
                     }
                     finally { SafeFiles.RequireNoLinks(cached); File.Delete(cached); File.Delete(config); }
                 }
                 finally { RemoveDownload(directory); }
             }
-            else result = await runner.RunAsync(RequireExecutable(), args, output, operation?.Token ?? default, operation is null ? null : operation.Observe);
+            else
+            {
+                if (action == RuntimeAction.Install)
+                    await CheckReplacementAsync(runtime, expectedInstalledVersion, operation?.Token ?? default);
+                result = await runner.RunAsync(RequireExecutable(), args, output, operation?.Token ?? default, operation is null ? null : operation.Observe);
+            }
             EnsureSuccess(result);
             return result;
         }
         finally { mutation.Release(); }
+    }
+
+    private async Task<PythonRuntime> ResolveRuntimeAsync(PythonRuntime runtime, bool online, bool exact, string? index, CancellationToken token)
+    {
+        var selector = exact ? runtime.ExactSelector : runtime.Selector;
+        var arguments = new List<string> { "list", "--format=json", selector };
+        // PIM treats a preview suffix as a prefix (rc1 also matches rc1t). --one asks
+        // PIM for the same preferred package its installer selects; we then require
+        // the complete ID and version to match rather than accepting another variant.
+        if (online && exact) arguments.Add("--one");
+        if (online) arguments.Add(index is null ? "--online" : "--source=" + index);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+        timeout.CancelAfter(TimeSpan.FromSeconds(120));
+        var resolved = await runner.RunAsync(RequireExecutable(), arguments, cancellationToken: timeout.Token);
+        EnsureSuccess(resolved);
+        var matches = RuntimeParser.Parse(resolved.Output);
+        if (matches.Count != 1 || !matches[0].Id.Equals(runtime.Id, StringComparison.OrdinalIgnoreCase) ||
+            matches[0].Company != runtime.Company || matches[0].Tag != runtime.Tag)
+            throw new InvalidOperationException("The Python selector is ambiguous. Refresh the list before trying again");
+        if ((exact || !online) && !matches[0].SameIdentity(runtime))
+            throw new InvalidOperationException("The requested Python version could not be resolved exactly. Refresh the catalog before trying again");
+        return matches[0] with { CatalogIndex = index };
+    }
+
+    private async Task CheckReplacementAsync(PythonRuntime runtime, string? expectedInstalledVersion, CancellationToken token)
+    {
+        var current = (await ListAsync(cancellationToken: token)).SingleOrDefault(r => r.Id.Equals(runtime.Id, StringComparison.OrdinalIgnoreCase));
+        if (expectedInstalledVersion is not null && (current is null || current.Version != expectedInstalledVersion))
+            throw new InvalidOperationException("The installed Python version changed after confirmation. Refresh the list before trying again");
+        if (current is not null && !current.SameIdentity(runtime) && (!current.IsManaged || current.Version != expectedInstalledVersion))
+            throw new InvalidOperationException("Installing this micro version replaces the existing Python version. Refresh the list and confirm the replacement first");
     }
 
     private static void RemoveDownload(string directory)

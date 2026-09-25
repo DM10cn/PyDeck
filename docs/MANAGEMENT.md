@@ -2,7 +2,31 @@
 
 **English** · [简体中文](MANAGEMENT.zh-CN.md) · [🏠 Home](../README.md)
 
-This guide covers **0.6.1**, including the management features introduced in 0.6.0. Python management settings now expand inline in Settings.
+This guide covers **0.6.2**, including management features introduced in 0.6.0 and 0.6.1. Python management settings expand inline in Settings; catalog browsing preferences live on Install Python.
+
+## 🆕 0.6.2: historical versions and interface
+
+### 🕰️ Browse and install a historical micro
+
+**Install Python → All versions** groups available packages by minor series, such as 3.14 and 3.13. Expand a group to select a specific micro. Search, architecture, preview and distribution filters still apply. The selected PIM source and its history pages define availability: the official source lists Windows installation packages, not all Python source releases. A micro or variant absent from that source cannot be installed from the catalog.
+
+Architecture, package type and **Show preview releases** are controlled directly on **Install Python**. Changes filter the list immediately, and PyDeck remembers them between sessions, including **All architectures** and individual **Embeddable**, **Free-threaded** or **With tests** selections. Settings no longer duplicates these browsing preferences; **Confirm before uninstall** remains in Settings.
+
+Catalog entries distinguish the runtime ID **and** full version. Before installing or downloading an offline bundle, PyDeck asks PIM to resolve the exact selected micro and rejects a different result. **Reinstall to repair** requests the installed micro; it does not silently turn into an update. The original installation source is retained for online repair, and missing versions fail explicitly.
+
+PIM can reuse one runtime ID across several micros of the same series, architecture and distribution. Choosing another micro therefore **replaces the existing installation**, rather than creating a second entry with that ID. PyDeck shows the current and requested versions before replacement and rechecks the current version under its operation lock. If it changed after confirmation, refresh and review again. Packages inside the interpreter and virtual environments using it may need attention after replacement.
+
+Historical **Download offline package** uses the selected micro. Installing from that bundle uses a verified local snapshot and applies the same replacement check, without requiring an online catalog lookup. Keep the complete generated bundle folder. The existing checksum, archive-path, source-trust and cancellation rules still apply.
+
+### 🧭 Page layout and activity
+
+- **My Python** shows the effective default on its runtime row; the duplicate hero is removed
+- **Install Python** uses an installation-source selector, search / filters, a recommendation and minor-series groups
+- **Virtual environments** puts Create / Import in the empty state; a populated list adds search and status filters, with Terminal on each row and other actions in its menu. Refresh asks before rechecking previously verified environments, retaining Ready only after a successful probe; cancelling leaves the list unchanged, and unverified imports are only inspected
+- **Settings** uses section headings, responsive setting rows and compact style previews; PIM management remains inline, and proxy fields appear when a custom proxy is selected
+- **Activity** shows time, severity and message separately. Filter Information / Warnings / Errors, clear the session, or copy only matching entries. Commands and raw output use monospace; multiline errors expand for details. Logs remain session-only
+
+Shared control metrics define typography, icons, padding and minimum height. Text scaling can increase the height, and narrow layouts rearrange content instead of using fixed-size text boxes. These layout changes do not constitute all-DPI or external accessibility acceptance. Current acceptance status belongs in [feature status](FEATURES.md).
 
 ## ✅ Operations and verification
 
@@ -67,6 +91,8 @@ Import and Refresh inspect metadata without running Python. Check and Terminal f
 Expand **Settings → Python management → Installation source**. Leave the URL empty to use the official source, or explicitly trust a custom HTTPS PIM index. This preference applies only to PyDeck, not pip/PyPI or other terminals. Source changes invalidate the catalog; stale cards cannot start an installation.
 
 Only HTTPS URLs without credentials, query strings or fragments are accepted in this first version. Packages require SHA-256 and retain size/path checks, proxy support, cancellation, speed and ETA. A different package origin or cross-origin package redirect requires confirmation before connecting. PIM handles catalog resolution and its existing signature rules remain in force. A checksum proves integrity, not publisher identity.
+
+PIM re-reads the online source when it installs. Its temporary bundle cache does not freeze a custom server's metadata: if that server changes the package after validation, PIM may download it again. Trust the source operator; post-installation version checks detect a mismatch but are not a transactional guarantee against a changing source.
 
 Update and Repair read the installation's original HTTPS index from PIM metadata, even if a different browsing source is selected. Missing or local-only original sources fail explicitly instead of silently choosing another publisher. Use the existing local offline-bundle flow for offline installs.
 

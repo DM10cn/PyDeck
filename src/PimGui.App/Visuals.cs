@@ -52,14 +52,32 @@ internal sealed class Palette(DesignTokens tokens)
     public Button Action(string label, string? icon = null, bool primary = false, bool compact = false)
     {
         label = T(label);
-        var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        if (icon is not null) content.Children.Add(new FontIcon { Glyph = icon, FontSize = 15 });
-        content.Children.Add(new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center });
-        var button = new Button { Content = content, Padding = compact ? new(14, 8, 14, 8) : new(18, 11, 18, 11),
-            CornerRadius = new(tokens.ActionRadius), MinHeight = compact ? 36 : 44 };
+        var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = tokens.ControlSpacing };
+        if (icon is not null) content.Children.Add(new FontIcon { Glyph = icon, FontSize = tokens.ControlIconSize, IsTextScaleFactorEnabled = false, VerticalAlignment = VerticalAlignment.Center });
+        content.Children.Add(new TextBlock { Text = label, FontSize = tokens.ControlFontSize, FontWeight = Microsoft.UI.Text.FontWeights.Normal, VerticalAlignment = VerticalAlignment.Center });
+        var button = new Button { Content = content, Padding = new(tokens.ControlHorizontalPadding, tokens.ControlVerticalPadding, tokens.ControlHorizontalPadding, tokens.ControlVerticalPadding),
+            FontSize = tokens.ControlFontSize, CornerRadius = new(tokens.ActionRadius), MinHeight = tokens.ControlHeight,
+            VerticalAlignment = VerticalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center, Tag = "ActionButton" };
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, label);
         ApplySurfaceResources(button);
         if (primary) { button.Background = Brush(Accent); button.Foreground = Brush(OnAccent); button.BorderThickness = new(0); }
         return button;
+    }
+    public Button IconAction(string label, string icon)
+    {
+        var button = new Button { Content = new FontIcon { Glyph = icon, FontSize = tokens.ControlIconSize, IsTextScaleFactorEnabled = false },
+            Width = tokens.ControlHeight, MinHeight = tokens.ControlHeight, Padding = new(0),
+            CornerRadius = new(tokens.ActionRadius), VerticalAlignment = VerticalAlignment.Center, Tag = "IconButton" };
+        ApplySurfaceResources(button);
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, T(label));
+        ToolTipService.SetToolTip(button, T(label));
+        return button;
+    }
+    public StackPanel Section(string title, params UIElement[] content)
+    {
+        var section = new StackPanel { Spacing = 12, Tag = "SettingsSection" };
+        section.Children.Add(Label(title, tokens.SectionTitleSize, true));
+        foreach (var child in content) section.Children.Add(child);
+        return section;
     }
 }

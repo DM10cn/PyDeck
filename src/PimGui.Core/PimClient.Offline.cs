@@ -2,7 +2,7 @@ namespace PimGui.Core;
 
 public sealed partial class PimClient
 {
-    public async Task InstallOfflineAsync(OfflineBundle bundle, PythonRuntime runtime, Action<string> output, bool dryRun = false, PimOperation? operation = null)
+    public async Task InstallOfflineAsync(OfflineBundle bundle, PythonRuntime runtime, Action<string> output, bool dryRun = false, PimOperation? operation = null, string? expectedInstalledVersion = null)
     {
         RequireMutationSupport();
         if (!await mutation.WaitAsync(0)) throw new InvalidOperationException("Another Python operation is already running.");
@@ -13,10 +13,11 @@ public sealed partial class PimClient
             // Checksum a private snapshot before PIM can consume it. No online catalog lookup.
             operation?.Report(OperationPhase.Verifying);
             using var prepared = await bundle.PrepareAsync(runtime, operation?.Token ?? default);
+            if (!dryRun) await CheckReplacementAsync(runtime, expectedInstalledVersion, operation?.Token ?? default);
             var arguments = new List<string> { "install", "--yes", "--source=" + prepared.IndexPath,
                 "--config=" + prepared.ConfigPath };
             if (dryRun) arguments.Add("--dry-run");
-            arguments.Add(runtime.Selector);
+            arguments.Add(runtime.ExactSelector);
             output("> pymanager " + string.Join(' ', arguments));
             operation?.Report(OperationPhase.Preparing);
             EnsureSuccess(await runner.RunAsync(RequireExecutable(), arguments, output, operation?.Token ?? default, operation is null ? null : operation.Observe));
@@ -33,11 +34,10 @@ public sealed partial class PimClient
             parentDirectory = ExecutionPaths.LocalPath(parentDirectory);
             SafeFiles.RequireNoLinks(parentDirectory);
             using var operationLock = AcquireOperationLock();
-            var index = SelectedSource is null ? null : InstallationSource.Validate(SelectedSource());
+            var index = SelectedSource is null && runtime.CatalogIndex is null ? null : InstallationSource.Validate(SelectedSource?.Invoke() ?? runtime.CatalogIndex!);
             if (index is not null && runtime.CatalogIndex != index)
                 throw new IOException("The installation source changed. Reload the catalog");
-            var current = (await ListAsync(true, operation?.Token ?? default, index)).SingleOrDefault(r => r.Id == runtime.Id && r.Version == runtime.Version && r.Company == runtime.Company);
-            if (current is null) throw new InvalidOperationException("This Python entry has changed. Refresh the list before trying again.");
+            var current = await ResolveRuntimeAsync(runtime, online: true, exact: true, index, operation?.Token ?? default);
             var directory = Path.Combine(parentDirectory, "Python-offline-" + runtime.Id + "-" + Guid.NewGuid().ToString("N")[..8]);
             if (Directory.Exists(directory) || File.Exists(directory)) throw new IOException("Choose another download folder.");
             Directory.CreateDirectory(directory);
@@ -47,7 +47,8 @@ public sealed partial class PimClient
                 await PackageDownload.FetchAsync(current, directory, http, operation, ConfirmDownloadOrigin);
                 return directory;
             }
-            string[] arguments = ["install", "--yes", "--by-id", "--download=" + directory, runtime.Id];
+            var arguments = new List<string> { "install", "--yes", "--download=" + directory, runtime.ExactSelector };
+            if (index is not null) arguments.Add("--source=" + index);
             output("> pymanager " + string.Join(' ', arguments));
             EnsureSuccess(await runner.RunAsync(RequireExecutable(), arguments, output, operation?.Token ?? default, operation is null ? null : operation.Observe));
             operation?.Report(OperationPhase.Verifying);

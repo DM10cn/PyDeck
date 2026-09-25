@@ -12,73 +12,64 @@ public sealed partial class MainWindow
     {
         var layout = PageGrid(GridLength.Auto, new(1, GridUnitType.Star));
         At(layout, Header("MAKE IT YOURS", "Settings", "Appearance, language, and Python preferences."), 0);
-        var body = new StackPanel { Spacing = 16 };
-        var appearance = new StackPanel { Spacing = 18 };
-        appearance.Children.Add(palette.Label("Appearance", 19, true));
-        var choices = new Grid { ColumnSpacing = 12 };
+        var body = new StackPanel { Spacing = 28, Padding = new(0, 0, 8, 16) };
+        var appearance = palette.Section("Appearance");
+        var choices = new Grid { ColumnSpacing = 8, MinWidth = 300, MaxWidth = 380 };
         choices.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); choices.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
         foreach (var (id, title, column) in new[] { ("Material", "Material 3 Expressive", 0), ("Fluent", "Windows Fluent", 1) })
         {
             var previewTokens = DesignTokens.For(id, Root.ActualTheme == ElementTheme.Light);
-            var preview = new StackPanel { Spacing = 10 };
-            var swatches = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            var preview = new StackPanel { Spacing = 6 };
+            var swatches = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+            const double swatchHeight = 10;
+            var swatchRadius = swatchHeight * previewTokens.ActionRadius / previewTokens.ControlHeight;
             foreach (var color in new[] { previewTokens.Accent, previewTokens.Hero, previewTokens.Card })
-                swatches.Children.Add(new Border { Width = 38, Height = 18, CornerRadius = new(previewTokens.ChipRadius), Background = Palette.Brush(color) });
+                swatches.Children.Add(new Border { Width = 24, Height = swatchHeight, CornerRadius = new(swatchRadius), Background = Palette.Brush(color) });
             preview.Children.Add(swatches);
             preview.Children.Add(palette.Label(T(title) + (preferences.Design == id ? "  ✓" : ""), 14, true));
             var button = new Button { Content = preview, HorizontalContentAlignment = HorizontalAlignment.Stretch, HorizontalAlignment = HorizontalAlignment.Stretch,
-                Padding = new(16), CornerRadius = new(palette.Radius), BorderThickness = new(preferences.Design == id ? 2 : 1),
+                Padding = new(12, 8, 12, 8), MinHeight = 56, CornerRadius = new(palette.Tokens.ActionRadius), BorderThickness = new(preferences.Design == id ? 2 : 1),
                 BorderBrush = Palette.Brush(preferences.Design == id ? palette.Accent : palette.Line), IsEnabled = !busy };
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, T(title));
             palette.ApplySurfaceResources(button);
             button.Click += (_, _) => SaveAppearance(id, preferences.Theme);
             Grid.SetColumn(button, column); choices.Children.Add(button);
         }
-        appearance.Children.Add(choices);
+        appearance.Children.Add(SettingRow("Interface style", "Choose a design for PyDeck", choices));
         appearance.Children.Add(SettingRow("App theme", null, Choice([("System", "System"), ("Light", "Light"), ("Dark", "Dark")], preferences.Theme,
             value => SaveAppearance(preferences.Design, value), "App theme")));
         appearance.Children.Add(SettingRow("Language", "Changes apply immediately.", Choice([("en-US", "English (US)"), ("zh-CN", "简体中文"), ("zh-TW", "繁體中文（台灣）"), ("ja-JP", "日本語")], preferences.Language,
             value => SavePreferences(preferences with { Language = value }), "Language")));
 
-        var effects = new StackPanel { Spacing = 8 };
-        effects.Children.Add(palette.Label("Transparency effects", 14, true));
         var radios = new StackPanel { Spacing = 2 };
         foreach (var (id, label) in new[] { ("System", "Use Windows setting"), ("On", "On"), ("Off", "Off") })
         {
-            var radio = new RadioButton { Content = T(label), GroupName = "Transparency", IsChecked = preferences.Transparency == id, IsEnabled = palette.Tokens.SupportsEffects && !busy };
+            var radio = new RadioButton { Content = T(label), GroupName = "Transparency", FontSize = palette.Tokens.ControlFontSize,
+                MinHeight = palette.Tokens.ControlHeight, IsChecked = preferences.Transparency == id, IsEnabled = palette.Tokens.SupportsEffects && !busy };
             palette.ApplyAccentResources(radio);
             radio.Checked += (_, _) => SavePreferences(preferences with { Transparency = id });
             radios.Children.Add(radio);
         }
-        effects.Children.Add(radios);
+        appearance.Children.Add(SettingRow("Transparency effects", null, radios));
         var material = Choice([("Mica", "Mica"), ("Acrylic", "Acrylic")], preferences.Backdrop,
             value => SavePreferences(preferences with { Backdrop = value }), "Window material");
         material.IsEnabled = palette.Tokens.SupportsEffects && preferences.Transparency != "Off" && !busy;
-        effects.Children.Add(SettingRow("Window material", "Mica uses your wallpaper colors. Acrylic blurs what is behind the window.", material));
-        effects.Children.Add(palette.Label(BackdropDescription(), 12, muted: true));
-        appearance.Children.Add(effects);
-        body.Children.Add(palette.CardBox(appearance));
+        appearance.Children.Add(SettingRow("Window material", "Mica uses your wallpaper colors. Acrylic blurs what is behind the window.", material));
+        appearance.Children.Add(palette.Label(BackdropDescription(), palette.Tokens.CaptionFontSize, muted: true));
+        body.Children.Add(appearance);
 
-        var python = new StackPanel { Spacing = 18 };
-        python.Children.Add(palette.Label("Python", 19, true));
-        python.Children.Add(SettingRow("Default architecture", "Used when opening the install catalog.", Choice([("x64", "x64"), ("ARM64", "ARM64"), ("x86", "x86")], preferences.DefaultArchitecture,
-            value => SavePreferences(preferences with { DefaultArchitecture = value }), "Default architecture")));
-        python.Children.Add(SettingRow("Show preview releases", "Include prerelease versions in the catalog.", Toggle(preferences.ShowPreviewReleases,
-            value => SavePreferences(preferences with { ShowPreviewReleases = value }), "Show preview releases")));
-        python.Children.Add(SettingRow("Show specialized packages", "Expand Other distributions by default.", Toggle(preferences.ShowSpecializedPackages,
-            value => SavePreferences(preferences with { ShowSpecializedPackages = value }), "Show specialized packages")));
+        var python = palette.Section("Python");
         python.Children.Add(SettingRow("Confirm before uninstall", null, Toggle(preferences.ConfirmBeforeUninstall,
             value => SavePreferences(preferences with { ConfirmBeforeUninstall = value }), "Confirm before uninstall")));
-        body.Children.Add(palette.CardBox(python));
+        body.Children.Add(python);
         body.Children.Add(ManagementSettings());
 
-        var manager = new StackPanel { Spacing = 12, Tag = "ManagerLocation" };
-        manager.Children.Add(palette.Label("Python Install Manager location", 19, true));
+        var manager = palette.Section("Python Install Manager location");
+        manager.Tag = "ManagerLocation";
         manager.Children.Add(palette.Label(connected ? "Connected on this computer" : "Not connected", 12, muted: true));
         var path = palette.Label(client.Executable ?? T("Not found. Choose a location or install Python Install Manager."), 12, muted: true);
         path.IsTextSelectionEnabled = true; path.TextWrapping = TextWrapping.Wrap;
         manager.Children.Add(path);
-        var managerActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         var browse = palette.Action("Change…", "\uE8B7", compact: true); browse.IsEnabled = !busy;
         browse.Click += async (_, _) =>
         {
@@ -96,24 +87,24 @@ public sealed partial class MainWindow
         };
         var detect = palette.Action("Auto-detect", "\uE72C", compact: true); detect.IsEnabled = !busy;
         detect.Click += async (_, _) => await ChangeManagerAsync("");
-        var download = palette.Action("Download Python Install Manager", "\uE8A7", compact: true); download.Click += (_, _) => OpenManagerDownload();
-        managerActions.Children.Add(browse); managerActions.Children.Add(detect); managerActions.Children.Add(download);
-        manager.Children.Add(managerActions); body.Children.Add(palette.CardBox(manager));
+        var download = palette.Action("Download Python Install Manager", "\uE8A7", compact: true); download.HorizontalAlignment = HorizontalAlignment.Left; download.Click += (_, _) => OpenManagerDownload();
+        manager.Children.Add(Toolbar(browse, detect));
+        manager.Children.Add(download); body.Children.Add(manager);
         manager.Children.Add(palette.Label("After installing the manager, choose Auto-detect to connect without restarting PyDeck.", 12, muted: true));
 
-        var about = new StackPanel { Spacing = 10 };
-        about.Children.Add(palette.Label("About", 19, true));
-        about.Children.Add(palette.Label("PyDeck", 24, true));
+        var about = palette.Section("About");
+        about.Children.Add(palette.Label("PyDeck", 16, true));
         about.Children.Add(palette.Label(T("Version {0}", typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? ""), 12, muted: true));
         about.Children.Add(palette.Label("A desktop companion for managing Python installations with Python Install Manager.", 13));
         about.Children.Add(palette.Label("Independent project. Not affiliated with the Python Software Foundation.", 12, muted: true));
         about.Children.Add(palette.Label("Built with WinUI 3. .NET and Windows App Runtime are installed separately.", 12, muted: true));
         about.Children.Add(palette.Label("No analytics. Preferences stay on this computer; activity logs stay in this session.", 12, muted: true));
         var update = palette.Action("Check PyDeck updates", "\uE895", compact: true); update.IsEnabled = !busy;
-        update.Click += async (_, _) => await CheckAppUpdateAsync(); about.Children.Add(update);
-        var releases = palette.Action("GitHub releases", "\uE8A7", compact: true); releases.Click += (_, _) => OpenUrl(AppUpdates.ReleasesPage); about.Children.Add(releases);
-        var docs = palette.Action("Python documentation", "\uE8A7", compact: true); docs.Click += (_, _) => OpenUrl("https://docs.python.org/3/using/windows.html");
-        about.Children.Add(docs); body.Children.Add(palette.CardBox(about));
+        update.Click += async (_, _) => await CheckAppUpdateAsync();
+        var releases = palette.Action("GitHub releases", "\uE8A7", compact: true); releases.Click += (_, _) => OpenUrl(AppUpdates.ReleasesPage);
+        var docs = palette.Action("Python documentation", "\uE8A7", compact: true); docs.HorizontalAlignment = HorizontalAlignment.Left; docs.Click += (_, _) => OpenUrl("https://docs.python.org/3/using/windows.html");
+        about.Children.Add(Toolbar(update, releases));
+        about.Children.Add(docs); body.Children.Add(about);
         settingsScroll = new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         settingsScroll.Loaded += (sender, _) => ((ScrollViewer)sender).ChangeView(null, settingsOffset, null, true);
         At(layout, settingsScroll, 1);
@@ -122,17 +113,29 @@ public sealed partial class MainWindow
 
     private Grid SettingRow(string title, string? description, FrameworkElement control)
     {
-        var row = new Grid { ColumnSpacing = 24 };
+        var row = new Grid { ColumnSpacing = 20, RowSpacing = 8, Padding = new(0, 12, 0, 12), Tag = "SettingsRow",
+            BorderBrush = Palette.Brush(palette.Line), BorderThickness = new(0, 0, 0, 1), MinHeight = 56 };
         row.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); row.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
+        row.RowDefinitions.Add(new() { Height = GridLength.Auto }); row.RowDefinitions.Add(new() { Height = GridLength.Auto });
         var text = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
-        text.Children.Add(palette.Label(title, 14, true));
-        if (description is not null) text.Children.Add(palette.Label(description, 12, muted: true));
+        text.Children.Add(palette.Label(title, palette.Tokens.BodyFontSize, true));
+        if (description is not null) text.Children.Add(palette.Label(description, palette.Tokens.CaptionFontSize, muted: true));
         row.Children.Add(text); Grid.SetColumn(control, 1); control.VerticalAlignment = VerticalAlignment.Center; row.Children.Add(control);
+        // Narrow settings content stacks the control under its label instead of clipping a fixed two-column form.
+        row.SizeChanged += (_, args) =>
+        {
+            var narrow = args.NewSize.Width < 620;
+            Grid.SetColumnSpan(text, narrow ? 2 : 1);
+            Grid.SetColumn(control, narrow ? 0 : 1); Grid.SetRow(control, narrow ? 1 : 0); Grid.SetColumnSpan(control, narrow ? 2 : 1);
+            control.HorizontalAlignment = narrow ? HorizontalAlignment.Left : HorizontalAlignment.Right;
+            control.MaxWidth = Math.Max(control.MinWidth, narrow ? args.NewSize.Width : Math.Min(380, args.NewSize.Width / 2));
+        };
         return row;
     }
     private ComboBox Choice((string Id, string Label)[] options, string selected, Action<string> changed, string name)
     {
-        var box = new ComboBox { MinWidth = 168, IsEnabled = !busy };
+        var box = new ComboBox { MinWidth = 168, MinHeight = palette.Tokens.ControlHeight, FontSize = palette.Tokens.ControlFontSize,
+            Padding = new(12, 4, 32, 4), IsEnabled = !busy, VerticalAlignment = VerticalAlignment.Center };
         palette.ApplySurfaceResources(box);
         foreach (var option in options) box.Items.Add(new ComboBoxItem { Content = T(option.Label), Tag = option.Id });
         box.SelectedItem = box.Items.Cast<ComboBoxItem>().FirstOrDefault(item => (string)item.Tag == selected);
@@ -155,7 +158,11 @@ public sealed partial class MainWindow
             changed = changed.Normalize();
             var previous = preferences;
             store.Save(changed); preferences = changed;
-            specializedExpanded = changed.ShowSpecializedPackages;
+            if (page == "catalog")
+            {
+                architecture = changed.DefaultArchitecture;
+                distributionFilter = changed.CatalogPackageType!;
+            }
             if (previous.Language != changed.Language) ApplyLanguage();
             if (previous.Design != changed.Design || previous.Theme != changed.Theme ||
                 previous.Transparency != changed.Transparency || previous.Backdrop != changed.Backdrop) ApplyAppearance();
@@ -216,20 +223,4 @@ public sealed partial class MainWindow
         finally { SetBusy(false); UpdateConnection(); RenderPage(); }
     }
 
-    private UIElement BuildActivityPage()
-    {
-        var layout = PageGrid(GridLength.Auto, GridLength.Auto, new(1, GridUnitType.Star), GridLength.Auto);
-        var copy = palette.Action("Copy log", "\uE8C8", compact: true); copy.Click += (_, _) => { if (Copy(string.Join(Environment.NewLine, logLines))) StatusText.Text = T("Activity copied to clipboard"); };
-        At(layout, Header("BEHIND THE SCENES", "Activity", "Real output from your Python operations.", copy), 0);
-        var state = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
-        state.Children.Add(palette.Chip(busy ? "In progress" : "Session log", true));
-        state.Children.Add(palette.Label(busy ? "You can keep browsing while this finishes." : "Everything that happens in this session appears here.", 12, muted: true));
-        At(layout, state, 1);
-        logBox = new TextBox { Text = string.Join(Environment.NewLine, logLines), IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap,
-            FontFamily = new("Cascadia Mono, Consolas"), FontSize = 12, Padding = new(18), CornerRadius = new(palette.Radius), Background = Palette.Brush(palette.Card) };
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(logBox, T("Activity output"));
-        ScrollViewer.SetVerticalScrollBarVisibility(logBox, ScrollBarVisibility.Auto); At(layout, logBox, 2);
-        At(layout, palette.Label("Session only · up to 2,000 lines / 1 MB. Python Install Manager output is shown in its original language.", 11, muted: true), 3);
-        return layout;
-    }
 }

@@ -23,17 +23,16 @@ public sealed partial class MainWindow : Window
     private Task catalogLoading = Task.CompletedTask;
     private OfflineBundle? offlineBundle;
     private bool OfflineSource => preferences.CatalogSource == "Offline";
-    private readonly List<string> logLines = [];
+    private readonly ActivityLog activityLog = new();
+    private ActivityLevel? activityFilter;
     private string page = "runtimes";
     private string search = "";
     private string architecture = "All architectures";
-    private bool specializedExpanded;
     private bool busy;
     private bool initialized;
     private bool connected;
     private bool closeDialogOpen;
     private bool confirmationOpen;
-    private TextBox? logBox;
     private StackPanel? runtimeRows;
     private TextBlock? resultLabel;
     private ScrollViewer? settingsScroll;
@@ -107,7 +106,7 @@ public sealed partial class MainWindow : Window
         ContentColumn.MaxWidth = palette.Tokens.ContentWidth;
         BrandMark.Background = new SolidColorBrush(Colors.Transparent);
         BrandMark.CornerRadius = new(palette.Tokens.IconRadius);
-        ConnectionCard.Background = Palette.Brush(palette.Card);
+        ConnectionCard.Background = new SolidColorBrush(Colors.Transparent);
         ConnectionCard.CornerRadius = new(palette.Tokens.IconRadius);
         ConnectionDot.Fill = Palette.Brush(connected ? palette.Green : palette.Muted);
         StyleStatus.Text = palette.Tokens.Name + "  ·  PyDeck " + typeof(MainWindow).Assembly.GetName().Version?.ToString(3);
@@ -128,7 +127,7 @@ public sealed partial class MainWindow : Window
         page = destination;
         search = "";
         architecture = destination == "catalog" ? preferences.DefaultArchitecture : "All architectures";
-        specializedExpanded = preferences.ShowSpecializedPackages;
+        if (destination == "catalog") distributionFilter = preferences.CatalogPackageType ?? "Standard";
         RenderPage();
         if (destination == "catalog" && !OfflineSource && catalog is null && connected && !busy) _ = LoadCatalogAsync();
     }
@@ -137,7 +136,7 @@ public sealed partial class MainWindow : Window
         RefreshDatabaseButton.IsEnabled = !busy && !confirmationOpen;
         if (settingsScroll?.IsLoaded == true) settingsOffset = settingsScroll.VerticalOffset;
         settingsScroll = null;
-        logBox = null;
+        activityList = null; activityEmpty = null;
         runtimeRows = null;
         resultLabel = null;
         foreach (var button in new[] { RuntimesNav, CatalogNav, EnvironmentsNav, ActivityNav, SettingsNav })
@@ -148,7 +147,7 @@ public sealed partial class MainWindow : Window
             button.BorderThickness = new(selected ? palette.Tokens.NavigationIndicator : 0, 0, 0, 0);
             button.BorderBrush = Palette.Brush(palette.Accent);
             button.CornerRadius = new(palette.Tokens.NavigationRadius);
-            button.Padding = new(16, 13, 16, 13);
+            button.Padding = new(12, 8, 12, 8); button.MinHeight = 40; button.FontSize = palette.Tokens.ControlFontSize;
             button.FontWeight = selected ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal;
         }
         PageHost.Children.Clear();
@@ -203,7 +202,7 @@ public sealed partial class MainWindow : Window
         SetBusy(true, "Checking available Python releases…");
         try
         {
-            catalog = await client.ListAsync(online: true, cancellationToken: cancellation.Token);
+            catalog = await client.ListCatalogAsync(cancellationToken: cancellation.Token);
             Log($"Catalog refreshed. {catalog.Count} releases available.");
             StatusText.Text = T("Catalog updated · {0}", DateTime.Now.ToString("t"));
         }
@@ -215,6 +214,25 @@ public sealed partial class MainWindow : Window
     private async Task ChangeRuntimeAsync(RuntimeAction action, PythonRuntime runtime)
     {
         if (busy || !connected || confirmationOpen) return;
+        string? expectedInstalledVersion = null;
+        if (action == RuntimeAction.Install)
+        {
+            confirmationOpen = true;
+            try
+            {
+                installed = await client.ListAsync();
+                var previous = installed.SingleOrDefault(r => r.Id.Equals(runtime.Id, StringComparison.OrdinalIgnoreCase));
+                if (previous is not null && previous.Version != runtime.Version)
+                {
+                    if (await Dialog("Replace this Python version?",
+                        T("Python {0} will be replaced with Python {1}. These versions share an installation folder", previous.Version, runtime.Version)
+                        + "\n\n" + T("Packages in that interpreter may need to be reinstalled. Existing virtual environments may need attention"), "Replace").ShowAsync() != ContentDialogResult.Primary) return;
+                    expectedInstalledVersion = previous.Version;
+                }
+            }
+            catch (Exception ex) { ShowError(ex); return; }
+            finally { confirmationOpen = false; }
+        }
         if ((action == RuntimeAction.Uninstall && preferences.ConfirmBeforeUninstall) || action == RuntimeAction.Repair)
         {
             confirmationOpen = true;
@@ -235,7 +253,7 @@ public sealed partial class MainWindow : Window
         Log($"{verb} {runtime.DisplayName} ({runtime.Id}).");
         try
         {
-            var result = await client.ChangeAsync(action, runtime, line => DispatcherQueue.TryEnqueue(() => Log(line)), operation);
+            var result = await client.ChangeAsync(action, runtime, line => DispatcherQueue.TryEnqueue(() => Log(line, origin: ActivityOrigin.PythonManager)), operation, expectedInstalledVersion: expectedInstalledVersion);
             if (operation is not null) FinalizingOperation(operation);
             Log($"Process finished. Exit code: {result.ExitCode}.");
             await VerifyOperationAsync(action, client.LastExpectedRuntime ?? runtime);
@@ -257,22 +275,18 @@ public sealed partial class MainWindow : Window
         ConnectionText.Text = T(connected ? "PIM connected" : "PIM not connected");
         ConnectionDot.Fill = Palette.Brush(connected ? palette.Green : palette.Muted);
     }
-    private void Log(string message)
+    private void Log(string message, ActivityLevel? level = null, ActivityOrigin origin = ActivityOrigin.Application)
     {
-        // Keep UI activity bounded, including output from long installations.
-        var clean = System.Text.RegularExpressions.Regex.Replace(message, @"\x1B\[[0-?]*[ -/]*[@-~]", "");
-        if (clean.Length > 2048) clean = clean[..2048] + " [shortened]";
-        logLines.Add($"[{DateTime.Now:HH:mm:ss}] {clean}");
-        if (logLines.Count > 2000) logLines.RemoveRange(0, logLines.Count - 2000);
-        // One MiB of retained UTF-16 text (object/list overhead is separate).
-        while (logLines.Sum(line => line.Length) * sizeof(char) > 1024 * 1024) logLines.RemoveAt(0);
-        if (logBox is not null) logBox.Text = string.Join(Environment.NewLine, logLines);
+        string? secret = null; try { secret = ProxyPassword(); } catch { }
+        activityLog.Add(SensitiveText.Redact(message, secret), level, origin);
+        RefreshActivityOutput();
     }
     private void Notify(string message, InfoBarSeverity severity)
     {
         MessageBar.Severity = severity;
         MessageBar.Title = T(severity switch { InfoBarSeverity.Error => "Something needs attention", InfoBarSeverity.Success => "All set", _ => "A quick note" });
         message = T(message);
+        Log(message, severity switch { InfoBarSeverity.Error => ActivityLevel.Error, InfoBarSeverity.Warning => ActivityLevel.Warning, _ => ActivityLevel.Information });
         MessageBar.Message = message.Length > 700 ? message[..700] + "… " + T("See Activity for details.") : message;
         MessageBar.IsOpen = true;
     }
@@ -281,7 +295,6 @@ public sealed partial class MainWindow : Window
         var message = ex is OperationCanceledException ? "The request timed out. Check your connection and try again." : ex.Message;
         string? secret = null; try { secret = ProxyPassword(); } catch { }
         message = SensitiveText.Redact(message, secret);
-        Log("ERROR · " + message);
         Notify(message, InfoBarSeverity.Error);
         StatusText.Text = T("Action needed · see Activity for details");
     }

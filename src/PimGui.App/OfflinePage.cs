@@ -9,26 +9,29 @@ public sealed partial class MainWindow
 {
     private UIElement CatalogSourceBar()
     {
-        var row = new Grid { ColumnSpacing = 12 };
+        var row = new Grid { ColumnSpacing = palette.Tokens.ToolbarSpacing, Tag = "PageToolbar" };
         row.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
-        var source = Choice([("Online", "Online"), ("Offline", "Offline")], preferences.CatalogSource,
+        row.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
+        var label = palette.Label("Installation source", palette.Tokens.ControlFontSize); label.VerticalAlignment = VerticalAlignment.Center; row.Children.Add(label);
+        var onlineLabel = string.IsNullOrEmpty(preferences.InstallationIndex) ? T("Python.org official catalog") : T("Custom catalog") + " · " + new Uri(preferences.InstallationIndex).Host;
+        var source = Choice([("Online", onlineLabel), ("Offline", "Offline folder")], preferences.CatalogSource,
             value => _ = SwitchCatalogSourceAsync(value), "Install from");
+        source.HorizontalAlignment = HorizontalAlignment.Stretch; source.MinWidth = 160;
         // Reading the online catalog can be cancelled. Installation cannot.
         source.IsEnabled = !busy || catalogCancellation is not null;
-        row.Children.Add(source);
-        var location = palette.Label(OfflineSource ? offlineBundle?.DirectoryPath ?? T("No folder selected") : T("Python release catalog") + " · " + new Uri(InstallationSource.Validate(preferences.InstallationIndex)).Host, 12, muted: true);
-        location.VerticalAlignment = VerticalAlignment.Center; location.TextWrapping = TextWrapping.NoWrap;
-        location.TextTrimming = TextTrimming.CharacterEllipsis;
-        ToolTipService.SetToolTip(location, location.Text);
-        Grid.SetColumn(location, 1); row.Children.Add(location);
+        Grid.SetColumn(source, 1); row.Children.Add(source);
+        ToolTipService.SetToolTip(source, OfflineSource ? offlineBundle?.DirectoryPath ?? T("No folder selected") : InstallationSource.Validate(preferences.InstallationIndex));
         if (OfflineSource)
         {
             var choose = palette.Action("Choose folder…", "\uE8B7", compact: true); choose.IsEnabled = !busy;
             choose.Click += async (_, _) => await PickOfflineFolderAsync();
             Grid.SetColumn(choose, 2); row.Children.Add(choose);
         }
+        var refresh = palette.IconAction("Refresh catalog", "\uE72C"); refresh.IsEnabled = !busy && (OfflineSource ? offlineBundle is not null : connected);
+        refresh.Click += async (_, _) => { if (OfflineSource && offlineBundle is not null) await LoadOfflineFolderAsync(offlineBundle.DirectoryPath); else await LoadCatalogAsync(); };
+        Grid.SetColumn(refresh, 3); row.Children.Add(refresh);
         return row;
     }
 
@@ -75,8 +78,6 @@ public sealed partial class MainWindow
             offlineBundle = bundle;
             MessageBar.IsOpen = false; StatusText.Text = T("Offline packages ready");
             Log($"Loaded offline bundle: {bundle.DirectoryPath} ({bundle.Runtimes.Count} versions).");
-            // Explicitly opening a bundle should show its specialized packages too.
-            specializedExpanded = true;
         }
         catch (Exception ex) { offlineBundle = null; ShowError(ex); }
         finally { SetBusy(false); }
@@ -85,11 +86,18 @@ public sealed partial class MainWindow
     {
         if (busy || !connected || offlineBundle is null || confirmationOpen) return;
         confirmationOpen = true;
+        string? expectedInstalledVersion = null;
         try
         {
+            installed = await client.ListAsync();
+            var previous = installed.SingleOrDefault(r => r.Id.Equals(runtime.Id, StringComparison.OrdinalIgnoreCase));
+            var replacement = previous is not null && previous.Version != runtime.Version
+                ? "\n\n" + T("Python {0} will be replaced with Python {1}. These versions share an installation folder", previous.Version, runtime.Version)
+                    + "\n" + T("Packages in that interpreter may need to be reinstalled. Existing virtual environments may need attention") : "";
             var dialog = Dialog(T("Install {0} from this folder?", RuntimeTitle(runtime)),
-                offlineBundle.DirectoryPath + "\n\n" + T("Use bundles from a source you trust. A checksum verifies the files, not the publisher."), "Install");
+                offlineBundle.DirectoryPath + "\n\n" + T("Use bundles from a source you trust. A checksum verifies the files, not the publisher.") + replacement, "Install");
             if (await dialog.ShowAsync() != ContentDialogResult.Primary || busy) return;
+            if (replacement.Length > 0) expectedInstalledVersion = previous!.Version;
         }
         catch (Exception ex) { ShowError(ex); return; }
         finally { confirmationOpen = false; }
@@ -99,7 +107,7 @@ public sealed partial class MainWindow
         SetBusy(true, T("Installing {0}…", RuntimeTitle(runtime)));
         try
         {
-            await client.InstallOfflineAsync(bundle, runtime, line => DispatcherQueue.TryEnqueue(() => Log(line)), operation: operation);
+            await client.InstallOfflineAsync(bundle, runtime, line => DispatcherQueue.TryEnqueue(() => Log(line, origin: ActivityOrigin.PythonManager)), operation: operation, expectedInstalledVersion: expectedInstalledVersion);
             FinalizingOperation(operation);
             await VerifyOperationAsync(RuntimeAction.Install, runtime);
         }
@@ -121,7 +129,7 @@ public sealed partial class MainWindow
         SetBusy(true, T("Downloading {0}…", RuntimeTitle(runtime)));
         try
         {
-            var directory = await client.DownloadOfflineAsync(runtime, parent, line => DispatcherQueue.TryEnqueue(() => Log(line)), operation);
+            var directory = await client.DownloadOfflineAsync(runtime, parent, line => DispatcherQueue.TryEnqueue(() => Log(line, origin: ActivityOrigin.PythonManager)), operation);
             FinalizingOperation(operation);
             Notify(T("Offline bundle saved to {0}", directory), InfoBarSeverity.Success);
             StatusText.Text = T("Offline packages ready");

@@ -147,13 +147,62 @@ Check("Catalog recommendation excludes previews and specialized packages and com
 });
 Check("Legacy and invalid preferences normalize without enabling risky options", () =>
 {
-    var defaults = new AppSettings();
+    var defaults = new AppSettings().Normalize();
     Require(defaults.Language == "en-US" && defaults.ConfirmBeforeUninstall && !defaults.ShowPreviewReleases && !defaults.ShowSpecializedPackages, "Incorrect defaults");
     var prefs = new AppSettings { Design = "bad", Theme = "bad", Language = "bad", Transparency = "bad", Backdrop = "bad", DefaultArchitecture = "bad" }.Normalize();
     Require(prefs == defaults, "Invalid preference not normalized");
     var store = new SettingsStore(Path.Combine(scratch, "new-settings"));
-    var chosen = defaults with { Language = "zh-TW", ShowPreviewReleases = true, ShowSpecializedPackages = true, ConfirmBeforeUninstall = false, DefaultArchitecture = "ARM64", Transparency = "Off", Backdrop = "Acrylic" };
+    var chosen = defaults with { Language = "zh-TW", ShowPreviewReleases = true, ShowSpecializedPackages = true, CatalogPackageType = "All", ConfirmBeforeUninstall = false, DefaultArchitecture = "ARM64", Transparency = "Off", Backdrop = "Acrylic" };
     store.Save(chosen); Require(store.Load() == chosen, "Python, language, and transparency preferences not persisted");
+});
+Check("Legacy catalog preferences migrate the old specialized switch without losing preview or architecture", () =>
+{
+    var directory = Path.Combine(scratch, "catalog-migration"); Directory.CreateDirectory(directory);
+    var store = new SettingsStore(directory);
+    foreach (var specialized in new[] { false, true })
+    {
+        File.WriteAllText(store.FilePath, "{\"ShowSpecializedPackages\":" + (specialized ? "true" : "false") +
+            ",\"ShowPreviewReleases\":true,\"DefaultArchitecture\":\"ARM64\",\"ConfirmBeforeUninstall\":false}");
+        var migrated = store.Load();
+        Require(store.LoadWarning is null && migrated.CatalogPackageType == (specialized ? "All" : "Standard") &&
+            migrated.ShowSpecializedPackages == specialized && migrated.ShowPreviewReleases && migrated.DefaultArchitecture == "ARM64" &&
+            !migrated.ConfirmBeforeUninstall, "Legacy catalog preferences were lost or broadened");
+        store.Save(migrated);
+        Require(store.Load() == migrated && migrated.Normalize() == migrated, "Migrated catalog settings did not persist idempotently");
+    }
+});
+Check("Catalog package filters and all-architecture choice persist with the new field authoritative", () =>
+{
+    var store = new SettingsStore(Path.Combine(scratch, "catalog-filter-settings"));
+    foreach (var packageType in new[] { "Standard", "All", "FreeThreaded", "Embedded", "Tests", "Other" })
+    foreach (var architecture in new[] { "x64", "ARM64", "x86", "All architectures" })
+    {
+        var chosen = new AppSettings { CatalogPackageType = packageType, ShowSpecializedPackages = packageType == "Standard",
+            DefaultArchitecture = architecture, ShowPreviewReleases = true, ConfirmBeforeUninstall = true };
+        store.Save(chosen);
+        var saved = store.Load();
+        Require(saved.CatalogPackageType == packageType && saved.DefaultArchitecture == architecture && saved.ShowPreviewReleases &&
+            saved.ShowSpecializedPackages == (packageType != "Standard") && saved.ConfirmBeforeUninstall,
+            "Catalog filters or uninstall confirmation changed on round-trip");
+    }
+});
+Check("Missing and invalid catalog preferences return a normalized conservative default", () =>
+{
+    var directory = Path.Combine(scratch, "catalog-filter-defaults");
+    var store = new SettingsStore(directory);
+    Require(store.Load().CatalogPackageType == "Standard" && !store.Load().ShowSpecializedPackages, "Fresh settings are not normalized");
+    Directory.CreateDirectory(directory);
+    foreach (var packageType in new[] { "", "bad", "all", "../Tests" })
+    {
+        store.Save(new AppSettings { CatalogPackageType = packageType, ShowSpecializedPackages = true, DefaultArchitecture = "bad" });
+        var normalized = store.Load();
+        Require(normalized.CatalogPackageType == "Standard" && !normalized.ShowSpecializedPackages && normalized.DefaultArchitecture == "x64",
+            "Invalid catalog preference widened the result set");
+    }
+    File.WriteAllText(store.FilePath, "{\"CatalogPackageType\":null,\"ShowSpecializedPackages\":true}");
+    Require(store.Load().CatalogPackageType == "All", "Explicit null did not follow legacy migration");
+    File.WriteAllText(store.FilePath, "{\"CatalogPackageType\":false}");
+    Require(store.Load().CatalogPackageType == "Standard" && store.LoadWarning is not null, "Failed load did not return normalized defaults");
 });
 Check("Transparency matrix enforces Material, Off, Windows setting, contrast, and unsupported fallback", () =>
 {
@@ -314,7 +363,7 @@ await CheckAsync("Offline install uses only a verified local source without onli
     {
         if (arguments[0] == "help") return Task.FromResult(new CommandResult(0, "Python installation manager 26.3\n--only-managed --online", ""));
         calls++;
-        Require(arguments[0] == "install" && !arguments.Contains("--by-id") && arguments.Contains("--dry-run") && arguments[^1] == runtime.Selector, "Wrong offline command");
+        Require(arguments[0] == "install" && !arguments.Contains("--by-id") && arguments.Contains("--dry-run") && arguments[^1] == runtime.ExactSelector, "Wrong offline command");
         var source = arguments.Single(a => a.StartsWith("--source="))[9..];
         Require(File.Exists(source) && !arguments.Any(a => a.Contains("https:")), "Network or missing source");
         Require(OfflineBundle.Load(Path.GetDirectoryName(source)!).Runtimes.Single().Id == runtime.Id, "Wrong offline snapshot");
@@ -426,6 +475,24 @@ await CheckAsync("Cancellation keeps the operation lock until the child task fin
 });
 await ManagementChecks.RunAsync(Check, CheckAsync, scratch);
 await T3Checks.RunAsync(Check, CheckAsync, scratch);
+await HistoricalChecks.RunAsync(Check, CheckAsync, scratch);
+if (args.Contains("--live-history"))
+{
+    await CheckAsync("Official paginated history contains earlier micros without changing installed Python", async () =>
+    {
+        var client = new PimClient(new ProcessRunner()); Require(await client.DiscoverAsync(), client.LastDiscoveryError);
+        var before = await client.ListAsync();
+        var catalog = await client.ListCatalogAsync();
+        var historical = catalog.GroupBy(r => r.Id).FirstOrDefault(g => g.Select(r => r.Version).Distinct().Count() > 1);
+        Require(historical is not null, "History contains only latest micros");
+        var selected = historical!.OrderByDescending(r => r.Version, Comparer<string>.Create(RuntimeCatalog.CompareVersions)).Skip(1).First();
+        var result = await new ProcessRunner().RunAsync(client.Executable!, ["list", "--format=json", "--online", "--one", selected.ExactSelector]);
+        Console.WriteLine($"  Historical probe: {selected.Id} / {selected.ExactSelector}; results: {string.Join(", ", RuntimeParser.Parse(result.Output).Select(r => r.Id + "=" + r.Version))}");
+        Require(result.ExitCode == 0 && RuntimeParser.Parse(result.Output).Single().SameIdentity(selected), "PIM cannot resolve the exact historical micro");
+        Require(before.SequenceEqual(await client.ListAsync()), "Read-only history lookup changed installed Python");
+        Console.WriteLine($"  Catalog: {catalog.Count} entries; historical selection: {selected.ExactSelector}");
+    });
+}
 if (args.Contains("--live"))
 {
     await CheckAsync("Live PIM read-only integration", async () =>

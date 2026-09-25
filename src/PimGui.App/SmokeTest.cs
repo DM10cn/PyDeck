@@ -35,6 +35,12 @@ public sealed partial class MainWindow
             if (!connected) throw new InvalidOperationException("Manager reconnect failed without app restart");
             checks.Add("Four-language missing-manager download / reconnect actions; reconnect succeeds without app restart.");
             if (preferences.Language != "en-US") throw new InvalidOperationException("English is not the default language.");
+            await CheckNotificationTextAsync(directory);
+            checks.Add("Notification titles and messages render in four languages and three severity states.");
+            await CheckRuleEntryAndActivityAsync(directory);
+            checks.Add("Four-language rule entry rejects blanks inline and accepts all interpreter targets; activity filters explicit severity, live output and navigation without duplicate errors.");
+            await CheckCancelledInlineEditsAsync(directory);
+            checks.Add("PIM and Shebang reviews can be cancelled and reopened without losing drafts; invalid source validation preserves input; user PIM configuration remains unchanged.");
             Navigate("runtimes");
             await CaptureAsync(Path.Combine(directory, "01-material-dark-runtimes.png"));
             if (BrandMark.Child is not Image { Source: BitmapImage { PixelWidth: > 0 } } ||
@@ -51,13 +57,19 @@ public sealed partial class MainWindow
             page = "catalog"; architecture = "x64"; RenderPage();
             await CaptureAsync(Path.Combine(directory, "02-material-dark-catalog.png"));
             checks.Add($"Online catalog: {catalog.Count} releases; {VisibleRuntimeCount} stable x64 results.");
-            var distributions = Descendants(PageHost).OfType<Expander>().Single(e => (string)e.Header == "Other distributions");
-            if (distributions.IsExpanded || ((StackPanel)distributions.Content).Children.Count != 0) throw new InvalidOperationException("Specialized packages should load only when expanded.");
-            distributions.IsExpanded = true;
+            var distributions = Descendants(PageHost).OfType<ComboBox>().Single(box =>
+                Microsoft.UI.Xaml.Automation.AutomationProperties.GetName(box) == T("Package type"));
+            if (distributionFilter != "Standard") throw new InvalidOperationException("Catalog must default to standard packages");
+            distributions.SelectedItem = distributions.Items.Cast<ComboBoxItem>().Single(item => item.Tag as string == "All");
             Root.UpdateLayout();
-            if (((StackPanel)distributions.Content).Children.Count == 0) throw new InvalidOperationException("Distribution expansion did not populate packages.");
-            await CaptureAsync(Path.Combine(directory, "02b-other-distributions.png"));
-            checks.Add("Recommended stable release and collapsed / expanded specialized packages verified.");
+            if (distributionFilter != "All" || VisibleRuntimeCount != RuntimeCatalog.Filter(catalog, "x64", false, "").Count)
+                throw new InvalidOperationException("Package type filter did not include specialized packages");
+            var releaseSeries = Descendants(PageHost).OfType<Expander>().Where(e => e.Tag is string tag && tag.StartsWith("CatalogSeries:")).ToArray();
+            if (releaseSeries.Length == 0 || releaseSeries.Any(series => Descendants(series).OfType<Expander>().Any()))
+                throw new InvalidOperationException("Catalog series must have a single expandable level");
+            releaseSeries[0].IsExpanded = true;
+            await CaptureAsync(Path.Combine(directory, "02b-all-distributions.png"));
+            checks.Add("Recommended stable release, global package-type filter and single-level minor series verified.");
             Navigate("settings");
             await CaptureAsync(Path.Combine(directory, "03-material-dark-settings.png"));
             var managerSection = Descendants(PageHost).OfType<StackPanel>().Single(panel => panel.Tag as string == "ManagerLocation");
@@ -66,16 +78,18 @@ public sealed partial class MainWindow
             await ScrollSettingsAsync(bottom: true);
             await CaptureAsync(Path.Combine(directory, "03b-python-settings-about.png"));
             await ScrollSettingsAsync();
-            SavePreferences(preferences with { ShowPreviewReleases = true, ShowSpecializedPackages = true, DefaultArchitecture = "ARM64" });
+            SavePreferences(preferences with { ShowPreviewReleases = true, CatalogPackageType = "All", DefaultArchitecture = "ARM64" });
             Navigate("catalog"); Root.UpdateLayout();
             if (architecture != "ARM64" || VisibleRuntimeCount != RuntimeCatalog.Filter(catalog, "ARM64", true, "").Count)
-                throw new InvalidOperationException("Python settings did not affect the catalog.");
-            if (!Descendants(PageHost).OfType<Expander>().Single(e => (string)e.Header == "Other distributions").IsExpanded)
-                throw new InvalidOperationException("Specialized package preference was not applied.");
-            SavePreferences(preferences with { ShowPreviewReleases = false, ShowSpecializedPackages = false, DefaultArchitecture = "x64" });
-            checks.Add("Python defaults drive catalog filtering and expansion; manager location is read-only.");
+                throw new InvalidOperationException("Saved catalog filters did not affect the catalog.");
+            if (distributionFilter != "All") throw new InvalidOperationException("Package-type preference was not applied.");
+            SavePreferences(preferences with { ShowPreviewReleases = false, CatalogPackageType = "Standard", DefaultArchitecture = "x64" });
+            await CheckCatalogFilterPreferencesAsync(directory);
+            checks.Add("Four-language catalog architecture, package type and preview controls persist across navigation and profile reload; live changes preserve focus; My Python filters stay independent; manager location is read-only.");
             await CheckManagementSettingsAsync(directory);
             checks.Add("Four-language inline management settings, read-only PATH diagnostics, virtual environments, runtime badges, catalog grouping and actual byte progress rendered without saving user settings.");
+            await CheckPageLayoutsAsync(directory);
+            checks.Add("Four languages and both designs at normal/compact widths: shared header geometry, action metrics, settings rows, environment actions, structured activity and historical micro identities verified.");
             SaveAppearance("Fluent", "Dark"); Navigate("runtimes"); architecture = "All architectures"; RenderPage();
             await CaptureAsync(Path.Combine(directory, "04-fluent-dark-runtimes.png"));
             SavePreferences(preferences with { Transparency = "Off" });
@@ -133,11 +147,18 @@ public sealed partial class MainWindow
                 await SwitchCatalogSourceAsync("Offline"); await pendingCatalog;
                 if (busy || catalogCancellation is not null || MessageBar.IsOpen) throw new InvalidOperationException("Online lookup did not cancel cleanly when switching offline.");
                 Navigate("catalog");
+                var savedPackageType = preferences.CatalogPackageType;
                 await LoadOfflineFolderAsync(arguments[fixtureArgument + 1]);
-                if (offlineBundle is null || VisibleRuntimeCount == 0 || !specializedExpanded) throw new InvalidOperationException("Offline catalog failed to load.");
+                if (offlineBundle is null || distributionFilter != savedPackageType || store.Load().CatalogPackageType != savedPackageType)
+                    throw new InvalidOperationException("Opening an offline bundle changed the package-type preference.");
+                Root.UpdateLayout();
+                var offlineType = Descendants(PageHost).OfType<ComboBox>().Single(box =>
+                    Microsoft.UI.Xaml.Automation.AutomationProperties.GetName(box) == T("Package type"));
+                offlineType.SelectedItem = offlineType.Items.Cast<ComboBoxItem>().Single(item => item.Tag as string == "All");
+                if (VisibleRuntimeCount == 0) throw new InvalidOperationException("Offline catalog failed to load.");
                 foreach (var language in Strings.Languages)
                 {
-                    SavePreferences(preferences with { Language = language }); specializedExpanded = true; RenderPage();
+                    SavePreferences(preferences with { Language = language });
                     await CaptureAsync(Path.Combine(directory, "12-offline-" + language + ".png"));
                 }
                 if (store.Load().CatalogSource != "Offline") throw new InvalidOperationException("Offline preference not saved.");
@@ -164,7 +185,7 @@ public sealed partial class MainWindow
         }
         catch (Exception ex)
         {
-            File.WriteAllText(Path.Combine(directory, "result.json"), JsonSerializer.Serialize(new { passed = false, checks, error = ex.ToString(), preferences, uiMessage = MessageBar.Message, recentActivity = logLines.TakeLast(8).ToArray() }, new JsonSerializerOptions { WriteIndented = true }));
+            File.WriteAllText(Path.Combine(directory, "result.json"), JsonSerializer.Serialize(new { passed = false, checks, error = ex.ToString(), preferences, uiMessage = MessageBar.Message, recentActivity = activityLog.Entries.TakeLast(8).ToArray() }, new JsonSerializerOptions { WriteIndented = true }));
         }
         finally { Close(); }
     }
@@ -252,14 +273,14 @@ public sealed partial class MainWindow
         }
         PageHost.Children.Clear(); PageHost.Children.Add(gallery);
         await CaptureAsync(Path.Combine(directory, "18-runtime-icons.png"));
-        Navigate("catalog"); specializedExpanded = true; RenderPage(); Root.UpdateLayout();
-        var group = Descendants(PageHost).OfType<Expander>().Single(e => e.Header as string == T("Other distributions"));
-        var filter = Descendants(group).OfType<ComboBox>().Single();
+        Navigate("catalog"); distributionFilter = "All"; RenderPage(); Root.UpdateLayout();
+        var filter = Descendants(PageHost).OfType<ComboBox>().Single(box =>
+            Microsoft.UI.Xaml.Automation.AutomationProperties.GetName(box) == T("Package type"));
         filter.SelectedItem = filter.Items.Cast<ComboBoxItem>().Single(i => i.Tag as string == "Embedded");
-        var series = Descendants(group).OfType<Expander>().First(); series.IsExpanded = true; Root.UpdateLayout();
+        var series = Descendants(PageHost).OfType<Expander>().First(e => e.Tag is string tag && tag.StartsWith("CatalogSeries:")); series.IsExpanded = true; Root.UpdateLayout();
         if (!Descendants(series).OfType<TextBlock>().Any(t => t.Text.Contains("Embeddable", StringComparison.OrdinalIgnoreCase))) throw new IOException("Distribution filter did not populate versions");
         await CaptureAsync(Path.Combine(directory, "19-filtered-minor-series.png"));
-        distributionFilter = "All";
+        SavePreferences(preferences with { CatalogPackageType = "Standard" });
     }
     private async Task<ContentDialog> WaitForCancellationDialogAsync(string title = "Stop this installation?")
     {
@@ -309,15 +330,17 @@ public sealed partial class MainWindow
         var language = Descendants(PageHost).OfType<ComboBox>().Single(box => Microsoft.UI.Xaml.Automation.AutomationProperties.GetName(box) == T("Language"));
         language.SelectedItem = language.Items.Cast<ComboBoxItem>().Single(item => (string)item.Tag == "zh-CN");
         Root.UpdateLayout();
+        Navigate("catalog"); Root.UpdateLayout();
         var preview = Descendants(PageHost).OfType<ToggleSwitch>().Single(toggle => Microsoft.UI.Xaml.Automation.AutomationProperties.GetName(toggle) == T("Show preview releases"));
         preview.IsOn = !preview.IsOn; Root.UpdateLayout();
-        SavePreferences(preferences with { DefaultArchitecture = "ARM64", ShowSpecializedPackages = true, ConfirmBeforeUninstall = false });
+        SavePreferences(preferences with { DefaultArchitecture = "ARM64", CatalogPackageType = "All", ConfirmBeforeUninstall = false });
         SavePreferences(preferences with { Theme = "Light" });
         Root.UpdateLayout();
         if (!ReferenceEquals(controller, SystemBackdrop)) throw new InvalidOperationException(material + " controller replaced by unrelated settings.");
         if (((SolidColorBrush)PageSurface.Background).Color.A == 255 || ((SolidColorBrush)ConnectionCard.Background).Color.A == 255 || palette.Card.A == 255)
             throw new InvalidOperationException(material + " covered by an opaque content layer.");
-        SavePreferences(preferences with { Language = "en-US", Theme = "Dark", DefaultArchitecture = "x64", ShowPreviewReleases = false, ShowSpecializedPackages = false, ConfirmBeforeUninstall = true });
+        SavePreferences(preferences with { Language = "en-US", Theme = "Dark", DefaultArchitecture = "x64", ShowPreviewReleases = false, CatalogPackageType = "Standard", ConfirmBeforeUninstall = true });
+        Navigate("settings");
         await ScrollSettingsAsync();
         await CaptureAsync(Path.Combine(directory, "04-effects-" + material + ".png"));
         if (!ReferenceEquals(controller, SystemBackdrop)) throw new InvalidOperationException(material + " controller replaced after restoring settings.");

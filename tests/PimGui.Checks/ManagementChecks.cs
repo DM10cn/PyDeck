@@ -86,7 +86,7 @@ static class ManagementChecks
                 if (args[0] == "help") return Task.FromResult(new CommandResult(0, "Python installation manager 26.3\n--only-managed --online --force", ""));
                 if (args[0] != "list") { mutations++; return Task.FromResult(new CommandResult(0, "", "")); }
                 var items = new JsonArray(entry.DeepClone());
-                if (args.Contains(runtime.Selector)) { var other = entry.DeepClone(); other["id"] = "other-runtime"; items.Add(other); }
+                if (args.Contains(runtime.ExactSelector)) { var other = entry.DeepClone(); other["id"] = "other-runtime"; items.Add(other); }
                 return Task.FromResult(new CommandResult(0, new JsonObject { ["versions"] = items }.ToJsonString(), ""));
             });
             var client = new PimClient(runner, Path.Combine(scratch, "ambiguous.lock"));

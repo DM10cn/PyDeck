@@ -10,18 +10,20 @@
 
 PyDeck is a native **WinUI 3** companion for **Python Install Manager**. Browse interpreters, install a version, choose your default, and keep offline packages close at hand — in a desktop interface with **Windows Fluent** and **Material 3 Expressive** styles.
 
-📦 **Stable release · 0.6.1** · 🪟 **Windows 11 x64** · 📄 **MIT**
+📦 **Stable release · 0.6.2** · 🪟 **Windows 11 x64** · 📄 **MIT**
 
 ## 📦 Download
 
 Get **MSI**, **MSIX**, and the **standalone dependency helper** from [GitHub Releases](https://github.com/DM10cn/PyDeck/releases). For source, use GitHub's automatic **Source code (zip)** / **Source code (tar.gz)** links in Assets. Follow the [installation guide](docs/INSTALL.md) for dependencies, installer choices, and MSIX certificate trust.
 
-New in **0.6.1**: 🧰 virtual environments, 🌐 custom HTTPS installation sources, 📜 Shebang rules, and 🔔 app update checks that open GitHub in your browser. Python settings expand inline; the catalog filters package types and groups minor versions. Python icons carry independent variant and EAP badges. The footer refreshes local and catalog data. MSI downloads perform full-package replacement upgrades while retaining settings and installer choices.
+New in **0.6.2**: 🕰️ browse historical micro versions and install or repair the exact version, 🔎 keep architecture / package-type / preview filters together on Install Python with saved selections, 🧭 use a consistent page layout and control sizing, and 📋 filter a structured activity viewer. Notification text, Shebang validation and environment browsing are also improved. See the [release notes](docs/releases/0.6.2.md).
+
+Features introduced in **0.6.1** remain available: 🧰 virtual environments, 🌐 custom HTTPS installation sources, 📜 Shebang rules, 🔔 browser-based app update checks, inline Python settings, Python / variant / EAP icons, and database refresh. MSI uses full-package replacement upgrades while retaining settings and installer choices.
 
 ## ✨ What you can do
 
 - 🐍 **See your Python installations** — version, publisher, architecture, executable path, and effective default
-- 📥 **Find and install Python** — a stable recommendation, search, architecture filters, and expandable specialized distributions
+- 📥 **Find and install Python** — a stable recommendation, historical micros grouped by minor series, search, and remembered architecture / package-type / preview filters
 - 📦 **Work offline** — download a portable PIM bundle on one computer and install it on another
 - ⏳ **Follow an operation** — persistent stage progress and cancellation for installation, updates, and offline downloads
 - 🛠️ **Manage a runtime** — update, uninstall, set the default, open a terminal or folder, and copy its path
@@ -85,9 +87,9 @@ Language changes apply immediately and are saved. Documentation is maintained in
 
 ## 🧪 Validation status
 
-The 0.5.1 preview passed core and native checks, installed-MSI GUI checks, and MSIX development-registration / activation checks. MSI folder selection, shortcut choices, repair, and upgrades have also been exercised.
+Version **0.6.2** passed **81 core checks**, **22 GUI check groups**, and **8 historical-version lifecycle checks** in a disposable Windows Sandbox. The GUI checks cover 80 page / language / design / width combinations; the lifecycle checks include an actual historical micro replacement, exact repair and stale-confirmation rejection.
 
-Version 0.6.0 adds a disposable Windows Sandbox lifecycle harness covering PIM upgrade, real Python update, repair, cancellation, default changes, uninstall, and offline reinstall. Clean-machine GUI deployment and the MSIX production certificate-trust installation path remain separate acceptance work. The [feature-status table](docs/FEATURES.md) records completed checks and remaining work; the [development guide](docs/DEVELOPMENT.md) explains how to run them.
+These application results do not certify installer behavior. Final package validation is recorded in the [GitHub release details](https://github.com/DM10cn/PyDeck/releases/tag/v0.6.2); clean-machine GUI deployment, production MSIX certificate-trust installation, all text-scaling settings and external accessibility remain separate acceptance work. The [feature-status table](docs/FEATURES.md) retains current and historical results, and the [development guide](docs/DEVELOPMENT.md) explains how to run the checks.
 
 ## 🤝 Contributing
 

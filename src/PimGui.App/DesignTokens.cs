@@ -33,6 +33,17 @@ internal sealed record DesignTokens
     public double HeroTitleSize { get; init; }
     public double SectionSpacing { get; init; }
     public double ContentWidth { get; init; } = 1160;
+    public double ControlHeight { get; init; } = 32;
+    public double ControlFontSize { get; init; } = 14;
+    public double ControlIconSize { get; init; } = 16;
+    public double ControlHorizontalPadding { get; init; } = 12;
+    public double ControlVerticalPadding { get; init; } = 4;
+    public double ControlSpacing { get; init; } = 8;
+    public double ToolbarSpacing { get; init; } = 12;
+    public double RowPadding { get; init; } = 12;
+    public double BodyFontSize { get; init; } = 14;
+    public double CaptionFontSize { get; init; } = 12;
+    public double SectionTitleSize { get; init; } = 18;
 
     public DesignTokens WithBackdrop(bool active)
     {
@@ -60,8 +71,8 @@ internal sealed record DesignTokens
             Shell = Pick("EDF3FA", "10151E"), Surface = Pick("F8FAFE", "161D28"), Card = Pick("FFFFFF", "1D2735"), Hero = Pick("DCEBFF", "243E5F"), ControlFill = Pick("F0F4FA", "293441"),
             Text = Pick("182636", "E9F0FC"), Muted = Pick("54677D", "A2B1C8"), Accent = Pick("086BCC", "87BCFF"), OnAccent = Pick("FFFFFF", "052F59"),
             AccentContainer = Pick("DCEBFF", "243E5F"), NavigationSelected = Pick("DCEBFF", "243E5F"), Line = Pick("DCE4EF", "2E3A4D"), Green = Pick("146A4C", "8CDABB"),
-            CardRadius = 22, SurfaceRadius = 28, ActionRadius = 24, InputRadius = 18, ChipRadius = 12, IconRadius = 16, NavigationRadius = 24,
-            CardBorder = 0, NavigationIndicator = 0, PageTitleSize = 30, HeroTitleSize = 32, SectionSpacing = 20
+            CardRadius = 22, SurfaceRadius = 28, ActionRadius = 8, InputRadius = 18, ChipRadius = 12, IconRadius = 16, NavigationRadius = 24,
+            CardBorder = 0, NavigationIndicator = 0, PageTitleSize = 28, HeroTitleSize = 32, SectionSpacing = 20
         };
     }
 }

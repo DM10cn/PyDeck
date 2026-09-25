@@ -21,7 +21,7 @@ public sealed class OfflineBundle
         SafeFiles.RequireNoLinks(index);
         if (!File.Exists(index)) throw new IOException("Choose a folder containing index.json and the Python packages.");
         var json = SafeFiles.ReadText(index);
-        var runtimes = RuntimeParser.Parse(json);
+        var runtimes = RuntimeParser.ParseCatalog(json);
         var root = JsonNode.Parse(json)!.AsObject();
         // A signed/chained feed cannot be rewritten into a standalone unsigned snapshot.
         if (root.ContainsKey("next") || root.ContainsKey("requires_signature") || root.ContainsKey("source_settings"))
@@ -91,6 +91,17 @@ public sealed class OfflineBundle
             var metadata = (JsonObject)package.Metadata.DeepClone();
             cancellationToken.ThrowIfCancellationRequested();
             metadata["url"] = Path.GetFileName(prepared.ArchivePath);
+            // Old standalone bundles may only declare a minor alias. This private snapshot
+            // contains exactly one verified package, so add its exact micro tag without
+            // changing the user's bundle. A minor request would otherwise leave a different
+            // already-installed micro untouched while PIM reports "already installed".
+            var exactTag = runtime.ExactSelector.Split('/', 2)[1];
+            var installFor = metadata["install-for"] as JsonArray;
+            if (metadata["install-for"] is not null && installFor is null)
+                throw new IOException("The offline package contains invalid installation tags");
+            if (installFor is null) metadata["install-for"] = installFor = new JsonArray();
+            if (!installFor.Any(tag => tag is JsonValue value && value.TryGetValue<string>(out var text) && text == exactTag))
+                installFor.Add(exactTag);
             AtomicJson.Write(prepared.IndexPath, new JsonObject { ["versions"] = new JsonArray(metadata) }.ToJsonString());
             // Keep both primary and fallback sources local; do not modify the user's PIM configuration.
             AtomicJson.Write(prepared.ConfigPath, new JsonObject { ["install"] = new JsonObject

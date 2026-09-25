@@ -15,23 +15,36 @@ public sealed record AppSettings
     public string CatalogSource { get; init; } = "Online";
     public bool ShowPreviewReleases { get; init; }
     public bool ShowSpecializedPackages { get; init; }
+    // Null means an older settings file: Normalize migrates the former visibility switch.
+    public string? CatalogPackageType { get; init; }
     public bool ConfirmBeforeUninstall { get; init; } = true;
     public NetworkSettings Network { get; init; } = new();
     public string InstallationIndex { get; init; } = "";
 
-    public AppSettings Normalize() => this with
+    public AppSettings Normalize()
     {
-        Design = Design is "Fluent" or "Material" ? Design : "Material",
-        Theme = Theme is "System" or "Light" or "Dark" ? Theme : "Dark",
-        Language = Language is "en-US" or "zh-CN" or "zh-TW" or "ja-JP" ? Language : "en-US",
-        Transparency = Transparency is "System" or "On" or "Off" ? Transparency : "System",
-        Backdrop = Backdrop is "Mica" or "Acrylic" ? Backdrop : "Mica",
-        DefaultArchitecture = DefaultArchitecture is "x64" or "ARM64" or "x86" ? DefaultArchitecture : "x64",
-        CatalogSource = CatalogSource is "Online" or "Offline" ? CatalogSource : "Online",
-        ManagerPath = ManagerPath?.Trim() ?? "",
-        InstallationIndex = string.IsNullOrWhiteSpace(InstallationIndex) ? "" : InstallationSource.Validate(InstallationIndex),
-        Network = Network ?? new()
-    };
+        var packageType = CatalogPackageType switch
+        {
+            null => ShowSpecializedPackages ? "All" : "Standard",
+            "Standard" or "All" or "FreeThreaded" or "Embedded" or "Tests" or "Other" => CatalogPackageType,
+            _ => "Standard"
+        };
+        return this with
+        {
+            Design = Design is "Fluent" or "Material" ? Design : "Material",
+            Theme = Theme is "System" or "Light" or "Dark" ? Theme : "Dark",
+            Language = Language is "en-US" or "zh-CN" or "zh-TW" or "ja-JP" ? Language : "en-US",
+            Transparency = Transparency is "System" or "On" or "Off" ? Transparency : "System",
+            Backdrop = Backdrop is "Mica" or "Acrylic" ? Backdrop : "Mica",
+            DefaultArchitecture = DefaultArchitecture is "x64" or "ARM64" or "x86" or "All architectures" ? DefaultArchitecture : "x64",
+            CatalogSource = CatalogSource is "Online" or "Offline" ? CatalogSource : "Online",
+            CatalogPackageType = packageType,
+            ShowSpecializedPackages = packageType != "Standard",
+            ManagerPath = ManagerPath?.Trim() ?? "",
+            InstallationIndex = string.IsNullOrWhiteSpace(InstallationIndex) ? "" : InstallationSource.Validate(InstallationIndex),
+            Network = Network ?? new()
+        };
+    }
 }
 
 public sealed class SettingsStore(string directory)
@@ -44,11 +57,11 @@ public sealed class SettingsStore(string directory)
         LoadWarning = null;
         try
         {
-            if (!File.Exists(FilePath)) return new();
+            if (!File.Exists(FilePath)) return new AppSettings().Normalize();
             return (JsonSerializer.Deserialize<AppSettings>(SafeFiles.ReadText(FilePath)) ?? throw new JsonException("Empty settings.")).Normalize();
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or ArgumentException)
-        { LoadWarning = "Your saved preferences could not be read. Defaults are in use. " + ex.Message; return new(); }
+        { LoadWarning = "Your saved preferences could not be read. Defaults are in use. " + ex.Message; return new AppSettings().Normalize(); }
     }
     public void Save(AppSettings settings)
     {

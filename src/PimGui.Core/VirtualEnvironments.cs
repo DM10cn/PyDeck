@@ -31,6 +31,27 @@ public sealed class VirtualEnvironments(string dataDirectory)
         if (!remove) entries.Add(environment);
         AtomicJson.Write(RegistryPath, JsonSerializer.Serialize(entries), previous, checkOriginal: true);
     }
+    public async Task<bool> RefreshAsync(IProcessRunner runner, Func<IReadOnlyList<VirtualEnvironment>, Task<bool>> confirmRecheck)
+    {
+        var environments = Read();
+        var verified = environments.Where(environment => environment.State == "Environment ready").ToArray();
+        // A previous successful probe cannot be inferred from paths or pyvenv.cfg alone.
+        // Re-running trusted entries needs confirmation; imported entries stay metadata-only.
+        if (verified.Length > 0 && !await confirmRecheck(verified)) return false;
+        foreach (var environment in environments)
+        {
+            VirtualEnvironment refreshed;
+            try
+            {
+                refreshed = environment.State == "Environment ready"
+                    ? await CheckAsync(environment.Path, runner) : Inspect(environment.Path);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            { refreshed = environment with { State = "Environment check failed" }; }
+            Remember(refreshed);
+        }
+        return true;
+    }
     public static VirtualEnvironment Inspect(string path)
     {
         path = ExecutionPaths.LocalPath(path); SafeFiles.RequireNoLinks(path);

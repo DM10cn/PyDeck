@@ -2,9 +2,30 @@
 
 **English** · [简体中文](FEATURES.zh-CN.md) · [🏠 Home](../README.md)
 
-**Version 0.6.1** — this page is the reference for feature and acceptance status. “Implemented” means the code and UI exist; completed checks are recorded below. A feature can be implemented while its full acceptance testing remains outstanding. Ideas under consideration are not commitments.
+**Current version: 0.6.2** — this page is the reference for feature and acceptance status. “Implemented” means the code and UI exist; completed checks are recorded below. A feature can be implemented while its full acceptance testing remains outstanding. Ideas under consideration are not commitments.
 
-## ✅ Implemented
+## ✨ New in 0.6.2
+
+Version 0.6.2 adds the following behavior to the 0.6.1 baseline. Application checks and final package checks are recorded separately; historical release results below do not certify the new packages. See the [0.6.2 GitHub release details](https://github.com/DM10cn/PyDeck/releases/tag/v0.6.2) for packaging validation.
+
+| Area | 0.6.2 behavior |
+| --- | --- |
+| 🕰️ Historical micro versions | Read every page of the selected PIM index, retain separate micro identities, and group them by minor series. For the official source, this means the Windows packages present in its index, not every Python source release |
+| 🎯 Exact version operations | Resolve the selected micro through PIM before installation or offline download; repair requests the installed micro and checks the resulting interpreter instead of silently selecting the newest micro |
+| 🔁 Replacement confirmation | Different micros sharing a PIM runtime ID replace one another. Online and offline installation review the existing version; a changed installation invalidates the confirmation |
+| 🧭 Common page layout | Shared title, primary action, toolbar and content roles; the installed list carries the default marker without a duplicate hero; installation uses source, filters, recommendation and minor groups |
+| 🔎 Installation filters | Architecture, package type and Show preview releases live on Install Python, apply immediately and remember the selection between sessions, including All architectures and individual Embeddable / Free-threaded / With tests choices. Settings retains Confirm before uninstall |
+| 📐 Control sizing | Shared typography, icon size, control padding and minimum height; controls can grow for text scaling, and compact layouts rearrange content |
+| ⚙️ Settings | Plain section headings and setting rows, compact style previews, responsive label/control placement, and independent inline management expanders |
+| 🧰 Environment browsing | Empty-state Create / Import actions; populated lists add search and status filters, with Terminal directly available and secondary actions in a menu |
+| 📋 Activity viewer | Time, INFO / WARN / ERROR and message columns; level filtering, clear and filtered copy; command/output text uses monospace and multiline errors expand for details |
+| 📝 Feedback | Notification text remains visible, and an empty Shebang template disables Add with validation feedback beside the field |
+
+Usage details for the history and interface changes are in [Python management](MANAGEMENT.md). Runtime dependencies are unchanged; 0.6.1 artifacts remain immutable historical releases.
+
+**0.6.2 application validation (2026-09-25):** 81 core checks and 22 GUI check groups passed. GUI coverage includes 80 page / language / design / width combinations, persisted catalog filters, draft retention after cancelling reviews, and exact historical installed-state markers. Eight checks in a disposable Windows Sandbox passed, including an actual 3.14.7 → 3.14.6 replacement, execution of the selected interpreter, repair without upgrading, stale-confirmation rejection, and uninstall cleanup. This does not replace manual compositor inspection, every Windows text-scaling configuration, or fresh installer acceptance.
+
+## ✅ Implemented in 0.6.1
 
 | Area | Current behavior |
 | --- | --- |
