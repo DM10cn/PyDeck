@@ -152,6 +152,34 @@ static class T3Checks
             Require(executions == 1 && refreshed.Single(e => e.Path == fixture.Ready.Path).State == "Environment ready" &&
                 refreshed.Single(e => e.Path == fixture.Imported.Path).State == "Not checked", "Refresh lost verified health or trusted an import");
         });
+        await checkAsync("Refresh cannot resurrect an environment removed during a probe", async () =>
+        {
+            var fixture = RefreshFixture("concurrent-remove");
+            var runner = new FakeRunner((_, _) =>
+            {
+                fixture.Registry.Remember(fixture.Imported, remove: true);
+                return Task.FromResult(new CommandResult(0, new JsonObject { ["prefix"] = fixture.Ready.Path,
+                    ["base"] = fixture.Ready.BasePath, ["version"] = "3.14.8" }.ToJsonString(), ""));
+            });
+            try { await fixture.Registry.RefreshAsync(runner, _ => Task.FromResult(true)); throw new Exception("Concurrent edit was overwritten"); }
+            catch (IOException ex) when (ex.Message == "Environment list changed; refresh again") { }
+            Require(fixture.Registry.Read().SequenceEqual(new[] { fixture.Ready }), "Partial refresh committed or removed entry resurrected");
+        });
+        await checkAsync("Refresh preserves concurrently added environments and runtime associations", async () =>
+        {
+            var fixture = RefreshFixture("concurrent-add");
+            var ready = fixture.Ready with { BaseRuntimeId = "fixture-runtime" }; fixture.Registry.Remember(ready);
+            var added = new VirtualEnvironment(Path.Combine(scratch, "registered-while-refreshing"));
+            var runner = new FakeRunner((_, _) =>
+            {
+                fixture.Registry.Remember(added);
+                return Task.FromResult(new CommandResult(0, new JsonObject { ["prefix"] = ready.Path,
+                    ["base"] = ready.BasePath, ["version"] = ready.Version }.ToJsonString(), ""));
+            });
+            await fixture.Registry.RefreshAsync(runner, _ => Task.FromResult(true));
+            var records = fixture.Registry.Read();
+            Require(records.Count == 3 && records.Contains(added) && records.Contains(ready), "New entry or runtime association was lost");
+        });
         await checkAsync("Environment refresh removes Ready when the interpreter becomes broken or disappears", async () =>
         {
             var fixture = RefreshFixture("broken");

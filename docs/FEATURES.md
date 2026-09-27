@@ -2,7 +2,11 @@
 
 **English** · [简体中文](FEATURES.zh-CN.md) · [🏠 Home](../README.md)
 
-**Current version: 0.6.3** — this page is the reference for feature and acceptance status. “Implemented” means the code and UI exist; completed checks are recorded below. A feature can be implemented while its full acceptance testing remains outstanding. Ideas under consideration are not commitments.
+**Current version: 0.7.0-fix** — this page is the reference for feature and acceptance status. “Implemented” means the code and UI exist; completed checks are recorded below. A feature can be implemented while its full acceptance testing remains outstanding. Ideas under consideration are not commitments.
+
+## 🧰 0.7.0-fix
+
+Private build-Python preparation, build storage cleanup, runtime usage and venv pip management are included in 0.7.0-fix. Application verification passed 108 core checks and 26 GUI groups; final package checks are recorded on the release. See the [0.7.0 management guide](MANAGEMENT_070.md) for usage and boundaries.
 
 ## ✨ New in 0.6.2
 
@@ -79,7 +83,7 @@ The table describes 0.6.1. See [Python management](MANAGEMENT.md) for usage. Onl
 | Idea | Notes |
 | --- | --- |
 | 📊 Persistent transfer history | Current activity remains session-only |
-| 🧰 Package management | pip, uv, conda, environment migration and recursive deletion remain outside scope |
+| 🧰 Package management | 0.7.0 development adds venv pip management; uv, conda and environment migration remain outside scope |
 | 💻 ARM64 application builds | Catalog architecture filtering does not mean the GUI has a native ARM64 build |
 
 ⏸️ **Windows 10 support is deferred**. Windows 7, 8, and 8.1 are outside the target scope.

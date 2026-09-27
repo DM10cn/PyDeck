@@ -9,6 +9,8 @@ namespace PimGui.App;
 [Microsoft.UI.Xaml.Data.Bindable]
 public sealed class ActivityRow
 {
+    private static readonly FontFamily AppFont = new("Segoe UI Variable, Segoe UI");
+    private static readonly FontFamily OutputFont = new("Cascadia Mono, Consolas");
     public ActivityEntry Entry { get; set; } = new(DateTime.MinValue, ActivityLevel.Information, "");
     public string Time => Entry.Timestamp.ToString("HH:mm:ss");
     public string Level => Entry.Level switch { ActivityLevel.Warning => "WARN", ActivityLevel.Error => "ERROR", _ => "INFO" };
@@ -17,7 +19,7 @@ public sealed class ActivityRow
     public bool HasDetails => Entry.Level == ActivityLevel.Error && Entry.Message.IndexOfAny(['\r', '\n']) >= 0;
     public Visibility TextVisibility => HasDetails ? Visibility.Collapsed : Visibility.Visible;
     public Visibility DetailVisibility => HasDetails ? Visibility.Visible : Visibility.Collapsed;
-    public FontFamily MessageFont => new(Entry.Origin == ActivityOrigin.Application ? "Segoe UI Variable, Segoe UI" : "Cascadia Mono, Consolas");
+    public FontFamily MessageFont => Entry.Origin == ActivityOrigin.Application ? AppFont : OutputFont;
     public double MessageSize => Entry.Origin == ActivityOrigin.Application ? 14 : 13;
     public Brush TextBrush { get; set; } = new SolidColorBrush();
     public Brush MutedBrush { get; set; } = new SolidColorBrush();
@@ -29,6 +31,7 @@ public sealed partial class MainWindow
     private ListView? activityList;
     private TextBlock? activityEmpty;
     private readonly ObservableCollection<ActivityRow> activityRows = [];
+    private IReadOnlyCollection<ActivityEntry>? renderedActivity;
     private string ActivityVisibleText => string.Join(Environment.NewLine, activityRows.Select(row => row.Entry.Format()));
 
     private UIElement BuildActivityPage()
@@ -74,16 +77,21 @@ public sealed partial class MainWindow
     private void RefreshActivityOutput(bool reset = false)
     {
         if (activityList is null) return;
-        var visible = activityLog.Entries.Where(entry => activityFilter is null || entry.Level == activityFilter).ToArray();
+        var snapshot = activityLog.Entries;
+        if (!reset && ReferenceEquals(snapshot, renderedActivity)) return;
+        renderedActivity = snapshot;
+        var visible = snapshot.Where(entry => activityFilter is null || entry.Level == activityFilter).ToArray();
         if (reset) activityRows.Clear();
         var retained = visible.ToHashSet(ReferenceEqualityComparer.Instance);
         while (activityRows.Count > 0 && !retained.Contains(activityRows[0].Entry)) activityRows.RemoveAt(0);
         var last = activityRows.Count == 0 ? -1 : Array.FindIndex(visible, item => ReferenceEquals(item, activityRows[^1].Entry));
+        var textBrush = Palette.Brush(palette.Text);
+        var mutedBrush = Palette.Brush(palette.Muted);
         foreach (var entry in visible.Skip(last + 1))
         {
             var severityBrush = entry.Level switch { ActivityLevel.Error => "SystemFillColorCriticalBrush", ActivityLevel.Warning => "SystemFillColorCautionBrush", _ => null };
-            activityRows.Add(new ActivityRow { Entry = entry, TextBrush = Palette.Brush(palette.Text), MutedBrush = Palette.Brush(palette.Muted),
-                LevelBrush = severityBrush is not null && Application.Current.Resources.TryGetValue(severityBrush, out var resource) && resource is Brush brush ? brush : Palette.Brush(palette.Muted) });
+            activityRows.Add(new ActivityRow { Entry = entry, TextBrush = textBrush, MutedBrush = mutedBrush,
+                LevelBrush = severityBrush is not null && Application.Current.Resources.TryGetValue(severityBrush, out var resource) && resource is Brush brush ? brush : mutedBrush });
         }
         if (activityEmpty is not null) activityEmpty.Visibility = visible.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
     }

@@ -72,19 +72,19 @@ public sealed partial class MainWindow
             await CaptureAsync(Path.Combine(directory, "26-settings-scroll.png"));
             Navigate("build");
             using var operation = BeginOperation(T("Building CPython {0}", BuildRecipe.Version), download: true);
-            SetBusy(true);
+            using var work = StartWork(WorkKind.Build);
             operation.Report(OperationPhase.Compiling); UpdateOperationPanel();
             if (!OperationProgressBar.IsIndeterminate || OperationPhaseText.Text != T("Compiling CPython")) throw new IOException("Compile progress invents a percentage");
             operation.Report(OperationPhase.Training); UpdateOperationPanel();
             if (!OperationProgressBar.IsIndeterminate || OperationPhaseText.Text != T("Training PGO")) throw new IOException("PGO training stage is not distinct");
             Navigate("runtimes"); await RequestOperationCancellationAsync();
             if (!operation.IsCancellationRequested) throw new IOException("Build cancellation failed after navigation");
-            FinishOperation(operation); SetBusy(false);
+            FinishOperation(operation); work?.Dispose();
         }
         finally
         {
             if (activeOperation is not null) FinishOperation(activeOperation);
-            busy = false; Builds.Remove(record.Id);
+            Builds.Remove(record.Id);
             localRuntimes = originalLocal; installed = originalInstalled; connected = originalConnected; buildOptions = originalOptions;
             buildVersions = originalVersions; buildPreset = originalPreset;
             currentBuild = null; SavePreferences(originalPreferences); Navigate("runtimes");

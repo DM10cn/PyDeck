@@ -1,10 +1,12 @@
+using System.Text.RegularExpressions;
+
 namespace PimGui.Core;
 
-public static class RuntimeCatalog
+public static partial class RuntimeCatalog
 {
     public static string MinorSeries(PythonRuntime runtime)
     {
-        var match = System.Text.RegularExpressions.Regex.Match(runtime.Version, @"\A\d+\.\d+");
+        var match = MinorPattern().Match(runtime.Version);
         return match.Success ? match.Value : runtime.Tag;
     }
     public static bool MatchesDistribution(PythonRuntime runtime, string filter) => filter switch
@@ -12,31 +14,43 @@ public static class RuntimeCatalog
         "FreeThreaded" => runtime.IsFreeThreaded, "Embedded" => runtime.IsEmbeddable, "Tests" => runtime.IncludesTests,
         "Other" => runtime.IsSpecialized && !runtime.IsFreeThreaded && !runtime.IsEmbeddable && !runtime.IncludesTests, _ => true
     };
-    public static int CompareVersions(string left, string right)
+    public static int CompareVersions(string left, string right) => VersionKey(left).CompareTo(VersionKey(right));
+
+    // Use this as the sort key, rather than reparsing both strings on every comparison.
+    // No global cache: catalogs may come from arbitrary user-selected sources.
+    public static (Version Core, int Stage, int Number) VersionKey(string value)
     {
-        var result = SortVersion(left).CompareTo(SortVersion(right));
-        if (result != 0) return result;
-        (int Stage, int Number) Suffix(string value)
-        {
-            var match = System.Text.RegularExpressions.Regex.Match(value, @"(?:\d)(a|b|rc)(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            return match.Success ? (match.Groups[1].Value.ToLowerInvariant() switch { "a" => 0, "b" => 1, _ => 2 },
-                int.TryParse(match.Groups[2].Value, out var number) ? number : int.MaxValue) : (3, 0);
-        }
-        return Suffix(left).CompareTo(Suffix(right));
+        var core = CorePattern().Match(value).Value;
+        var version = Version.TryParse(core, out var parsed) ? parsed : new Version(0, 0);
+        var suffix = PreviewPattern().Match(value);
+        return suffix.Success ? (version, suffix.Groups[1].Value.ToLowerInvariant() switch { "a" => 0, "b" => 1, _ => 2 },
+            int.TryParse(suffix.Groups[2].Value, out var number) ? number : int.MaxValue) : (version, 3, 0);
     }
     public static IReadOnlyList<PythonRuntime> Filter(IEnumerable<PythonRuntime> source, string architecture, bool previews, string search) =>
         source.Where(r => (architecture == "All architectures" || r.Architecture == architecture) &&
             (previews || !r.IsPrerelease) && (search.Length == 0 ||
             $"{r.DisplayName} {r.Tag} {r.Version} {r.Company} {r.Distribution}".Contains(search, StringComparison.OrdinalIgnoreCase)))
-        .OrderByDescending(r => r.Version, Comparer<string>.Create(CompareVersions)).ThenBy(r => r.IsSpecialized).ToArray();
+        .OrderByDescending(r => VersionKey(r.Version)).ThenBy(r => r.IsSpecialized).ToArray();
 
-    public static PythonRuntime? Recommended(IEnumerable<PythonRuntime> source, string preferredArchitecture) =>
-        source.Where(r => !r.IsPrerelease && !r.IsSpecialized)
-            .OrderByDescending(r => r.Version, Comparer<string>.Create(CompareVersions)).ThenByDescending(r => r.Architecture == preferredArchitecture).FirstOrDefault();
-
-    private static Version SortVersion(string value)
+    public static PythonRuntime? Recommended(IEnumerable<PythonRuntime> source, string preferredArchitecture)
     {
-        var core = System.Text.RegularExpressions.Regex.Match(value, @"^\d+(?:\.\d+){1,3}").Value;
-        return Version.TryParse(core, out var version) ? version : new Version(0, 0);
+        PythonRuntime? best = null;
+        (Version Core, int Stage, int Number) bestKey = default;
+        foreach (var candidate in source)
+        {
+            if (candidate.IsPrerelease || candidate.IsSpecialized) continue;
+            var key = VersionKey(candidate.Version);
+            var comparison = best is null ? 1 : key.CompareTo(bestKey);
+            if (comparison > 0 || comparison == 0 && candidate.Architecture == preferredArchitecture && best!.Architecture != preferredArchitecture)
+            { best = candidate; bestKey = key; }
+        }
+        return best;
     }
+
+    [GeneratedRegex(@"\A\d+\.\d+")]
+    private static partial Regex MinorPattern();
+    [GeneratedRegex(@"^\d+(?:\.\d+){1,3}")]
+    private static partial Regex CorePattern();
+    [GeneratedRegex(@"(?:\d)(a|b|rc)(\d+)", RegexOptions.IgnoreCase)]
+    private static partial Regex PreviewPattern();
 }

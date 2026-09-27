@@ -11,10 +11,10 @@ public sealed partial class MainWindow
         buildSourceLabel = palette.Label(buildOptions.SourceArchive.Length == 0 ? BuildSources.Url(buildOptions.Version) : buildOptions.SourceArchive, 12, muted: true);
         section.Children.Add(buildSourceLabel);
         section.Children.Add(palette.Label("Import a Python-version.tgz source archive; its version must match your selection", 12, muted: true));
-        var import = palette.Action("Import source archive…", "\uE8B7"); import.IsEnabled = !busy;
+        var import = palette.Action("Import source archive…", "\uE8B7"); BindAvailability(import, () => CanWork(WorkKind.Build));
         import.Click += async (_, _) =>
         {
-            if (busy || confirmationOpen) return; confirmationOpen = true;
+            if (!CanWork(WorkKind.Build) || confirmationOpen) return; confirmationOpen = true;
             try
             {
                 var picker = new Windows.Storage.Pickers.FileOpenPicker();
@@ -30,7 +30,7 @@ public sealed partial class MainWindow
             catch (Exception ex) { ShowError(ex); }
             finally { confirmationOpen = false; RenderPage(); }
         };
-        var official = palette.Action("Use official source", "\uE777"); official.IsEnabled = !busy && buildOptions.SourceArchive.Length > 0;
+        var official = palette.Action("Use official source", "\uE777"); BindAvailability(official, () => CanWork(WorkKind.Build) && buildOptions.SourceArchive.Length > 0);
         official.Click += (_, _) => { buildOptions = buildOptions with { SourceArchive = "" }; RenderPage(); };
         section.Children.Add(Toolbar(import, official));
         section.Children.Add(palette.Label("Compatibility depends on the selected source and installed compiler; older releases may need another build adapter", 12, muted: true));
@@ -38,7 +38,7 @@ public sealed partial class MainWindow
     }
     private async Task ChooseBuildOutputAsync()
     {
-        if (busy || confirmationOpen) return; confirmationOpen = true;
+        if (!CanWork(WorkKind.Build) || confirmationOpen) return; confirmationOpen = true;
         try
         {
             var picker = new Windows.Storage.Pickers.FolderPicker();

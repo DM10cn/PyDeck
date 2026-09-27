@@ -28,6 +28,8 @@ The native `PyDeck.Launcher.exe` is also signed. An identical signed copy is exp
 
 ## 📦 Build
 
+An optional `InformationalVersion` supplies the app display label and asset filenames (for example, `0.7.0-fix`). It must start with the numeric `Version`. Installer identity and the stable Git tag remain numeric; the build records both values. A display-label change alone is not an installer upgrade: subsequent releases must increase `Version`.
+
 Review and commit the changes first. Package version comes from `PimGui.App.csproj` and must be three numeric components. MSI uses that version; MSIX adds a fourth zero. Increase the installer version for each upgrade, including subsequent previews.
 
 ```powershell

@@ -1,4 +1,4 @@
-param([string]$BuildDirectory, [string]$OfflineFixture)
+param([string]$BuildDirectory, [string]$OfflineFixture, [ValidateRange(30, 1800)][int]$TimeoutSeconds = 300)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 if (!$BuildDirectory) { $BuildDirectory = (Get-Content -LiteralPath (Join-Path $projectRoot 'artifacts\latest-build.txt') -Raw).Trim() }
@@ -8,7 +8,7 @@ $outputDirectory = Join-Path $projectRoot ('artifacts\smoke-' + (Get-Date -Forma
 $appArguments = @('--smoke-test', ('"' + $outputDirectory + '"'))
 if ($OfflineFixture) { $appArguments += @('--offline-fixture', ('"' + $OfflineFixture + '"')) }
 $appProcess = Start-Process -FilePath $appPath -ArgumentList $appArguments -WorkingDirectory $BuildDirectory -WindowStyle Hidden -PassThru
-if (!$appProcess.WaitForExit(180000)) { throw "Smoke test is still running as process $($appProcess.Id). Output: $outputDirectory" }
+if (!$appProcess.WaitForExit($TimeoutSeconds * 1000)) { throw "Smoke test is still running as process $($appProcess.Id). Output: $outputDirectory" }
 if ($appProcess.ExitCode -ne 0) { throw "GUI exited with code $($appProcess.ExitCode)." }
 $resultPath = Join-Path $outputDirectory 'result.json'
 if (!(Test-Path -LiteralPath $resultPath)) { throw 'GUI did not produce a smoke-test result.' }

@@ -15,7 +15,7 @@ public sealed partial class MainWindow
         var layout = PageGrid(GridLength.Auto, GridLength.Auto, GridLength.Auto, new(1, GridUnitType.Star));
         Button Action(string title, string icon, Func<Task> action, bool primary = false)
         {
-            var button = palette.Action(title, icon, primary, compact: true); button.IsEnabled = !busy;
+            var button = palette.Action(title, icon, primary, compact: true); BindAvailability(button, () => CanWork(WorkKind.Environments));
             button.Click += async (_, _) => await action();
             return button;
         }
@@ -94,27 +94,33 @@ public sealed partial class MainWindow
         Grid.SetColumnSpan(details, 2); body.Children.Add(details);
         var state = palette.Label(environment.State, palette.Tokens.CaptionFontSize, muted: environment.State == "Not checked");
         state.VerticalAlignment = VerticalAlignment.Center; Grid.SetRow(state, 1); body.Children.Add(state);
-        var terminal = palette.Action("Terminal", "\uE756", compact: true); terminal.IsEnabled = !busy;
+        var terminal = palette.Action("Terminal", "\uE756", compact: true); BindAvailability(terminal, () => CanWork(WorkKind.Environments));
         terminal.Click += async (_, _) => await OpenEnvironmentTerminalAsync(environment);
-        var more = palette.IconAction(T("Environment actions") + " · " + environment.Name, "\uE712"); more.IsEnabled = !busy;
+        var more = palette.IconAction(T("Environment actions") + " · " + environment.Name, "\uE712");
         var menu = RuntimeMenu();
         foreach (var (title, icon, action) in new (string, string, Func<Task>)[] {
             ("Check environment", "\uE73E", async () => { await CheckEnvironmentAsync(environment); }),
             ("Open folder", "\uE8B7", () => { OpenFolder(new("", "", "", "", "", "", environment.Path, false)); return Task.CompletedTask; }),
             ("Remove from list", "\uE74D", () => RemoveEnvironmentAsync(environment)) })
         {
-            var item = new MenuFlyoutItem { Text = T(title), Icon = new FontIcon { Glyph = icon, FontSize = palette.Tokens.ControlIconSize }, IsEnabled = !busy };
+            var item = new MenuFlyoutItem { Text = T(title), Icon = new FontIcon { Glyph = icon, FontSize = palette.Tokens.ControlIconSize }, IsEnabled = CanWork(WorkKind.Environments) };
+            BindAvailability(item, () => title == "Open folder" || CanWork(WorkKind.Environments));
             item.Click += async (_, _) => await action(); menu.Items.Add(item);
         }
         more.Flyout = menu;
-        var actions = Toolbar(terminal, more); Grid.SetColumn(actions, 1); Grid.SetRow(actions, 1); body.Children.Add(actions);
-        return palette.CardBox(body, palette.Tokens.RowPadding);
+        var packages = palette.Action("Packages", compact: true); BindAvailability(packages, () => CanWork(WorkKind.Packages));
+        packages.Click += async (_, _) => await OpenPackagesAsync(environment);
+        var actions = Toolbar(packages, terminal, more); Grid.SetColumn(actions, 1); Grid.SetRow(actions, 1); body.Children.Add(actions);
+        var content = new StackPanel { Spacing = 12 }; content.Children.Add(body);
+        if (packageEnvironment == environment.Path) content.Children.Add(PackagePanel(environment));
+        return palette.CardBox(content, palette.Tokens.RowPadding);
     }
     private async Task RefreshEnvironmentsAsync()
     {
-        if (busy || confirmationOpen) return;
-        confirmationOpen = true;
-        SetBusy(true, "Checking files");
+        if (confirmationOpen) return;
+        using var work = StartWork(WorkKind.Environments);
+        if (work is null) return;
+        StatusText.Text = T("Checking files");
         try
         {
             await Environments.RefreshAsync(new ProcessRunner(), async verified =>
@@ -131,34 +137,44 @@ public sealed partial class MainWindow
                 var dialog = Dialog("Recheck environments", "", "Check");
                 dialog.Content = new ScrollViewer { Content = content, MaxHeight = 320,
                     VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
-                return await dialog.ShowAsync() == ContentDialogResult.Primary;
+                if (confirmationOpen || cancelDialogOpen) return false;
+                confirmationOpen = true;
+                try { return await dialog.ShowAsync() == ContentDialogResult.Primary; }
+                finally { confirmationOpen = false; }
             });
         }
         catch (Exception ex) { ShowError(ex); }
-        finally { confirmationOpen = false; SetBusy(false); }
+        finally { RefreshWorkPage("environments"); }
     }
     private async Task ImportEnvironmentAsync()
     {
-        if (busy || confirmationOpen) return; confirmationOpen = true;
+        if (confirmationOpen) return;
+        using var work = StartWork(WorkKind.Environments);
+        if (work is null) return; confirmationOpen = true;
         try
         {
             var path = await PickFolderAsync(); if (path is null) return;
             var environment = VirtualEnvironments.Inspect(path);
             if (!File.Exists(Path.Combine(path, "pyvenv.cfg"))) throw new IOException("Choose a folder containing pyvenv.cfg");
-            Environments.Remember(environment); RenderPage();
+            Environments.Remember(environment); RefreshWorkPage("environments");
         }
         catch (Exception ex) { ShowError(ex); }
         finally { confirmationOpen = false; }
     }
     private async Task CreateEnvironmentAsync()
     {
-        if (busy || confirmationOpen) return; confirmationOpen = true;
+        if (confirmationOpen) return;
+        using var work = StartWork(WorkKind.Environments);
+        if (work is null) return;
+        var ownsConfirmation = false;
         string? parent = null, name = null; PythonRuntime? runtime = null;
         try
         {
             installed = await ListInstalledAsync();
             var available = installed.Where(r => !r.IsEmbeddable).ToArray();
             if (available.Length == 0) { Notify("Install a Python version first", InfoBarSeverity.Warning); return; }
+            if (confirmationOpen || cancelDialogOpen) return;
+            confirmationOpen = true; ownsConfirmation = true;
             parent = await PickFolderAsync(); if (parent is null) return;
             var box = new TextBox { Header = T("Environment name"), Text = ".venv", MaxLength = 100 };
             var selected = available[0].Id;
@@ -170,10 +186,10 @@ public sealed partial class MainWindow
             runtime = available.Single(r => r.Id == selected); name = box.Text;
         }
         catch (Exception ex) { ShowError(ex); return; }
-        finally { confirmationOpen = false; }
+        finally { if (ownsConfirmation) confirmationOpen = false; }
         if (runtime is null || parent is null || name is null) return;
         var operation = BeginOperation(T("Creating environment"), download: true);
-        SetBusy(true, "Creating environment");
+        StatusText.Text = T("Creating environment");
         try
         {
             using var lease = runtime.IsLocalBuild ? null : client.AcquireConfigurationLock();
@@ -182,28 +198,35 @@ public sealed partial class MainWindow
         }
         catch (OperationCanceledException) { Notify("Creation stopped; partial files were kept", InfoBarSeverity.Warning); }
         catch (Exception ex) { ShowError(ex); }
-        finally { FinishOperation(operation); SetBusy(false); }
+        finally { FinishOperation(operation); RefreshWorkPage("environments"); }
     }
     private async Task<bool> CheckEnvironmentAsync(VirtualEnvironment environment)
     {
-        if (busy || confirmationOpen) return false; confirmationOpen = true;
+        if (confirmationOpen) return false;
+        using var work = StartWork(WorkKind.Environments);
+        if (work is null) return false;
+        if (confirmationOpen) return false; confirmationOpen = true;
+        var ownsConfirmation = true;
         try
         {
             if (await Dialog("Check environment", T("This runs the interpreter in the selected environment") + "\n\n" + environment.Executable, "Check").ShowAsync() != ContentDialogResult.Primary) return false;
-            SetBusy(true, "Checking files");
+            confirmationOpen = false; ownsConfirmation = false;
+            StatusText.Text = T("Checking files");
             var result = await VirtualEnvironments.CheckAsync(environment.Path, new ProcessRunner()); Environments.Remember(result);
             Notify(result.State, result.State == "Environment ready" ? InfoBarSeverity.Success : InfoBarSeverity.Warning);
             return result.State == "Environment ready";
         }
         catch (Exception ex) { ShowError(ex); return false; }
-        finally { confirmationOpen = false; SetBusy(false); }
+        finally { if (ownsConfirmation) confirmationOpen = false; RefreshWorkPage("environments"); }
     }
     private async Task RemoveEnvironmentAsync(VirtualEnvironment environment)
     {
-        if (busy || confirmationOpen) return; confirmationOpen = true;
+        if (confirmationOpen) return;
+        using var work = StartWork(WorkKind.Environments);
+        if (work is null) return; confirmationOpen = true;
         try { if (await Dialog("Remove from list", T("Files on disk will be kept") + "\n\n" + environment.Path, "Remove").ShowAsync() == ContentDialogResult.Primary) Environments.Remember(environment, remove: true); }
         catch (Exception ex) { ShowError(ex); }
-        finally { confirmationOpen = false; RenderPage(); }
+        finally { confirmationOpen = false; RefreshWorkPage("environments"); }
     }
     private async Task OpenEnvironmentTerminalAsync(VirtualEnvironment environment)
     {

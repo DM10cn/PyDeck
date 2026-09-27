@@ -122,6 +122,10 @@ The icon source is in `src/PimGui.App/Assets/AppIcon.Source.png`. Rebuild its PN
 
 ## 🧰 T3 checks
 
+⚡ See [performance and state consistency](PERFORMANCE_070.md) for notification batching, version-sort measurements and registry concurrency checks. The full GUI suite accepts `-TimeoutSeconds` (default 300).
+
+🧪 For 0.7.0, `dotnet run --project tests/PimGui.Checks -c Release -- --management-live <new-empty-scratch-directory> <trusted-python.exe> -` downloads a private bootstrap Python, checks compiler discovery, creates an isolated venv, prepares pip and installs/removes colorama from PyPI. It checks requirements round-trip, inherited `PIP_TARGET` isolation and pre-cancellation. Use only a new disposable directory; pass a verified local NuGet package instead of `-` to exercise cached bootstrap setup. Normal core checks cover requirement injection, stale cleanup, dependency changes after review and archive traversal. GUI smoke checks cover the new inline panels across four languages, two styles and two widths.
+
 Core checks cover stable update metadata, source validation and redirect consent, stale source snapshots, Shebang preservation and conflicts, and incomplete environment retention. Set `PYDECK_TEST_VENV_PYTHON` to a trusted local Python executable to include a real temporary venv create / probe / forget check. Test files remain in the ignored artifacts directory.
 
 `Test-PimLifecycle.ps1 -T3Only` runs source, Shebang and venv acceptance in a disposable Windows Sandbox. The HTTPS fixture creates a short-lived localhost test certificate inside that Sandbox, removes its public trust entry on disposal, and never changes host certificate trust. Omit `-T3Only` for the complete lifecycle.

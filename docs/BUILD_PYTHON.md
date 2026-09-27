@@ -4,6 +4,8 @@ English · [简体中文](#简体中文)
 
 📦 Available in 0.6.3 · x64 only
 
+🧰 The 0.7.0 development version adds private bootstrap preparation and reviewed storage cleanup; see [management additions](MANAGEMENT_070.md). The instructions below also describe the 0.6.3 baseline.
+
 ## 🚀 Configuration
 
 PyDeck orchestrates CPython's own [PCbuild](https://github.com/python/cpython/tree/main/PCbuild) and [PC/layout](https://github.com/python/cpython/tree/main/PC/layout) on x64 Windows. It does not publish a separate Python distribution.
@@ -41,6 +43,8 @@ Manifests and logs remain in `%LOCALAPPDATA%\PyDeck\Builds\Jobs`; default output
 ## 简体中文
 
 📦 0.6.3 新增 · 仅支持 x64
+
+🧰 0.7.0 开发版增加独立辅助 Python 准备与确认后空间清理，见[管理功能](MANAGEMENT_070.md#简体中文)；以下同时保留 0.6.3 基线说明
 
 ### 🚀 使用方法
 

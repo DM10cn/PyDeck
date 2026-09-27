@@ -7,6 +7,7 @@ namespace PimGui.App;
 
 public sealed partial class MainWindow
 {
+    private int catalogSourceRequest;
     private UIElement CatalogSourceBar()
     {
         var row = new Grid { ColumnSpacing = palette.Tokens.ToolbarSpacing, Tag = "PageToolbar" };
@@ -20,16 +21,16 @@ public sealed partial class MainWindow
             value => _ = SwitchCatalogSourceAsync(value), "Install from");
         source.HorizontalAlignment = HorizontalAlignment.Stretch; source.MinWidth = 160;
         // Reading the online catalog can be cancelled. Installation cannot.
-        source.IsEnabled = !busy || catalogCancellation is not null;
+        BindAvailability(source, () => CanWork(WorkKind.Catalog) || catalogCancellation is not null);
         Grid.SetColumn(source, 1); row.Children.Add(source);
         ToolTipService.SetToolTip(source, OfflineSource ? offlineBundle?.DirectoryPath ?? T("No folder selected") : InstallationSource.Validate(preferences.InstallationIndex));
         if (OfflineSource)
         {
-            var choose = palette.Action("Choose folder…", "\uE8B7", compact: true); choose.IsEnabled = !busy;
+            var choose = palette.Action("Choose folder…", "\uE8B7", compact: true); BindAvailability(choose, () => CanWork(WorkKind.Catalog));
             choose.Click += async (_, _) => await PickOfflineFolderAsync();
             Grid.SetColumn(choose, 2); row.Children.Add(choose);
         }
-        var refresh = palette.IconAction("Refresh catalog", "\uE72C"); refresh.IsEnabled = !busy && (OfflineSource ? offlineBundle is not null : connected);
+        var refresh = palette.IconAction("Refresh catalog", "\uE72C"); BindAvailability(refresh, () => CanWork(WorkKind.Catalog) && (OfflineSource ? offlineBundle is not null : connected));
         refresh.Click += async (_, _) => { if (OfflineSource && offlineBundle is not null) await LoadOfflineFolderAsync(offlineBundle.DirectoryPath); else await LoadCatalogAsync(); };
         Grid.SetColumn(refresh, 3); row.Children.Add(refresh);
         return row;
@@ -37,12 +38,14 @@ public sealed partial class MainWindow
 
     private async Task SwitchCatalogSourceAsync(string value)
     {
-        if (busy && catalogCancellation is null) return;
+        if (!CanWork(WorkKind.Catalog) && catalogCancellation is null) return;
+        var request = ++catalogSourceRequest;
         try
         {
             catalogCancellation?.Cancel();
             await catalogLoading;
-            if (busy) return;
+            if (request != catalogSourceRequest) return;
+            if (!CanWork(WorkKind.Catalog)) return;
             var changed = preferences with { CatalogSource = value };
             store.Save(changed); preferences = changed;
             MessageBar.IsOpen = false; search = "";
@@ -62,16 +65,24 @@ public sealed partial class MainWindow
     }
     private async Task PickOfflineFolderAsync()
     {
-        if (busy || confirmationOpen) return;
+        if (!CanWork(WorkKind.Catalog) || confirmationOpen) return;
         confirmationOpen = true;
-        try { var path = await PickFolderAsync(); if (path is not null && !busy) await LoadOfflineFolderAsync(path); }
+        var ownsConfirmation = true;
+        try
+        {
+            var path = await PickFolderAsync();
+            confirmationOpen = false; ownsConfirmation = false;
+            if (path is not null && CanWork(WorkKind.Catalog)) await LoadOfflineFolderAsync(path);
+        }
         catch (Exception ex) { ShowError(ex); }
-        finally { confirmationOpen = false; }
+        finally { if (ownsConfirmation) confirmationOpen = false; }
     }
     private async Task LoadOfflineFolderAsync(string path)
     {
-        if (busy) return;
-        SetBusy(true, "Reading offline packages…");
+        using var work = StartWork(WorkKind.Catalog);
+        if (work is null) return;
+
+        StatusText.Text = T("Reading offline packages…");
         try
         {
             var bundle = await Task.Run(() => OfflineBundle.Load(path));
@@ -80,12 +91,15 @@ public sealed partial class MainWindow
             Log($"Loaded offline bundle: {bundle.DirectoryPath} ({bundle.Runtimes.Count} versions).");
         }
         catch (Exception ex) { offlineBundle = null; ShowError(ex); }
-        finally { SetBusy(false); }
+        finally { RefreshWorkPage("catalog"); }
     }
     private async Task InstallOfflineRuntimeAsync(PythonRuntime runtime)
     {
-        if (busy || !connected || offlineBundle is null || confirmationOpen) return;
-        confirmationOpen = true;
+        if (confirmationOpen) return;
+        using var work = StartWork(WorkKind.RuntimeMutation);
+        if (work is null) return;
+        if (!connected || offlineBundle is null || confirmationOpen) return;
+        var bundle = offlineBundle;
         string? expectedInstalledVersion = null;
         try
         {
@@ -95,47 +109,48 @@ public sealed partial class MainWindow
                 ? "\n\n" + T("Python {0} will be replaced with Python {1}. These versions share an installation folder", previous.Version, runtime.Version)
                     + "\n" + T("Packages in that interpreter may need to be reinstalled. Existing virtual environments may need attention") : "";
             var dialog = Dialog(T("Install {0} from this folder?", RuntimeTitle(runtime)),
-                offlineBundle.DirectoryPath + "\n\n" + T("Use bundles from a source you trust. A checksum verifies the files, not the publisher.") + replacement, "Install");
-            if (await dialog.ShowAsync() != ContentDialogResult.Primary || busy) return;
+                bundle.DirectoryPath + "\n\n" + T("Use bundles from a source you trust. A checksum verifies the files, not the publisher.") + replacement, "Install");
+            if (await ShowGuardedDialogAsync(dialog) != ContentDialogResult.Primary) return;
             if (replacement.Length > 0) expectedInstalledVersion = previous!.Version;
         }
         catch (Exception ex) { ShowError(ex); return; }
-        finally { confirmationOpen = false; }
-        var bundle = offlineBundle;
         MessageBar.IsOpen = false;
         var operation = BeginOperation(T("Installing {0}…", RuntimeTitle(runtime)));
-        SetBusy(true, T("Installing {0}…", RuntimeTitle(runtime)));
+        StatusText.Text = T("Installing {0}…", RuntimeTitle(runtime));
         try
         {
-            await client.InstallOfflineAsync(bundle, runtime, line => DispatcherQueue.TryEnqueue(() => Log(line, origin: ActivityOrigin.PythonManager)), operation: operation, expectedInstalledVersion: expectedInstalledVersion);
+            await client.InstallOfflineAsync(bundle, runtime, CreateOutputLogger(ActivityOrigin.PythonManager), operation: operation, expectedInstalledVersion: expectedInstalledVersion);
             FinalizingOperation(operation);
             await VerifyOperationAsync(RuntimeAction.Install, runtime);
         }
         catch (OperationCanceledException) when (operation.IsCancellationRequested) { await ReconcileCancelledOperationAsync(target: runtime); }
         catch (Exception ex) { try { installed = await ListInstalledAsync(); } catch { installed = localRuntimes; } ShowError(ex); }
-        finally { FinishOperation(operation); SetBusy(false); UpdateConnection(); RenderPage(); }
+        finally { FinishOperation(operation); UpdateConnection(); RefreshWorkPage("runtimes", "catalog"); }
     }
     private async Task DownloadOfflineRuntimeAsync(PythonRuntime runtime)
     {
-        if (busy || !connected || confirmationOpen) return;
+        if (confirmationOpen) return;
+        using var work = StartWork(WorkKind.OfflineDownload);
+        if (work is null) return;
+        if (!connected || confirmationOpen) return;
         string? parent;
         confirmationOpen = true;
         try { parent = await PickFolderAsync(); }
         catch (Exception ex) { ShowError(ex); return; }
         finally { confirmationOpen = false; }
-        if (parent is null || busy) return;
+        if (parent is null) return;
         MessageBar.IsOpen = false;
         var operation = BeginOperation(T("Downloading {0}…", RuntimeTitle(runtime)), download: true);
-        SetBusy(true, T("Downloading {0}…", RuntimeTitle(runtime)));
+        StatusText.Text = T("Downloading {0}…", RuntimeTitle(runtime));
         try
         {
-            var directory = await client.DownloadOfflineAsync(runtime, parent, line => DispatcherQueue.TryEnqueue(() => Log(line, origin: ActivityOrigin.PythonManager)), operation);
+            var directory = await client.DownloadOfflineAsync(runtime, parent, CreateOutputLogger(ActivityOrigin.PythonManager), operation);
             FinalizingOperation(operation);
             Notify(T("Offline bundle saved to {0}", directory), InfoBarSeverity.Success);
             StatusText.Text = T("Offline packages ready");
         }
         catch (OperationCanceledException) when (operation.IsCancellationRequested) { await ReconcileCancelledOperationAsync(download: true); }
         catch (Exception ex) { ShowError(ex); }
-        finally { FinishOperation(operation); SetBusy(false); }
+        finally { FinishOperation(operation); }
     }
 }

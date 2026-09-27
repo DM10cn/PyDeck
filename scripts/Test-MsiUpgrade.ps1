@@ -7,8 +7,10 @@ $previous = (Resolve-Path -LiteralPath $PreviousReleaseDirectory).Path
 $metadata = Get-Content -LiteralPath (Join-Path $release 'build.json') -Raw | ConvertFrom-Json
 $old = Get-Content -LiteralPath (Join-Path $previous 'build.json') -Raw | ConvertFrom-Json
 if ([version]$old.version -ge [version]$metadata.version) { throw 'The previous release must be older.' }
-$msi = Join-Path $release ('assets/PyDeck-' + $metadata.version + '-win-x64.msi')
-$oldMsi = Join-Path $previous ('assets/PyDeck-' + $old.version + '-win-x64.msi')
+$assetVersion = if ($metadata.releaseLabel) { $metadata.releaseLabel } else { $metadata.version }
+$oldAssetVersion = if ($old.releaseLabel) { $old.releaseLabel } else { $old.version }
+$msi = Join-Path $release ('assets/PyDeck-' + $assetVersion + '-win-x64.msi')
+$oldMsi = Join-Path $previous ('assets/PyDeck-' + $oldAssetVersion + '-win-x64.msi')
 foreach ($file in @($msi, $oldMsi)) { if (!(Test-Path -LiteralPath $file)) { throw 'Both release MSI files are required.' } }
 $target = Join-Path $release 'work/upgrade-installed'
 $menu = Join-Path ([Environment]::GetFolderPath('Programs')) 'PyDeck'

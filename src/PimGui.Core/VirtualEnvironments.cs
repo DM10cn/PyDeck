@@ -19,26 +19,32 @@ public sealed class VirtualEnvironments(string dataDirectory)
     public IReadOnlyList<VirtualEnvironment> Read()
     {
         SafeFiles.RequireNoLinks(RegistryPath);
-        return File.Exists(RegistryPath) ? JsonSerializer.Deserialize<VirtualEnvironment[]>(SafeFiles.ReadText(RegistryPath))
-            ?? throw new IOException("Invalid environment list") : [];
+        return ParseRegistry(File.Exists(RegistryPath) ? SafeFiles.ReadText(RegistryPath) : null);
     }
-    public void Remember(VirtualEnvironment environment, bool remove = false)
+    private static IReadOnlyList<VirtualEnvironment> ParseRegistry(string? json) => json is null ? [] :
+        JsonSerializer.Deserialize<VirtualEnvironment[]>(json) ?? throw new IOException("Invalid environment list");
+
+    private void UpdateRegistry(Func<IReadOnlyList<VirtualEnvironment>, IReadOnlyList<VirtualEnvironment>> update)
     {
         Directory.CreateDirectory(dataDirectory);
         SafeFiles.RequireNoLinks(dataDirectory);
         var lockPath = System.IO.Path.Combine(dataDirectory, "environments.lock"); SafeFiles.RequireNoLinks(lockPath);
         using var lease = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None);
+        SafeFiles.RequireNoLinks(RegistryPath);
         var previous = File.Exists(RegistryPath) ? SafeFiles.ReadText(RegistryPath) : null;
-        var entries = Read().Where(e => !e.Path.Equals(environment.Path, StringComparison.OrdinalIgnoreCase)).ToList();
-        if (!remove)
-        {
-            var previousEntry = Read().FirstOrDefault(e => e.Path.Equals(environment.Path, StringComparison.OrdinalIgnoreCase));
-            if (environment.BaseRuntimeId is null && string.Equals(environment.BasePath, previousEntry?.BasePath, StringComparison.OrdinalIgnoreCase))
-                environment = environment with { BaseRuntimeId = previousEntry?.BaseRuntimeId };
-            entries.Add(environment);
-        }
+        var entries = update(ParseRegistry(previous));
         AtomicJson.Write(RegistryPath, JsonSerializer.Serialize(entries), previous, checkOriginal: true);
     }
+    private static VirtualEnvironment PreserveRuntime(VirtualEnvironment environment, VirtualEnvironment? previous) =>
+        environment.BaseRuntimeId is null && string.Equals(environment.BasePath, previous?.BasePath, StringComparison.OrdinalIgnoreCase)
+            ? environment with { BaseRuntimeId = previous?.BaseRuntimeId } : environment;
+
+    public void Remember(VirtualEnvironment environment, bool remove = false) => UpdateRegistry(current =>
+    {
+        var entries = current.Where(e => !e.Path.Equals(environment.Path, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (!remove) entries.Add(PreserveRuntime(environment, current.FirstOrDefault(e => e.Path.Equals(environment.Path, StringComparison.OrdinalIgnoreCase))));
+        return entries;
+    });
     public async Task<bool> RefreshAsync(IProcessRunner runner, Func<IReadOnlyList<VirtualEnvironment>, Task<bool>> confirmRecheck)
     {
         var environments = Read();
@@ -46,6 +52,7 @@ public sealed class VirtualEnvironments(string dataDirectory)
         // A previous successful probe cannot be inferred from paths or pyvenv.cfg alone.
         // Re-running trusted entries needs confirmation; imported entries stay metadata-only.
         if (verified.Length > 0 && !await confirmRecheck(verified)) return false;
+        var refreshedEntries = new Dictionary<string, VirtualEnvironment>(StringComparer.OrdinalIgnoreCase);
         foreach (var environment in environments)
         {
             VirtualEnvironment refreshed;
@@ -56,8 +63,18 @@ public sealed class VirtualEnvironments(string dataDirectory)
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
             { refreshed = environment with { State = "Environment check failed" }; }
-            Remember(refreshed);
+            refreshedEntries.Add(environment.Path, PreserveRuntime(refreshed, environment));
         }
+        if (environments.Count == 0) return true;
+        // Probing runs without holding the registry lock. Commit once, after checking
+        // that another instance did not remove/edit any of the entries we inspected.
+        UpdateRegistry(current =>
+        {
+            var byPath = current.ToDictionary(e => e.Path, StringComparer.OrdinalIgnoreCase);
+            if (environments.Any(original => !byPath.TryGetValue(original.Path, out var now) || now != original))
+                throw new IOException("Environment list changed; refresh again");
+            return current.Select(entry => refreshedEntries.GetValueOrDefault(entry.Path, entry)).ToArray();
+        });
         return true;
     }
     public static VirtualEnvironment Inspect(string path)

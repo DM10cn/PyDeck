@@ -10,13 +10,13 @@
 
 PyDeck is a native **WinUI 3** companion for **Python Install Manager**. Browse interpreters, install a version, choose your default, and keep offline packages close at hand — in a desktop interface with **Windows Fluent** and **Material 3 Expressive** styles.
 
-📦 **Stable release · 0.6.3** · 🪟 **Windows 11 x64** · 📄 **MIT**
+📦 **Stable release · 0.7.0-fix** · 🪟 **Windows 11 x64** · 📄 **MIT**
 
 ## 📦 Download
 
 Get **MSI**, **MSIX**, and the **standalone dependency helper** from [GitHub Releases](https://github.com/DM10cn/PyDeck/releases). For source, use GitHub's automatic **Source code (zip)** / **Source code (tar.gz)** links in Assets. Follow the [installation guide](docs/INSTALL.md) for dependencies, installer choices, and MSIX certificate trust.
 
-New in **0.6.3**: 🛠️ build your own x64 CPython with Standard / Performance / Debug / Minimal presets, source selection and import, component choices, cancellation and reusable history. Compact build controls and scrollbar spacing are improved. See the [release notes](docs/releases/0.6.3.md) and [Build Python guide](docs/BUILD_PYTHON.md).
+New in **0.7.0-fix**: 🧰 private build-Python preparation, 🧹 build storage cleanup, 🔗 runtime usage, and 📦 virtual-environment package / pip management. Background operations have independent controls and progress, with batched updates and consistent environment refresh. See the [release notes](docs/releases/0.7.0-fix.md), [management guide](docs/MANAGEMENT_070.md), and [performance notes](docs/PERFORMANCE_070.md).
 
 Features introduced in **0.6.1** remain available: 🧰 virtual environments, 🌐 custom HTTPS installation sources, 📜 Shebang rules, 🔔 browser-based app update checks, inline Python settings, Python / variant / EAP icons, and database refresh. MSI uses full-package replacement upgrades while retaining settings and installer choices.
 
@@ -87,9 +87,9 @@ Language changes apply immediately and are saved. Documentation is maintained in
 
 ## 🧪 Validation status
 
-Version **0.6.2** passed **81 core checks**, **22 GUI check groups**, and **8 historical-version lifecycle checks** in a disposable Windows Sandbox. The GUI checks cover 80 page / language / design / width combinations; the lifecycle checks include an actual historical micro replacement, exact repair and stale-confirmation rejection.
+Version **0.7.0-fix** passed **108 core checks** and **26 GUI check groups** in development. Earlier historical-version lifecycle and CPython build results remain documented separately; they were not rerun as part of this performance change.
 
-These application results do not certify installer behavior. Final package validation is recorded in the [GitHub release details](https://github.com/DM10cn/PyDeck/releases/tag/v0.6.2); clean-machine GUI deployment, production MSIX certificate-trust installation, all text-scaling settings and external accessibility remain separate acceptance work. The [feature-status table](docs/FEATURES.md) retains current and historical results, and the [development guide](docs/DEVELOPMENT.md) explains how to run the checks.
+Final package validation is recorded in the [GitHub release details](https://github.com/DM10cn/PyDeck/releases/tag/v0.7.0); clean-machine GUI deployment, production MSIX certificate-trust installation, all text-scaling settings and external accessibility remain separate acceptance work. The [feature-status table](docs/FEATURES.md) retains current and historical results, and the [development guide](docs/DEVELOPMENT.md) explains how to run the checks.
 
 ## 🤝 Contributing
 

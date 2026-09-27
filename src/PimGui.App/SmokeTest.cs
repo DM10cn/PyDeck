@@ -41,6 +41,10 @@ public sealed partial class MainWindow
             checks.Add("Four-language rule entry rejects blanks inline and accepts all interpreter targets; activity filters explicit severity, live output and navigation without duplicate errors.");
             await CheckCancelledInlineEditsAsync(directory);
             checks.Add("PIM and Shebang reviews can be cancelled and reopened without losing drafts; invalid source validation preserves input; user PIM configuration remains unchanged.");
+            await CheckWorkIsolationAsync(directory);
+            checks.Add("Scoped work: unrelated controls and settings drafts survive parallel tasks; progress, cancellation, completion and resource ownership stay isolated in four languages and two styles.");
+            await CheckBatchedUpdatesAsync();
+            checks.Add("Batched worker output/progress retain latest state, bounded activity and severity; clear/completion cannot be resurrected by queued notifications; hidden activity preserves settings.");
             Navigate("runtimes");
             await CaptureAsync(Path.Combine(directory, "01-material-dark-runtimes.png"));
             if (BrandMark.Child is not Image { Source: BitmapImage { PixelWidth: > 0 } } ||
@@ -90,6 +94,8 @@ public sealed partial class MainWindow
             checks.Add("Four-language inline management settings, read-only PATH diagnostics, virtual environments, runtime badges, catalog grouping and actual byte progress rendered without saving user settings.");
             await CheckPageLayoutsAsync(directory);
             await CheckBuildUiAsync(directory);
+            await CheckManagement070UiAsync(directory);
+            checks.Add("0.7.0: package actions, pip protection, build preparation and used-runtime cleanup guards render in four languages, two designs and two widths.");
             checks.Add("Build page: four languages, both designs, x64-only options, scrollbar clearance, retained scroll positions/drafts, cancellation after navigation and local runtime actions without PIM verified.");
             checks.Add("Four languages and both designs at normal/compact widths: shared header geometry, action metrics, settings rows, environment actions, structured activity and historical micro identities verified.");
             SaveAppearance("Fluent", "Dark"); Navigate("runtimes"); architecture = "All architectures"; RenderPage();
@@ -198,7 +204,7 @@ public sealed partial class MainWindow
         {
             SavePreferences(preferences with { Language = language }); Navigate("catalog");
             var operation = BeginOperation(T("Installing {0}…", "Python 3.14.7"));
-            SetBusy(true);
+            using var work = StartWork(WorkKind.RuntimeMutation);
             operation.Observe(new("Downloading: " + new string('.', 33), false));
             UpdateOperationPanel(); Root.UpdateLayout();
             if (OperationPanel.Visibility != Visibility.Visible || OperationProgressBar.IsIndeterminate || OperationProgressBar.Value != 50 || !CancelOperationButton.IsEnabled)
@@ -233,7 +239,7 @@ public sealed partial class MainWindow
                 FinalizingOperation(operation);
                 if (CancelOperationButton.IsEnabled) throw new InvalidOperationException("Completed process still has an enabled stop button.");
             }
-            FinishOperation(operation); SetBusy(false); MessageBar.IsOpen = false;
+            FinishOperation(operation); work?.Dispose(); MessageBar.IsOpen = false;
             if (OperationPanel.Visibility != Visibility.Collapsed) throw new InvalidOperationException("Finished progress panel remained visible.");
         }
         SavePreferences(preferences with { Language = "en-US" });

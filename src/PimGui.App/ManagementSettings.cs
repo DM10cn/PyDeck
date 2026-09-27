@@ -14,6 +14,12 @@ public sealed partial class MainWindow
           SelectedSource = () => preferences.InstallationIndex, ConfirmDownloadOrigin = ConfirmDownloadOriginAsync };
 
     private readonly HashSet<string> expandedSettings = [];
+    private readonly Dictionary<string, (Expander Section, Func<UIElement> Build)> settingsSections = [];
+    private void RefreshSettingsSection(string title)
+    {
+        if (page != "settings" || !settingsSections.TryGetValue(title, out var target)) return;
+        if (target.Section.IsExpanded) target.Section.Content = target.Build();
+    }
     private PathReport? lastPathReport;
     private UIElement ManagementSettings()
     {
@@ -26,9 +32,11 @@ public sealed partial class MainWindow
             var section = new Expander { Header = palette.Label(title, palette.Tokens.BodyFontSize, true), Tag = "Management:" + title, IsExpanded = expandedSettings.Contains(title),
                 HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
                 CornerRadius = new(palette.Tokens.ActionRadius), FontSize = palette.Tokens.ControlFontSize,
-                IsEnabled = !busy && (connected || title is "Network" or "Installation source") && (title != "Shebang rules" || client.SupportsMutations) };
+                IsEnabled = (connected || title is "Network" or "Installation source") && (title != "Shebang rules" || client.SupportsMutations) };
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(section, T(title));
+            BindAvailability(section, () => (connected || title is "Network" or "Installation source") && (title != "Shebang rules" || client.SupportsMutations));
             palette.ApplySurfaceResources(section);
+            settingsSections[title] = (section, build);
             void Populate() { try { section.Content = build(); } catch (Exception ex) { section.Content = palette.Label(T(ex.Message), 13); } }
             if (section.IsExpanded) Populate();
             section.Expanding += (_, _) => { expandedSettings.Add(title); if (section.Content is null) Populate(); };
@@ -38,37 +46,24 @@ public sealed partial class MainWindow
         return panel;
     }
     private sealed class InlineEditResult { public bool Applied { get; set; } }
-    private void InlineAction(StackPanel body, string label, Func<InlineEditResult, Task> action, bool enabled = true)
+    private void InlineAction(StackPanel body, string label, Func<InlineEditResult, Task> action, bool enabled = true, WorkKind kind = WorkKind.Configuration, string? section = null)
     {
-        var button = palette.Action(label, compact: true); button.IsEnabled = enabled && !busy;
+        var button = palette.Action(label, compact: true); BindAvailability(button, () => enabled && CanWork(kind));
         button.HorizontalAlignment = HorizontalAlignment.Left;
-        button.Click += async (_, _) => await SaveInlineAsync(action); body.Children.Add(button);
+        button.Click += async (_, _) => await SaveInlineAsync(action, kind, section); body.Children.Add(button);
     }
-    private async Task SaveInlineAsync(Func<InlineEditResult, Task> action)
+    private async Task SaveInlineAsync(Func<InlineEditResult, Task> action, WorkKind kind, string? section)
     {
-        if (busy || confirmationOpen) return; confirmationOpen = true;
-        var originalPage = page;
-        var originalContent = PageHost.Children.ToArray();
-        var originalScroll = settingsScroll;
-        var originalFocus = Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(Root.XamlRoot) as Control;
+        if (confirmationOpen) return;
+        using var work = StartWork(kind);
+        if (work is null) return;
         var result = new InlineEditResult();
-        SetBusy(true);
         try { await action(result); }
         catch (Exception ex) { ShowError(new IOException(SensitiveText.Redact(ex.Message))); }
         finally
         {
-            confirmationOpen = false; SetBusy(false);
-            // Busy rendering temporarily detaches the editor. A cancelled review or validation
-            // failure must return to those same controls and their unsaved draft. After a write,
-            // keep the rebuilt page even when a subsequent refresh fails.
-            if (!result.Applied && page == originalPage)
-            {
-                PageHost.Children.Clear();
-                foreach (var element in originalContent) PageHost.Children.Add(element);
-                settingsScroll = originalScroll;
-                Root.UpdateLayout();
-                if (originalFocus?.IsLoaded == true) originalFocus.Focus(FocusState.Programmatic);
-            }
+            // No detach/rebuild on entry: validation errors and cancelled reviews keep drafts.
+            if (result.Applied && section is not null) RefreshSettingsSection(section);
         }
     }
     private UIElement BuildNetworkEditor()
@@ -98,7 +93,7 @@ public sealed partial class MainWindow
             catalog = null;
             result.Applied = true;
             Notify("Network settings saved", InfoBarSeverity.Success);            await Task.CompletedTask;
-        });
+        }, kind: WorkKind.NetworkSettings, section: "Network");
         return body;
     }
     private UIElement BuildPimEditor()
@@ -132,7 +127,7 @@ public sealed partial class MainWindow
                 { "true" => T("On"), "false" => T("Off"), "\"-64\"" => "x64", "\"-32\"" => "x86", "\"-arm64\"" => "ARM64", _ => value.ToString() };
             var review = backup is null ? string.Join("\n", edits.Select(item => SettingName(item.Key) + ": " + DisplayValue(snapshot.Values[item.Key]) + " → " + DisplayValue(item.Value)))
                 : T("Restore configuration from {0}", Path.GetFileName(backup));
-            if (await Dialog("Review changes", review, "Save").ShowAsync() != ContentDialogResult.Primary) return;
+            if (await ShowGuardedDialogAsync(Dialog("Review changes", review, "Save")) != ContentDialogResult.Primary) return;
             using (client.AcquireConfigurationLock())
             {
                 if (backup is null) PimConfiguration.Save(snapshot, edits); else PimConfiguration.Restore(snapshot, backup);
@@ -141,7 +136,7 @@ public sealed partial class MainWindow
             installed = await ListInstalledAsync(); catalog = null;
             if (edits["default_tag"] is { } requested && installed.FirstOrDefault(r => r.IsDefault)?.Selector != requested.GetValue<string>())
                 Notify("Your preference was saved, but PIM reports a different effective default. A custom configuration or policy may override it.", InfoBarSeverity.Warning);
-            else Notify("Configuration saved and Python list refreshed", InfoBarSeverity.Success);        }, snapshot.Overrides.Count == 0);
+            else Notify("Configuration saved and Python list refreshed", InfoBarSeverity.Success);        }, snapshot.Overrides.Count == 0, section: "PIM configuration");
         return body;
     }
     private UIElement BuildPathEditor()
@@ -151,7 +146,7 @@ public sealed partial class MainWindow
             installed = await ListInstalledAsync();
             lastPathReport = await PathDiagnostics.ProbeKnownAsync(PathDiagnostics.Inspect(installed, client.Executable), installed, client.Executable);
             result.Applied = true;
-        });
+        }, kind: WorkKind.Runtimes, section: "PATH and aliases");
         if (lastPathReport is not { } report) return body;
 
             body.Children.Add(palette.Label(T("PyDeck default: {0}", report.DefaultVersion ?? T("Not found")), 16, true));
@@ -174,29 +169,41 @@ public sealed partial class MainWindow
     {
         var body = new StackPanel { Spacing = 12 };
         body.Children.Add(palette.Label("Ask PIM to rebuild registrations and global aliases for all managed versions", 13));
-        var button = palette.Action("Refresh aliases", compact: true); button.IsEnabled = client.SupportsMutations && !busy;
+        var button = palette.Action("Refresh aliases", compact: true); BindAvailability(button, () => client.SupportsMutations && CanWork(WorkKind.Configuration));
         button.Click += async (_, _) => await RefreshAliasesAsync(); body.Children.Add(button);
         return body;
     }
     private async Task RefreshAliasesAsync()
     {
-        if (busy || !connected || confirmationOpen) return;
+        if (confirmationOpen) return;
+        using var work = StartWork(WorkKind.Configuration);
+        if (work is null) return;
+        if (!connected || confirmationOpen) return;
         confirmationOpen = true;
+        var ownsConfirmation = true;
         try
         {
             if (await Dialog("Refresh aliases", "PIM will rebuild registrations and global aliases for all managed versions", "Refresh").ShowAsync() != ContentDialogResult.Primary) return;
-            SetBusy(true, "Checking files");
-            await client.RefreshRegistrationsAsync(line => DispatcherQueue.TryEnqueue(() => Log(line, origin: ActivityOrigin.PythonManager)));
+            confirmationOpen = false; ownsConfirmation = false;
+            StatusText.Text = T("Checking files");
+            await client.RefreshRegistrationsAsync(CreateOutputLogger(ActivityOrigin.PythonManager));
             installed = await ListInstalledAsync();
             Notify("Registrations refreshed. Run PATH diagnostics to check command resolution", InfoBarSeverity.Informational);
         }
         catch (Exception ex) { try { installed = await ListInstalledAsync(); } catch { installed = localRuntimes; } ShowError(ex); }
-        finally { confirmationOpen = false; SetBusy(false); RenderPage(); }
+        finally
+        {
+            if (ownsConfirmation) confirmationOpen = false;
+            lastPathReport = null; RefreshSettingsSection("PATH and aliases");
+            RefreshWorkPage("runtimes", "catalog");
+        }
     }
     private async Task CheckRuntimeAsync(PythonRuntime runtime)
     {
-        if (busy || confirmationOpen) return;
-        SetBusy(true, "Checking files");
+        if (confirmationOpen) return;
+        using var work = StartWork(WorkKind.Runtimes);
+        if (work is null) return;
+        StatusText.Text = T("Checking files");
         try
         {
             installed = await ListInstalledAsync();
@@ -206,7 +213,7 @@ public sealed partial class MainWindow
             Notify(health.Message, health.Healthy ? InfoBarSeverity.Success : InfoBarSeverity.Warning);
         }
         catch (Exception ex) { ShowError(ex); }
-        finally { SetBusy(false); RenderPage(); }
+        finally { RefreshWorkPage("runtimes"); }
     }
     private async Task VerifyOperationAsync(RuntimeAction action, PythonRuntime runtime)
     {

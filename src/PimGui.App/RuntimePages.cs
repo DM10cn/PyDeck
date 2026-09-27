@@ -114,7 +114,7 @@ public sealed partial class MainWindow
         }
         else
         {
-            var refresh = palette.IconAction("Refresh", "\uE72C"); refresh.IsEnabled = !busy;
+            var refresh = palette.IconAction("Refresh", "\uE72C"); BindAvailability(refresh, () => CanWork(WorkKind.Runtimes));
             refresh.Click += async (_, _) => await RefreshInstalledAsync(); Grid.SetColumn(refresh, 2); filters.Children.Add(refresh);
         }
         outer.Children.Add(filters);
@@ -168,7 +168,7 @@ public sealed partial class MainWindow
         else if (online && !connected)
             runtimeRows.Children.Add(ManagerSetup());
         else if (online && !OfflineSource && catalog is null)
-            runtimeRows.Children.Add(Empty("\uE896", busy ? "Checking the release catalog…" : "Your next Python starts here", "Available versions are loaded from the selected catalog", busy ? null : "Load releases", () => _ = LoadCatalogAsync()));
+            runtimeRows.Children.Add(Empty("\uE896", workCoordinator.Contains(WorkKind.Catalog) ? "Checking the release catalog…" : "Your next Python starts here", "Available versions are loaded from the selected catalog", workCoordinator.Contains(WorkKind.Catalog) ? null : "Load releases", () => _ = LoadCatalogAsync()));
         else if (filtered.Length == 0)
             runtimeRows.Children.Add(Empty("\uE721", source.Any() ? "No matching versions" : "No Python versions yet", source.Any() ? "Try another search or filter" : "Install your first Python version to get started.", source.Any() || online ? null : "Install Python", () => Navigate("catalog")));
         else if (online) PopulateCatalog(filtered);
@@ -177,11 +177,12 @@ public sealed partial class MainWindow
 
     private UIElement ManagerSetup()
     {
-        if (busy) return Empty("\uE8CE", "Finding your Python setup", "Checking Python Install Manager on this computer…");
+        if (workCoordinator.Contains(WorkKind.Connection)) return Empty("\uE8CE", "Finding your Python setup", "Checking Python Install Manager on this computer…");
         var panel = (StackPanel)Empty("\uE8CE", "Let's connect your manager",
             "Download Python Install Manager, then return here and check again.", "Download Python Install Manager", OpenManagerDownload);
         panel.Tag = "ManagerSetup";
         var retry = palette.Action("Check again", "\uE72C", compact: true);
+        BindAvailability(retry, () => CanWork(WorkKind.Connection));
         retry.Tag = "ReconnectManager";
         retry.HorizontalAlignment = HorizontalAlignment.Center;
         retry.Click += async (_, _) => await ChangeManagerAsync("");
@@ -213,7 +214,7 @@ public sealed partial class MainWindow
             runtimeRows.Children.Add(card);
         }
         runtimeRows.Children.Add(palette.Label("All versions", palette.Tokens.SectionTitleSize, true));
-        foreach (var series in filtered.GroupBy(RuntimeCatalog.MinorSeries).OrderByDescending(g => g.Key, Comparer<string>.Create(RuntimeCatalog.CompareVersions)))
+        foreach (var series in filtered.GroupBy(RuntimeCatalog.MinorSeries).OrderByDescending(g => RuntimeCatalog.VersionKey(g.Key)))
         {
             var items = new StackPanel { Spacing = 0 };
             var section = new Expander { Header = "Python " + series.Key, Tag = "CatalogSeries:" + series.Key,
@@ -265,13 +266,13 @@ public sealed partial class MainWindow
         {
             var existing = installed.FirstOrDefault(r => r.Id.Equals(runtime.Id, StringComparison.OrdinalIgnoreCase) && r.Version == runtime.Version);
             var install = palette.Action(existing is null ? "Install" : "Installed", existing is null ? "\uE896" : "\uE73E", primary: existing is null, compact: true);
-            install.IsEnabled = existing is null && !busy && connected && client.SupportsMutations;
+            BindAvailability(install, () => existing is null && CanWork(WorkKind.RuntimeMutation) && connected && client.SupportsMutations);
             install.Click += async (_, _) => { if (OfflineSource) await InstallOfflineRuntimeAsync(runtime); else await ChangeRuntimeAsync(RuntimeAction.Install, runtime); };
             actions.Children.Add(install);
             if (!OfflineSource)
             {
                 var more = palette.IconAction(T("More options for {0}", RuntimeTitle(runtime)), "\uE712");
-                more.IsEnabled = connected && !busy;
+                BindAvailability(more, () => connected && CanWork(WorkKind.OfflineDownload));
                 ToolTipService.SetToolTip(more, T("Download offline package"));
                 var menu = RuntimeMenu();
                 var download = new MenuFlyoutItem { Text = T("Download offline package"), Icon = new FontIcon { Glyph = "\uE896" } };
@@ -281,14 +282,19 @@ public sealed partial class MainWindow
         }
         else
         {
-            var terminal = palette.Action("Terminal", "\uE756", compact: true); terminal.IsEnabled = !busy; terminal.Click += (_, _) => OpenTerminal(runtime); actions.Children.Add(terminal);
-            var more = palette.IconAction(T("More options for {0}", RuntimeTitle(runtime)), "\uE712"); more.IsEnabled = !busy;
+            var terminal = palette.Action("Terminal", "\uE756", compact: true); BindAvailability(terminal, () => !workCoordinator.Contains(WorkKind.RuntimeMutation) && !workCoordinator.Contains(WorkKind.Storage)); terminal.Click += (_, _) => OpenTerminal(runtime); actions.Children.Add(terminal);
+            var more = palette.IconAction(T("More options for {0}", RuntimeTitle(runtime)), "\uE712");
             var menu = RuntimeMenu();
             MenuFlyoutItem Item(string text, string glyph, Action action, bool enabled = true)
-            { var item = new MenuFlyoutItem { Text = T(text), Icon = new FontIcon { Glyph = glyph }, IsEnabled = enabled }; item.Click += (_, _) => action(); menu.Items.Add(item); return item; }
+            { var item = new MenuFlyoutItem { Text = T(text), Icon = new FontIcon { Glyph = glyph }, IsEnabled = enabled };
+                if (text is "Set as default" or "Check for updates" or "Reinstall to repair" or "Uninstall…") BindAvailability(item, () => enabled && CanWork(WorkKind.RuntimeMutation));
+                else if (text == "Check installation") BindAvailability(item, () => enabled && CanWork(WorkKind.Runtimes));
+                else if (text == "Remove from list") BindAvailability(item, () => enabled && CanWork(WorkKind.Storage));
+                item.Click += (_, _) => action(); menu.Items.Add(item); return item; }
             Item("Set as default", "\uE735", () => _ = SetDefaultAsync(runtime), !runtime.IsDefault && !runtime.IsLocalBuild && connected);
             Item("Check for updates", "\uE895", () => _ = ChangeRuntimeAsync(RuntimeAction.Update, runtime), runtime.IsManaged && client.SupportsMutations);
             Item("Open installation folder", "\uE8B7", () => OpenFolder(runtime));
+            Item("Runtime usage", "\uE8B7", () => _ = ShowRuntimeUsageAsync(runtime));
             Item("Copy executable path", "\uE8C8", () => Copy(runtime.Executable));
             Item("Check installation", "\uE73E", () => _ = CheckRuntimeAsync(runtime), runtime.IsManaged || runtime.IsLocalBuild);
             Item("Reinstall to repair", "\uE90F", () => _ = ChangeRuntimeAsync(RuntimeAction.Repair, runtime), runtime.IsManaged && client.SupportsRepair && client.SupportsMutations);

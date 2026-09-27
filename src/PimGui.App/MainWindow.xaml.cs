@@ -13,6 +13,8 @@ namespace PimGui.App;
 
 public sealed partial class MainWindow : Window
 {
+    private static string AppVersionLabel => System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(MainWindow).Assembly)?.InformationalVersion
+        ?? typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "";
     private PimClient client = new(new ProcessRunner());
     private readonly SettingsStore store;
     private AppSettings preferences;
@@ -24,11 +26,12 @@ public sealed partial class MainWindow : Window
     private OfflineBundle? offlineBundle;
     private bool OfflineSource => preferences.CatalogSource == "Offline";
     private readonly ActivityLog activityLog = new();
+    private readonly CoalescedAction activityRefresh;
+    private readonly CoalescedAction operationRefresh;
     private ActivityLevel? activityFilter;
     private string page = "runtimes";
     private string search = "";
     private string architecture = "All architectures";
-    private bool busy;
     private bool initialized;
     private bool connected;
     private bool closeDialogOpen;
@@ -43,6 +46,8 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        activityRefresh = new(action => DispatcherQueue.TryEnqueue(() => action()), () => RefreshActivityOutput());
+        operationRefresh = new(action => DispatcherQueue.TryEnqueue(() => action()), UpdateOperationPanel);
         var args = Environment.GetCommandLineArgs();
         var smokeIndex = Array.IndexOf(args, "--smoke-test");
         if (smokeIndex >= 0 && smokeIndex + 1 < args.Length) smokeDirectory = Path.GetFullPath(args[smokeIndex + 1]);
@@ -110,7 +115,7 @@ public sealed partial class MainWindow : Window
         ConnectionCard.Background = new SolidColorBrush(Colors.Transparent);
         ConnectionCard.CornerRadius = new(palette.Tokens.IconRadius);
         ConnectionDot.Fill = Palette.Brush(connected ? palette.Green : palette.Muted);
-        StyleStatus.Text = palette.Tokens.Name + "  ·  PyDeck " + typeof(MainWindow).Assembly.GetName().Version?.ToString(3);
+        StyleStatus.Text = palette.Tokens.Name + "  ·  PyDeck " + AppVersionLabel;
         AppWindow.TitleBar.ButtonBackgroundColor = Colors.Transparent;
         AppWindow.TitleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
         AppWindow.TitleBar.ButtonForegroundColor = palette.Text;
@@ -130,11 +135,13 @@ public sealed partial class MainWindow : Window
         architecture = destination == "catalog" ? preferences.DefaultArchitecture : "All architectures";
         if (destination == "catalog") distributionFilter = preferences.CatalogPackageType ?? "Standard";
         RenderPage();
-        if (destination == "catalog" && !OfflineSource && catalog is null && connected && !busy) _ = LoadCatalogAsync();
+        if (destination == "catalog" && !OfflineSource && catalog is null && connected && CanWork(WorkKind.Catalog)) _ = LoadCatalogAsync();
     }
     private void RenderPage()
     {
-        RefreshDatabaseButton.IsEnabled = !busy && !confirmationOpen;
+        availability.Clear();
+        settingsSections.Clear();
+        RefreshDatabaseButton.IsEnabled = CanWork(WorkKind.Runtimes) && CanWork(WorkKind.Catalog);
         if (settingsScroll?.IsLoaded == true) settingsOffset = settingsScroll.VerticalOffset;
         if (buildScroll?.IsLoaded == true) buildOffset = buildScroll.VerticalOffset;
         buildScroll = null;
@@ -163,8 +170,11 @@ public sealed partial class MainWindow : Window
 
     private async Task ConnectAsync()
     {
-        if (busy) return;
-        SetBusy(true, "Connecting to Python Install Manager…");
+        if (confirmationOpen) return;
+        using var work = StartWork(WorkKind.Connection);
+        if (work is null) return;
+
+        StatusText.Text = T("Connecting to Python Install Manager…");
         try
         {
             connected = await client.DiscoverAsync(preferences.ManagerPath);
@@ -180,29 +190,35 @@ public sealed partial class MainWindow : Window
             installed = localRuntimes;
             ShowError(ex);
         }
-        finally { SetBusy(false); UpdateConnection(); RenderPage(); }
+        finally { UpdateConnection(); RefreshWorkPage("runtimes", "catalog"); }
     }
 
     private async Task RefreshInstalledAsync()
     {
-        if (busy) return;
+        if (confirmationOpen) return;
         if (!connected) { await ConnectAsync(); return; }
-        SetBusy(true, "Refreshing your Python versions…");
+        using var work = StartWork(WorkKind.Runtimes);
+        if (work is null) return;
+
+        StatusText.Text = T("Refreshing your Python versions…");
         try { installed = await ListInstalledAsync(); MessageBar.IsOpen = false; StatusText.Text = T("Up to date · {0}", DateTime.Now.ToString("t")); }
         catch (Exception ex) { ShowError(ex); }
-        finally { SetBusy(false); UpdateConnection(); RenderPage(); }
+        finally { UpdateConnection(); RefreshWorkPage("runtimes", "catalog"); }
     }
 
     private Task LoadCatalogAsync()
     {
-        if (busy || !connected || OfflineSource) return Task.CompletedTask;
+        if (!CanWork(WorkKind.Catalog) || !connected || OfflineSource) return Task.CompletedTask;
         return catalogLoading = LoadCatalogCoreAsync();
     }
     private async Task LoadCatalogCoreAsync()
     {
+        if (confirmationOpen) return;
+        using var work = StartWork(WorkKind.Catalog);
+        if (work is null) return;
         using var cancellation = new CancellationTokenSource();
         catalogCancellation = cancellation;
-        SetBusy(true, "Checking available Python releases…");
+        StatusText.Text = T("Checking available Python releases…");
         try
         {
             catalog = await client.ListCatalogAsync(cancellationToken: cancellation.Token);
@@ -211,40 +227,45 @@ public sealed partial class MainWindow : Window
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         catch (Exception ex) { ShowError(ex); }
-        finally { catalogCancellation = null; SetBusy(false); RenderPage(); }
+        finally { catalogCancellation = null; RefreshWorkPage("catalog"); }
     }
 
     private async Task ChangeRuntimeAsync(RuntimeAction action, PythonRuntime runtime)
     {
-        if (busy || !connected || confirmationOpen || runtime.IsLocalBuild) return;
+        if (confirmationOpen) return;
+        using var work = StartWork(WorkKind.RuntimeMutation);
+        if (work is null) return;
+        if (!connected || confirmationOpen || runtime.IsLocalBuild) return;
+        string usageReview;
+        int dependentEnvironments;
+        try { usageReview = RuntimeUsageText(runtime); dependentEnvironments = RuntimeUsage.Find(runtime, Environments.Read()).Count; }
+        catch (Exception ex) { ShowError(ex); return; }
         string? expectedInstalledVersion = null;
         if (action == RuntimeAction.Install)
         {
-            confirmationOpen = true;
             try
             {
                 installed = await ListInstalledAsync();
                 var previous = installed.SingleOrDefault(r => r.Id.Equals(runtime.Id, StringComparison.OrdinalIgnoreCase));
                 if (previous is not null && previous.Version != runtime.Version)
                 {
-                    if (await Dialog("Replace this Python version?",
+                    if (await ShowGuardedDialogAsync(Dialog("Replace this Python version?",
                         T("Python {0} will be replaced with Python {1}. These versions share an installation folder", previous.Version, runtime.Version)
-                        + "\n\n" + T("Packages in that interpreter may need to be reinstalled. Existing virtual environments may need attention"), "Replace").ShowAsync() != ContentDialogResult.Primary) return;
+                        + "\n\n" + T("Packages in that interpreter may need to be reinstalled. Existing virtual environments may need attention"), "Replace")) != ContentDialogResult.Primary) return;
                     expectedInstalledVersion = previous.Version;
                 }
             }
             catch (Exception ex) { ShowError(ex); return; }
-            finally { confirmationOpen = false; }
         }
-        if ((action == RuntimeAction.Uninstall && preferences.ConfirmBeforeUninstall) || action == RuntimeAction.Repair)
+        if ((action == RuntimeAction.Uninstall && (preferences.ConfirmBeforeUninstall || dependentEnvironments > 0)) || action == RuntimeAction.Repair)
         {
             confirmationOpen = true;
             try
             {
                 var dialog = action == RuntimeAction.Repair
                     ? Dialog("Reinstall to repair", T("PIM will replace this interpreter. Packages installed in its folder may be removed. Projects outside that folder are not removed") + "\n\n" + runtime.Prefix, "Repair")
-                    : Dialog(T("Uninstall {0}?", RuntimeTitle(runtime)), T("This removes this Python runtime and its installed packages. Projects outside its installation folder are not removed.") + "\n\n" + runtime.Prefix, "Uninstall");
-                if (await dialog.ShowAsync() != ContentDialogResult.Primary || busy) return;
+                    : Dialog(T("Uninstall {0}?", RuntimeTitle(runtime)), T("This removes this Python runtime and its installed packages. Projects outside its installation folder are not removed.") + "\n\n" + runtime.Prefix + "\n\n" + usageReview, "Uninstall");
+                if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
             }
             catch (Exception ex) { ShowError(ex); return; }
             finally { confirmationOpen = false; }
@@ -252,37 +273,47 @@ public sealed partial class MainWindow : Window
         var verb = action switch { RuntimeAction.Install => "Installing", RuntimeAction.Update => "Updating", RuntimeAction.Repair => "Repair", _ => "Uninstalling" };
         MessageBar.IsOpen = false;
         var operation = action == RuntimeAction.Uninstall ? null : BeginOperation(T(action switch { RuntimeAction.Install => "Installing {0}…", RuntimeAction.Repair => "Repairing {0}…", _ => "Updating {0}…" }, RuntimeTitle(runtime)));
-        SetBusy(true, T(action switch { RuntimeAction.Install => "Installing {0}…", RuntimeAction.Update => "Updating {0}…", RuntimeAction.Repair => "Repairing {0}…", _ => "Uninstalling {0}…" }, RuntimeTitle(runtime)));
+        StatusText.Text = T(action switch { RuntimeAction.Install => "Installing {0}…", RuntimeAction.Update => "Updating {0}…", RuntimeAction.Repair => "Repairing {0}…", _ => "Uninstalling {0}…" }, RuntimeTitle(runtime));
         Log($"{verb} {runtime.DisplayName} ({runtime.Id}).");
         try
         {
-            var result = await client.ChangeAsync(action, runtime, line => DispatcherQueue.TryEnqueue(() => Log(line, origin: ActivityOrigin.PythonManager)), operation, expectedInstalledVersion: expectedInstalledVersion);
+            var environmentLock = Path.Combine(store.DirectoryPath, "environments.lock"); SafeFiles.RequireNoLinks(environmentLock);
+            using var environmentLease = new FileStream(environmentLock, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None);
+            if (RuntimeUsageText(runtime) != usageReview) throw new IOException("Environment usage changed; review the operation again");
+            var result = await client.ChangeAsync(action, runtime, CreateOutputLogger(ActivityOrigin.PythonManager), operation, expectedInstalledVersion: expectedInstalledVersion);
             if (operation is not null) FinalizingOperation(operation);
             Log($"Process finished. Exit code: {result.ExitCode}.");
             await VerifyOperationAsync(action, client.LastExpectedRuntime ?? runtime);
         }
         catch (OperationCanceledException) when (operation?.IsCancellationRequested == true) { await ReconcileCancelledOperationAsync(target: runtime); }
         catch (Exception ex) { try { installed = await ListInstalledAsync(); } catch { installed = localRuntimes; } ShowError(ex); }
-        finally { FinishOperation(operation); SetBusy(false); UpdateConnection(); RenderPage(); }
+        finally { FinishOperation(operation); UpdateConnection(); RefreshWorkPage("runtimes", "catalog"); }
     }
 
-    private void SetBusy(bool value, string? status = null)
-    {
-        busy = value;
-        UpdateOperationPanel();
-        if (status is not null) StatusText.Text = T(status);
-        RenderPage();
-    }
+
     private void UpdateConnection()
     {
         ConnectionText.Text = T(connected ? "PIM connected" : "PIM not connected");
         ConnectionDot.Fill = Palette.Brush(connected ? palette.Green : palette.Muted);
+        if (managerStateLabel?.IsLoaded == true) managerStateLabel.Text = T(connected ? "Connected on this computer" : "Not connected");
+        if (managerPathLabel?.IsLoaded == true) managerPathLabel.Text = client.Executable ?? T("Not found. Choose a location or install Python Install Manager.");
     }
     private void Log(string message, ActivityLevel? level = null, ActivityOrigin origin = ActivityOrigin.Application)
     {
         string? secret = null; try { secret = ProxyPassword(); } catch { }
         activityLog.Add(SensitiveText.Redact(message, secret), level, origin);
-        RefreshActivityOutput();
+        activityRefresh.Request();
+    }
+    private Action<string> CreateOutputLogger(ActivityOrigin origin = ActivityOrigin.Application)
+    {
+        // Capture credentials once for the operation; never access settings/credential
+        // storage from every output line or send one dispatcher item per line.
+        var secret = ProxyPassword();
+        return message =>
+        {
+            activityLog.Add(SensitiveText.Redact(message, secret), origin: origin);
+            activityRefresh.Request();
+        };
     }
     private void Notify(string message, InfoBarSeverity severity)
     {
@@ -308,6 +339,13 @@ public sealed partial class MainWindow : Window
         PrimaryButtonText = T(primary ?? ""), CloseButtonText = T(primary is null ? "OK" : "Cancel"),
         DefaultButton = ContentDialogButton.Close
     };
+    private async Task<ContentDialogResult> ShowGuardedDialogAsync(ContentDialog dialog)
+    {
+        if (confirmationOpen || cancelDialogOpen || closeDialogOpen) return ContentDialogResult.None;
+        confirmationOpen = true;
+        try { return await dialog.ShowAsync(); }
+        finally { confirmationOpen = false; }
+    }
     private async void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
         if (!busy) return;
@@ -328,7 +366,7 @@ public sealed partial class MainWindow : Window
         try
         {
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps ||
-                !(new[] { "www.python.org", "docs.python.org", "learn.microsoft.com" }.Contains(uri.Host) ||
+                !(new[] { "www.python.org", "docs.python.org", "learn.microsoft.com", "visualstudio.microsoft.com" }.Contains(uri.Host) ||
                   (uri.Host == "github.com" && uri.AbsolutePath.StartsWith("/DM10cn/PyDeck/releases", StringComparison.Ordinal) && uri.UserInfo.Length == 0 && uri.IsDefaultPort)))
                 throw new ArgumentException("This link is not a supported documentation address.");
             Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });

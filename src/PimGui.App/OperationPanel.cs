@@ -7,33 +7,41 @@ namespace PimGui.App;
 
 public sealed partial class MainWindow
 {
-    private PimOperation? activeOperation;
-    private string operationTitle = "";
-    private bool operationCanCancel;
-    private bool operationIsDownload;
+    private sealed class RunningOperation(PimOperation operation, string title, bool download)
+    {
+        public PimOperation Operation { get; } = operation;
+        public string Title { get; } = title;
+        public bool Download { get; } = download;
+        public bool CanCancel { get; set; } = true;
+    }
+    private readonly List<RunningOperation> runningOperations = [];
+    private RunningOperation? selectedOperation;
+    private PimOperation? activeOperation => selectedOperation?.Operation;
+    private bool operationCanCancel { get => selectedOperation?.CanCancel == true; set { if (selectedOperation is not null) selectedOperation.CanCancel = value; } }
+    private bool operationIsDownload => selectedOperation?.Download == true;
     private bool cancelDialogOpen;
 
     private PimOperation BeginOperation(string title, bool download = false)
     {
-        operationTitle = title; operationCanCancel = true; operationIsDownload = download;
-        PimOperation? operation = null;
-        operation = new PimOperation(_ => DispatcherQueue.TryEnqueue(() =>
-        {
-            // Ignore callbacks queued by a previous operation after navigation or completion.
-            if (ReferenceEquals(activeOperation, operation)) UpdateOperationPanel();
-        }));
-        activeOperation = operation;
+        // Read the selected operation at dispatch time, not the producer's old snapshot.
+        var operation = new PimOperation(_ => operationRefresh.Request());
+        selectedOperation = new(operation, title, download);
+        runningOperations.Add(selectedOperation);
+        RefreshOperationChoices();
         UpdateOperationPanel();
         return operation;
     }
     private void FinishOperation(PimOperation? operation)
     {
-        if (ReferenceEquals(activeOperation, operation)) { activeOperation = null; operationCanCancel = false; }
+        runningOperations.RemoveAll(item => ReferenceEquals(item.Operation, operation));
+        if (ReferenceEquals(activeOperation, operation)) selectedOperation = runningOperations.LastOrDefault();
+        RefreshOperationChoices();
         operation?.Dispose(); UpdateOperationPanel();
     }
     private void FinalizingOperation(PimOperation operation)
     {
-        operationCanCancel = false;
+        var entry = runningOperations.FirstOrDefault(item => ReferenceEquals(item.Operation, operation));
+        if (entry is not null) entry.CanCancel = false;
         operation.Report(OperationPhase.Finalizing);
         UpdateOperationPanel();
     }
@@ -46,7 +54,9 @@ public sealed partial class MainWindow
         OperationPanel.BorderBrush = Palette.Brush(palette.Line);
         OperationPanel.BorderThickness = new(palette.Tokens.CardBorder);
         OperationPanel.CornerRadius = new(palette.Radius);
-        OperationTitleText.Text = operationTitle;
+        OperationTitleText.Text = selectedOperation!.Title;
+        AutomationProperties.SetName(OperationPicker, T("Running tasks"));
+        palette.ApplySurfaceResources(OperationPicker);
         OperationTitleText.Foreground = Palette.Brush(palette.Text);
         OperationPhaseText.Foreground = Palette.Brush(palette.Muted);
         var progress = activeOperation.Current;
@@ -56,6 +66,7 @@ public sealed partial class MainWindow
             OperationPhase.Extracting => "Extracting files", OperationPhase.Finalizing => "Finishing up",
             OperationPhase.Compiling => "Compiling CPython", OperationPhase.Assembling => "Assembling runtime", OperationPhase.Testing => "Testing runtime",
             OperationPhase.Training => "Training PGO",
+            OperationPhase.ManagingPackages => "Managing packages",
             OperationPhase.Stopping => "Stopping…", _ => "Preparing"
         });
         OperationPhaseText.Text = progress.Percent is { } percent
@@ -74,6 +85,18 @@ public sealed partial class MainWindow
         CancelOperationButton.Content = T(activeOperation.IsCancellationRequested ? "Stopping…" : "Cancel");
         CancelOperationButton.IsEnabled = operationCanCancel && !activeOperation.IsCancellationRequested;
         palette.ApplySurfaceResources(CancelOperationButton);
+    }
+    private void RefreshOperationChoices()
+    {
+        OperationPicker.Items.Clear();
+        foreach (var item in runningOperations) OperationPicker.Items.Add(new ComboBoxItem { Content = item.Title, Tag = item });
+        OperationPicker.SelectedItem = OperationPicker.Items.Cast<ComboBoxItem>().FirstOrDefault(item => ReferenceEquals(item.Tag, selectedOperation));
+        OperationPicker.Visibility = runningOperations.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+    }
+    private void OperationPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (OperationPicker.SelectedItem is ComboBoxItem { Tag: RunningOperation item })
+        { selectedOperation = item; UpdateOperationPanel(); }
     }
     private async void CancelOperation_Click(object sender, RoutedEventArgs e) => await RequestOperationCancellationAsync();
     private async Task RequestOperationCancellationAsync()
@@ -98,7 +121,8 @@ public sealed partial class MainWindow
     }
     private async Task ReconcileCancelledOperationAsync(bool download = false, PythonRuntime? target = null)
     {
-        operationCanCancel = false; UpdateOperationPanel();
+        // The caller owns finalization; never change another selected task's cancel state.
+        UpdateOperationPanel();
         try
         {
             installed = await ListInstalledAsync();

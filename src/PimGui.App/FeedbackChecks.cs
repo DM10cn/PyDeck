@@ -157,6 +157,7 @@ public sealed partial class MainWindow
             var errorCount = activityLog.Entries.Count(e => e.Message == "feedback-error");
             if (errorCount != Array.IndexOf(Strings.Languages, language) + 1) throw new IOException("Errors logged twice");
             Log("feedback-live-error", ActivityLevel.Error);
+            await WaitForSmokeConditionAsync(() => NormalizeLines(ActivityVisibleText) == NormalizeLines(activityLog.Text(ActivityLevel.Error)), "Batched live activity did not refresh");
             if (!ActivityVisibleText.Contains("feedback-live-error") || ActivityVisibleText.Contains("feedback-warning")) throw new IOException("Live filtering failed");
             Navigate("runtimes"); Navigate("activity"); Root.UpdateLayout();
             await WaitForSmokeConditionAsync(() => activityFilter == ActivityLevel.Error &&

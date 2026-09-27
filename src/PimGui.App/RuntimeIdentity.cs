@@ -34,17 +34,14 @@ public sealed partial class MainWindow
     private async void RefreshDatabase_Click(object sender, RoutedEventArgs e) => await RefreshDatabaseAsync();
     private async Task RefreshDatabaseAsync()
     {
-        if (busy || confirmationOpen) return;
+        if (confirmationOpen || !CanWork(WorkKind.Runtimes) || !CanWork(WorkKind.Catalog)) return;
         if (!connected) { await ConnectAsync(); if (!connected) return; }
-        SetBusy(true, "Refreshing database");
-        try
-        {
-            installed = await ListInstalledAsync();
-            if (OfflineSource && offlineBundle is not null) offlineBundle = await Task.Run(() => OfflineBundle.Load(offlineBundle.DirectoryPath));
-            else if (!OfflineSource) catalog = await client.ListCatalogAsync();
-            MessageBar.IsOpen = false; StatusText.Text = T("Up to date · {0}", DateTime.Now.ToString("t"));
-        }
-        catch (Exception ex) { catalog = null; ShowError(ex); }
-        finally { SetBusy(false); }
+        // Both paths own their own leases. A catalog failure must not erase a valid
+        // installed list, and switching offline can cancel this same catalog request.
+        var versions = RefreshInstalledAsync();
+        var releases = OfflineSource
+            ? offlineBundle is { } bundle ? LoadOfflineFolderAsync(bundle.DirectoryPath) : Task.CompletedTask
+            : LoadCatalogAsync();
+        await Task.WhenAll(versions, releases);
     }
 }

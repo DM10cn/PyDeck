@@ -18,7 +18,7 @@ internal static class BuildProcess
             StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8 };
         // Drop developer-shell injections and Python discovery overrides. All build inputs are explicit.
         foreach (var key in start.Environment.Keys.ToArray())
-            if (key.StartsWith("PYTHON", StringComparison.OrdinalIgnoreCase) || key.StartsWith("PYMANAGER", StringComparison.OrdinalIgnoreCase) ||
+            if (key.StartsWith("PIP_", StringComparison.OrdinalIgnoreCase) || key.StartsWith("PYTHON", StringComparison.OrdinalIgnoreCase) || key.StartsWith("PYMANAGER", StringComparison.OrdinalIgnoreCase) ||
                 key.StartsWith("MSBUILD", StringComparison.OrdinalIgnoreCase) || key.StartsWith("VSCMD", StringComparison.OrdinalIgnoreCase) ||
                 key.StartsWith("VCTools", StringComparison.OrdinalIgnoreCase) || key.StartsWith("WindowsSDK", StringComparison.OrdinalIgnoreCase) ||
                 new[] { "EXTERNALS_DIR", "HOST_PYTHON", "VIRTUAL_ENV", "CL", "_CL_", "LINK", "_LINK_", "INCLUDE", "LIB", "LIBPATH", "TCL_LIBRARY", "TK_LIBRARY", "Platform", "Configuration" }.Contains(key, StringComparer.OrdinalIgnoreCase))

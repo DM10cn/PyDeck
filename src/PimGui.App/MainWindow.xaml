@@ -62,6 +62,7 @@
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
         <StackPanel Spacing="4">
+         <ComboBox x:Name="OperationPicker" Visibility="Collapsed" SelectionChanged="OperationPicker_SelectionChanged" HorizontalAlignment="Stretch"/>
          <TextBlock x:Name="OperationTitleText" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
          <TextBlock x:Name="OperationPhaseText" FontSize="12" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
         </StackPanel>

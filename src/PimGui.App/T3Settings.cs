@@ -9,18 +9,25 @@ public sealed partial class MainWindow
 {
     private async Task CheckAppUpdateAsync()
     {
-        if (busy || confirmationOpen) return;
-        confirmationOpen = true; SetBusy(true, "Checking PyDeck updates");
+        if (confirmationOpen) return;
+        using var work = StartWork(WorkKind.AppUpdate);
+        if (work is null) return;
+        StatusText.Text = T("Checking PyDeck updates");
         try
         {
             using var http = preferences.Network.CreateClient(ProxyPassword());
             var release = await AppUpdates.CheckAsync(http, typeof(MainWindow).Assembly.GetName().Version!);
             if (release is null) { Notify("PyDeck is up to date", InfoBarSeverity.Success); return; }
-            if (await Dialog("PyDeck update available", T("Version {0} is available on GitHub", release.Version), "Open release page").ShowAsync() == ContentDialogResult.Primary)
-                OpenUrl(release.Page.AbsoluteUri);
+            if (confirmationOpen || cancelDialogOpen) { Notify(T("Version {0} is available on GitHub", release.Version), InfoBarSeverity.Informational); return; }
+            confirmationOpen = true;
+            try
+            {
+                if (await Dialog("PyDeck update available", T("Version {0} is available on GitHub", release.Version), "Open release page").ShowAsync() == ContentDialogResult.Primary)
+                    OpenUrl(release.Page.AbsoluteUri);
+            }
+            finally { confirmationOpen = false; }
         }
         catch (Exception) { Notify("Could not check for updates. Try again later", InfoBarSeverity.Warning); }
-        finally { confirmationOpen = false; SetBusy(false); }
     }
     private async Task<bool> ConfirmDownloadOriginAsync(Uri uri)
     {
@@ -39,11 +46,11 @@ public sealed partial class MainWindow
             var actions = Toolbar(reset); body.Children.Add(actions);
         InlineAction(actions, "Save", async result => {
             var index = InstallationSource.Validate(input.Text.Trim());
-            if (index != InstallationSource.Official && await Dialog("Trust this source?", index + "\n\n" + T("A checksum verifies files, not the publisher"), "Trust source").ShowAsync() != ContentDialogResult.Primary) return;
+            if (index != InstallationSource.Official && await ShowGuardedDialogAsync(Dialog("Trust this source?", index + "\n\n" + T("A checksum verifies files, not the publisher"), "Trust source")) != ContentDialogResult.Primary) return;
             var updated = preferences with { InstallationIndex = index == InstallationSource.Official ? "" : index };
             store.Save(updated); preferences = updated; catalog = null;
             result.Applied = true;
-            Notify("Source saved. Reload the catalog to continue", InfoBarSeverity.Informational);        });
+            Notify("Source saved. Reload the catalog to continue", InfoBarSeverity.Informational);        }, kind: WorkKind.NetworkSettings, section: "Installation source");
         return body;
     }
     private UIElement BuildShebangEditor()
@@ -112,10 +119,10 @@ public sealed partial class MainWindow
             var review = string.Join("\n\n", edits.Select(pair => pair.Key == "shebang_can_run_anything"
                 ? T("Run non-Python programs") + ": " + DisplayMode(snapshot.Values[pair.Key]) + " → " + DisplayMode(pair.Value)
                 : T("Shebang rules") + "\n" + DisplayRules(pair.Value)));
-            if (await Dialog("Review changes", review, "Save").ShowAsync() != ContentDialogResult.Primary) return;
+            if (await ShowGuardedDialogAsync(Dialog("Review changes", review, "Save")) != ContentDialogResult.Primary) return;
             using (client.AcquireConfigurationLock()) PimConfiguration.Save(snapshot, edits);
             result.Applied = true;
-            Notify("Shebang rules saved", InfoBarSeverity.Success);        }, snapshot.Overrides.Count == 0);
+            Notify("Shebang rules saved", InfoBarSeverity.Success);        }, snapshot.Overrides.Count == 0, section: "Shebang rules");
         return body;
     }
 }

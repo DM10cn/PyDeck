@@ -52,7 +52,10 @@ try {
     [xml]$project = Get-Content -LiteralPath 'src/PimGui.App/PimGui.App.csproj' -Raw
     $version = [string]$project.Project.PropertyGroup.Version
     if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'The release version must have three numeric components.' }
-    $output = Join-Path $repoRoot ('artifacts\release-' + $version + '-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+    $labelNode = $project.SelectSingleNode('/Project/PropertyGroup/InformationalVersion')
+    $releaseLabel = if ($labelNode) { $labelNode.InnerText } else { $version }
+    if ($releaseLabel -notmatch ('^' + [regex]::Escape($version) + '(?:-[A-Za-z0-9][A-Za-z0-9.-]*)?$')) { throw 'Release label must match the numeric installer version.' }
+    $output = Join-Path $repoRoot ('artifacts\release-' + $releaseLabel + '-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
     $work = Join-Path $output 'work'
     $assets = Join-Path $output 'assets'
     $payload = Join-Path $work 'payload'
@@ -106,7 +109,7 @@ try {
         }
         Export-Certificate -Cert $certificate -FilePath (Join-Path $assets 'PyDeck-preview.cer') | Out-Null
     }
-    Copy-Item -LiteralPath (Join-Path $payload 'PyDeck.Launcher.exe') -Destination (Join-Path $assets "PyDeck-Dependencies-$version-win-x64.exe")
+    Copy-Item -LiteralPath (Join-Path $payload 'PyDeck.Launcher.exe') -Destination (Join-Path $assets "PyDeck-Dependencies-$releaseLabel-win-x64.exe")
 
     # Generate explicit per-user components with stable HKCU key paths; no recursive installer deletion.
     $fragment = [Text.StringBuilder]::new()
@@ -142,7 +145,7 @@ try {
     $licenseText = (Get-Content -LiteralPath LICENSE -Raw).Replace('\', '\\').Replace('{', '\{').Replace('}', '\}') -replace '\r?\n', '\par '
     $licenseRtf = Join-Path $work 'License.rtf'
     [IO.File]::WriteAllText($licenseRtf, '{\rtf1\ansi\deff0 {\fonttbl {\f0 Segoe UI;}}\f0\fs18 ' + $licenseText + '}', [Text.Encoding]::ASCII)
-    $msi = Join-Path $assets "PyDeck-$version-win-x64.msi"
+    $msi = Join-Path $assets "PyDeck-$releaseLabel-win-x64.msi"
     Invoke-Checked $WixCommand @('build', 'packaging/msi/Package.wxs', 'packaging/msi/InstallOptions.wxs', $fragmentPath, '-arch', 'x64', '-ext', 'WixToolset.UI.wixext/7.0.0', '-d', "ProductVersion=$version", '-d', "PayloadDir=$payload", '-d', "LicenseRtf=$licenseRtf", '-d', ('InstallerActions=' + (Join-Path $work 'native\PyDeck.InstallerActions.dll')), '-pdbtype', 'none', '-intermediatefolder', (Join-Path $work 'wix'), '-o', $msi)
 
     $msixStage = Join-Path $work 'msix'
@@ -166,7 +169,7 @@ try {
     $manifest.Package.Identity.Version = "$version.0"
     if ($certificate -and $manifest.Package.Identity.Publisher -ne $certificate.Subject) { throw 'Certificate subject must match the MSIX publisher identity.' }
     $manifest.Save((Join-Path $msixStage 'AppxManifest.xml'))
-    $msix = Join-Path $assets "PyDeck-$version-win-x64.msix"
+    $msix = Join-Path $assets "PyDeck-$releaseLabel-win-x64.msix"
     Invoke-Checked (Join-Path $sdkTools 'makeappx.exe') @('pack', '/d', $msixStage, '/p', $msix, '/h', 'SHA256', '/o')
     if ($certificate) {
         foreach ($package in @($msi, $msix)) {
@@ -174,6 +177,7 @@ try {
         }
     }
     $metadata = [ordered]@{ version = $version; sourceCommit = $sourceCommit; sourceDirty = $sourceDirty; signed = [bool]$certificate; certificateThumbprint = $CertificateThumbprint; certificateExpires = $(if ($certificate) { $certificate.NotAfter.ToUniversalTime().ToString('o') } else { $null }); assets = $assets; payload = $payload }
+    $metadata.releaseLabel = $releaseLabel
     $metadata | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'build.json') -Encoding utf8
     Set-Content -LiteralPath (Join-Path $repoRoot 'artifacts\latest-release.txt') -Value $output -Encoding utf8
     Write-Output "Release packages: $assets"

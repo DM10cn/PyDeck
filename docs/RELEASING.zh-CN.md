@@ -1,5 +1,7 @@
 # 🚀 发行流程
 
+可选的 `InformationalVersion` 指定应用显示版本及下载文件名，例如 `0.7.0-fix`，必须以数字 `Version` 开头。安装器内部版本和正式 Git 标签仍使用数字，构建记录同时保存两者。仅修改显示名称不构成安装升级，后续发行必须递增 `Version`
+
 [English](RELEASING.md) · **简体中文** · [🏠 首页](../README.zh-CN.md)
 
 ## 🧰 工具

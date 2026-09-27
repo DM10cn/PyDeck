@@ -1,6 +1,9 @@
 using PimGui.Core;
 using System.Text.Json.Nodes;
 
+if (args.Length == 4 && args[0] == "--management-live")
+    return await Management070Checks.LiveAsync(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]), args[3] == "-" ? "-" : Path.GetFullPath(args[3]));
+
 // Opt-in integration harness. Uses only the caller's isolated directory and never mutates PIM installations.
 if (args.Length is 3 or 4 && args[0] is "--build-python" or "--build-python-cancel")
 {
@@ -133,7 +136,8 @@ await CheckAsync("Atomic settings retries reject an intervening external edit", 
     try { await WaitForStagedWriteAsync(path); File.WriteAllText(path, "external value"); }
     finally { reader.Dispose(); }
     try { await writer; throw new Exception("External edit was overwritten"); }
-    catch (IOException ex) { Require(ex.Message.Contains("changed while saving"), "Unexpected failure: " + ex.Message); }
+    // The external writer can overlap the retry's read. A sharing violation is also a safe refusal.
+    catch (IOException ex) { Require(ex.Message.Contains("changed while saving") || (ex.HResult & 0xffff) == 32, "Unexpected failure: " + ex.Message); }
     Require(File.ReadAllText(path) == "external value", "External edit was lost");
 });
 
@@ -508,6 +512,9 @@ await ManagementChecks.RunAsync(Check, CheckAsync, scratch);
 await T3Checks.RunAsync(Check, CheckAsync, scratch);
 await HistoricalChecks.RunAsync(Check, CheckAsync, scratch);
 await BuildChecks.RunAsync(Check, CheckAsync, scratch);
+Management070Checks.Run(Check, scratch);
+WorkCoordinatorChecks.Run(Check);
+PerformanceChecks.Run(Check);
 if (args.Contains("--live-history"))
 {
     await CheckAsync("Official paginated history contains earlier micros without changing installed Python", async () =>

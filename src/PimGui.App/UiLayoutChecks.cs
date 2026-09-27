@@ -41,7 +41,7 @@ public sealed partial class MainWindow
                 throw new IOException("Historical micro releases sharing a PIM ID were hidden or ordered incorrectly");
             var currentAction = Descendants(historicalRows[0]).OfType<Button>().Single(button => AutomationProperties.GetName(button) == T("Installed"));
             var previousAction = Descendants(historicalRows[1]).OfType<Button>().Single(button => AutomationProperties.GetName(button) == T("Install"));
-            if (currentAction.IsEnabled || previousAction.IsEnabled != (connected && client.SupportsMutations && !busy))
+            if (currentAction.IsEnabled || previousAction.IsEnabled != (connected && client.SupportsMutations && CanWork(WorkKind.RuntimeMutation)))
                 throw new IOException("Installed status was compared by minor ID instead of exact micro release");
             if (Descendants(series).OfType<Expander>().Any()) throw new IOException("Catalog has nested category expanders");
             var type = Descendants(PageHost).OfType<ComboBox>().Single(box => AutomationProperties.GetName(box) == T("Package type"));

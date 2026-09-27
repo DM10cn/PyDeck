@@ -6,12 +6,13 @@ Add-Type -AssemblyName System.Security.Cryptography.Pkcs
 $release = (Resolve-Path -LiteralPath $ReleaseDirectory).Path
 $metadata = Get-Content -LiteralPath (Join-Path $release 'build.json') -Raw | ConvertFrom-Json
 $assets = Join-Path $release 'assets'
-$msixPath = Join-Path $assets ("PyDeck-{0}-win-x64.msix" -f $metadata.version)
-$msiPath = Join-Path $assets ("PyDeck-{0}-win-x64.msi" -f $metadata.version)
+$assetVersion = if ($metadata.releaseLabel) { $metadata.releaseLabel } else { $metadata.version }
+$msixPath = Join-Path $assets ("PyDeck-{0}-win-x64.msix" -f $assetVersion)
+$msiPath = Join-Path $assets ("PyDeck-{0}-win-x64.msi" -f $assetVersion)
 $certificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new((Join-Path $assets 'PyDeck-preview.cer'))
 if (!$metadata.signed -or $metadata.certificateThumbprint -ne $certificate.Thumbprint) { throw 'Signing metadata does not match the public certificate.' }
 if ($certificate.HasPrivateKey) { throw 'A release certificate must not contain a private key.' }
-foreach ($path in @($msiPath, $msixPath, (Join-Path $metadata.payload 'PyDeck.exe'), (Join-Path $metadata.payload 'PyDeck.Launcher.exe'), (Join-Path $assets ("PyDeck-Dependencies-{0}-win-x64.exe" -f $metadata.version)))) {
+foreach ($path in @($msiPath, $msixPath, (Join-Path $metadata.payload 'PyDeck.exe'), (Join-Path $metadata.payload 'PyDeck.Launcher.exe'), (Join-Path $assets ("PyDeck-Dependencies-{0}-win-x64.exe" -f $assetVersion)))) {
     $signature = Get-AuthenticodeSignature -LiteralPath $path
     if (!$signature.SignerCertificate -or $signature.SignerCertificate.Thumbprint -ne $certificate.Thumbprint) { throw "Unexpected signer: $path" }
     if ($signature.Status -eq 'HashMismatch' -or $signature.Status -eq 'NotSigned') { throw "Invalid signature: $path" }

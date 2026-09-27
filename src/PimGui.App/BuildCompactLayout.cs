@@ -5,6 +5,12 @@ namespace PimGui.App;
 
 public sealed partial class MainWindow
 {
+    private ComboBox BuildChoice((string Id, string Label)[] options, string selected, Action<string> changed, string name)
+    {
+        var box = Choice(options, selected, changed, name);
+        BindAvailability(box, () => CanWork(PimGui.Core.WorkKind.Build));
+        return box;
+    }
     private StackPanel BuildField(string title, FrameworkElement control)
     {
         var field = new StackPanel { Spacing = 6 };

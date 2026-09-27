@@ -120,6 +120,10 @@ dotnet run --project tests/PimGui.Checks -- --offline-fixture "C:\TestBundles\Py
 
 ## 🧰 T3 检查
 
+⚡ 通知合并、版本排序测量和登记并发检查见 [性能与状态一致性](PERFORMANCE_070.md#简体中文)，完整 GUI 检查支持 `-TimeoutSeconds`，默认 300 秒
+
+🧪 0.7.0 可运行 `dotnet run --project tests/PimGui.Checks -c Release -- --management-live <全新临时目录> <可信python.exe> -`，下载独立辅助 Python、检测编译器、创建隔离 venv、补装 pip 并从 PyPI 安装和卸载 colorama，同时检查 requirements 往返、外部 PIP_TARGET 隔离和预取消。只能使用全新的临时目录；将 `-` 换为已验证的本地 NuGet 包可测试缓存准备。普通核心检查覆盖参数注入、陈旧清理、确认后新增环境依赖和归档越界，GUI 检查覆盖四种语言、两种风格与两档宽度
+
 核心检查覆盖正式版本信息、源地址与跨站重定向确认、过期源快照、Shebang 保留与冲突，以及未完成环境的保留。将 `PYDECK_TEST_VENV_PYTHON` 设为可信的本机 Python 路径，可追加真实临时 venv 创建、检查和移除记录测试，测试文件留在已忽略的 artifacts 目录
 
 `Test-PimLifecycle.ps1 -T3Only` 在一次性 Windows Sandbox 中运行安装源、Shebang 和 venv 验收。HTTPS 测试仅在沙箱内创建短期 localhost 证书，结束后移除其信任条目，不更改宿主机证书信任。不加 `-T3Only` 则运行完整生命周期

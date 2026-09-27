@@ -59,7 +59,7 @@ public static class HistoricalCatalog
             next = new Uri(InstallationSource.Validate(new Uri(effectiveUrl, nextText).AbsoluteUri));
             await RequireOriginAsync(effectiveUrl, next, confirmOrigin);
         }
-        return entries.Values.OrderByDescending(r => r.Version, Comparer<string>.Create(RuntimeCatalog.CompareVersions)).ThenBy(r => r.Id, StringComparer.OrdinalIgnoreCase).ToArray();
+        return entries.Values.OrderByDescending(r => RuntimeCatalog.VersionKey(r.Version)).ThenBy(r => r.Id, StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
     private static async Task<(string Json, Uri Url, int Bytes)> ReadAsync(HttpClient client, Uri url,
