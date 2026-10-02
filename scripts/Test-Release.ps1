@@ -17,6 +17,12 @@ foreach ($path in @($msiPath, $msixPath, (Join-Path $metadata.payload 'PyDeck.ex
     if (!$signature.SignerCertificate -or $signature.SignerCertificate.Thumbprint -ne $certificate.Thumbprint) { throw "Unexpected signer: $path" }
     if ($signature.Status -eq 'HashMismatch' -or $signature.Status -eq 'NotSigned') { throw "Invalid signature: $path" }
 }
+if ($metadata.setup) {
+    $setupPath = Join-Path $assets ("PyDeck-Setup-{0}-win-x64.exe" -f $assetVersion)
+    $signature = Get-AuthenticodeSignature -LiteralPath $setupPath
+    if (!$signature.SignerCertificate -or $signature.SignerCertificate.Thumbprint -ne $certificate.Thumbprint -or $signature.Status -in 'HashMismatch','NotSigned') { throw 'Invalid Setup signature.' }
+    & (Join-Path $PSScriptRoot 'Test-Setup.ps1') -SetupPath $setupPath -MsiPath $msiPath
+}
 $archive = [IO.Compression.ZipFile]::OpenRead($msixPath)
 function Read-EntryText([string]$Name) {
     $entry = $archive.GetEntry($Name)

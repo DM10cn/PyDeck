@@ -10,7 +10,7 @@
      <TextBlock Text="{Binding Time}" FontSize="12" Foreground="{Binding MutedBrush}" MinWidth="60" Margin="0,3,0,0"/>
      <TextBlock Grid.Column="1" Text="{Binding Level}" FontSize="12" FontWeight="SemiBold" Foreground="{Binding LevelBrush}" MinWidth="52" Margin="0,3,0,0"/>
      <TextBlock Grid.Column="2" Text="{Binding Message}" FontSize="{Binding MessageSize}" FontFamily="{Binding MessageFont}" Foreground="{Binding TextBrush}" TextWrapping="Wrap" IsTextSelectionEnabled="True" Visibility="{Binding TextVisibility}"/>
-     <Expander Grid.Column="2" Header="{Binding Summary}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Visibility="{Binding DetailVisibility}">
+     <Expander Grid.Column="2" Header="{Binding Summary}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Visibility="{Binding DetailVisibility}" Loaded="OnDesignExpanderLoaded">
       <TextBlock Text="{Binding Message}" FontSize="13" FontFamily="{Binding MessageFont}" Foreground="{Binding TextBrush}" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
      </Expander>
     </Grid>
@@ -22,36 +22,21 @@
     <TextBlock Tag="ShellLabel" Text="PyDeck" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
    </StackPanel>
   </Grid>
-  <Grid Grid.Row="1">
-   <Grid.ColumnDefinitions><ColumnDefinition Width="220"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-   <Grid Padding="14,20,14,16">
-    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-    <StackPanel Margin="14,4,0,32" Spacing="10">
+  <!-- The selected presentation takes ownership of these shared application surfaces at startup. -->
+  <Grid Grid.Row="1" x:Name="ShellHost">
+    <StackPanel x:Name="BrandPanel" Margin="14,4,0,24" Spacing="10">
      <Border x:Name="BrandMark" Width="44" Height="44" CornerRadius="14" HorizontalAlignment="Left">
       <Image Source="Assets/AppIcon.png" AutomationProperties.Name="PyDeck"/>
      </Border>
      <TextBlock Tag="ShellLabel" Text="A home for Python." FontSize="14" FontWeight="SemiBold" Margin="0,2,0,0"/>
      <TextBlock Tag="ShellLabel" Text="Your versions, in one place." FontSize="11" Opacity="0.6"/>
     </StackPanel>
-    <StackPanel Grid.Row="1" Spacing="6" x:Name="NavPanel">
-     <Button x:Name="RuntimesNav" Tag="runtimes" Click="Nav_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
-      <StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE8F1;" FontSize="18"/><TextBlock Tag="ShellLabel" Text="My Python" VerticalAlignment="Center"/></StackPanel>
-     </Button>
-     <Button x:Name="CatalogNav" Tag="catalog" Click="Nav_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"><StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE896;" FontSize="18"/><TextBlock Tag="ShellLabel" Text="Install Python" VerticalAlignment="Center"/></StackPanel></Button>
-     <Button x:Name="EnvironmentsNav" Tag="environments" Click="Nav_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"><StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE8B7;" FontSize="18"/><TextBlock Tag="ShellLabel" Text="Virtual environments" VerticalAlignment="Center"/></StackPanel></Button>
-     <Button x:Name="BuildNav" Tag="build" Click="Nav_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"><StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE90F;" FontSize="18"/><TextBlock Tag="ShellLabel" Text="Build Python" VerticalAlignment="Center"/></StackPanel></Button>
-     <Button x:Name="ActivityNav" Tag="activity" Click="Nav_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"><StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE9D9;" FontSize="18"/><TextBlock Tag="ShellLabel" Text="Activity" VerticalAlignment="Center"/></StackPanel></Button>
-    </StackPanel>
-    <StackPanel Grid.Row="2" Spacing="16">
-     <Button x:Name="SettingsNav" Tag="settings" Click="Nav_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"><StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE713;" FontSize="18"/><TextBlock Tag="ShellLabel" Text="Settings" VerticalAlignment="Center"/></StackPanel></Button>
      <Border x:Name="ConnectionCard" Padding="12,6" CornerRadius="4">
       <StackPanel Spacing="4">
        <StackPanel Orientation="Horizontal" Spacing="8"><Ellipse x:Name="ConnectionDot" Width="6" Height="6"/><TextBlock x:Name="ConnectionText" Text="Connecting…" FontSize="12" FontWeight="SemiBold"/></StackPanel>
       </StackPanel>
      </Border>
-    </StackPanel>
-   </Grid>
-   <Border Grid.Column="1" x:Name="PageSurface" Margin="0,6,14,0" CornerRadius="24" Padding="30,26,30,22">
+   <Border x:Name="PageSurface" CornerRadius="24" Padding="24">
     <Grid x:Name="ContentColumn" MaxWidth="1160">
      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
      <InfoBar x:Name="MessageBar" Grid.Row="0" IsOpen="False" IsClosable="True" Margin="0,0,0,14"/>

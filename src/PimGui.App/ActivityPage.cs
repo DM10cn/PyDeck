@@ -45,7 +45,7 @@ public sealed partial class MainWindow
                 RefreshActivityOutput(reset: true);
             }, "Activity level");
         level.IsEnabled = true;
-        var clear = palette.Action("Clear", "\uE74D", compact: true);
+        var clear = palette.Action("Clear", "\uE74D", compact: true, role: ActionRole.Quiet);
         clear.Click += (_, _) => { activityLog.Clear(); RefreshActivityOutput(reset: true); };
         var copy = palette.Action("Copy log", "\uE8C8", compact: true);
         copy.Click += (_, _) => { if (Copy(activityLog.Text(activityFilter))) StatusText.Text = T("Activity copied to clipboard"); };

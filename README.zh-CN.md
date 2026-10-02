@@ -10,13 +10,24 @@
 
 PyDeck 是 **Python Install Manager** 的原生 **WinUI 3** 图形界面，支持查看解释器、安装版本、设置默认版本和管理离线包，并提供 **Windows Fluent** 与 **Material 3 Expressive** 两种界面风格
 
-📦 **正式版 · 0.7.0-fix** · 🪟 **Windows 11 x64** · 📄 **MIT**
+📦 **正式版 · 0.7.1-fix** · 🪟 **Windows 11 x64** · 📄 **MIT**
 
 ## 📦 下载
 
-从 [GitHub Releases](https://github.com/DM10cn/PyDeck/releases) 获取 **MSI**、**MSIX** 和 **独立依赖工具**，源码使用 Assets 中 GitHub 自动提供的 **Source code (zip)** / **Source code (tar.gz)** 链接。依赖要求、安装选项与 MSIX 证书信任步骤统一见 [安装说明](docs/INSTALL.zh-CN.md)
+从 [GitHub Releases](https://github.com/DM10cn/PyDeck/releases) 获取安装包，选择一种安装格式：
 
-**0.7.0-fix 新增**：🧰 独立构建辅助 Python 准备、🧹 构建空间清理、🔗 运行时使用关系及 📦 虚拟环境包与 pip 管理。后台操作分别控制进度和按钮，合并高频刷新，并改进环境状态一致性。详见[发行说明](docs/releases/0.7.0-fix.md#简体中文)、[管理指南](docs/MANAGEMENT_070.md#简体中文)与[性能说明](docs/PERFORMANCE_070.md#简体中文)
+| 下载文件 | 用途 |
+| --- | --- |
+| `PyDeck-Setup-0.7.1-fix-win-x64.exe` | 离线准备运行依赖，再进入 MSI 向导 |
+| `PyDeck-0.7.1-fix-win-x64.msi` | 当前用户独立安装包，运行时需另行准备 |
+| `PyDeck-0.7.1-fix-win-x64.msix` | Windows 管理的安装包，需要运行依赖与证书信任 |
+| `PyDeck-Dependencies-0.7.1-fix-win-x64.exe` | 就绪检查清单与官方下载入口，不安装 PyDeck |
+
+源码使用 Assets 中 GitHub 自动提供的 **Source code (zip)** / **Source code (tar.gz)** 链接。依赖要求、安装选项与 MSIX 证书信任步骤统一见 [安装说明](docs/INSTALL.zh-CN.md)
+
+**0.7.1-fix 新增**：🎨 分离的 Fluent 与 Material 3 Expressive 界面、基于壁纸的莫奈配色、手动基础色与可选双色方案，以及切换界面风格时可取消的重启弹窗。Material 搜索框、下拉菜单、展开项、滚动条及刷新 / 操作进度条统一跟随所选风格和配色。详见[外观说明](#-外观与语言)、[功能状态](docs/FEATURES.zh-CN.md)与[取色引擎源码说明](docs/MONET.md)
+
+**0.7.0-fix** 的管理功能继续保留：独立构建辅助 Python 准备、构建空间清理、运行时使用关系，以及虚拟环境包与 pip 管理。详见[管理指南](docs/MANAGEMENT_070.md#简体中文)与[历史性能说明](docs/PERFORMANCE_070.md#简体中文)
 
 **0.6.1 引入的功能继续保留**：🧰 虚拟环境、🌐 自定义 HTTPS 安装源、📜 Shebang 规则、🔔 在浏览器中打开的应用更新入口、页内 Python 设置、Python / 类型 / EAP 图标及数据库刷新。MSI 继续使用完整包覆盖升级，保留设置和安装选项
 
@@ -27,10 +38,10 @@ PyDeck 是 **Python Install Manager** 的原生 **WinUI 3** 图形界面，支�
 - 📦 **离线使用** — 在联网电脑下载 PIM 离线包，复制到另一台电脑安装
 - ⏳ **查看操作进度** — 持续显示阶段进度，支持取消安装、更新和离线下载
 - 🛠️ **管理解释器** — 更新、卸载、设为默认、打开终端或文件夹、复制路径
-- 🎨 **调整外观** — Fluent / Material 3 Expressive、跟随系统 / 浅色 / 深色，以及 Fluent 专属的 Mica / Acrylic
+- 🎨 **调整外观** — 分离的 Fluent / Material 3 Expressive 界面、跟随系统 / 浅色 / 深色、Fluent 的 Mica / Acrylic，以及 Material 的壁纸 / 手动动态配色
 - 🌏 **切换语言** — 默认英语，另有简体中文、繁体中文（台湾）和日语
 - 🧰 **补齐运行依赖** — 打开运行时或 Python Install Manager 官方下载页面，手动安装后重新检查或连接
-- 🗂️ **选择安装方式** — MSI 支持目录浏览、可选桌面和开始菜单快捷方式，升级时保留选择
+- 🗂️ **选择安装方式** — MSI 支持目录浏览、可选桌面和开始菜单快捷方式、首次界面风格选择，升级时保留已有偏好
 
 **0.6.0 新增**：操作结果核验、PATH / 别名诊断、PIM 配置备份与恢复、使用 Windows 凭据管理器的 HTTP 代理、真实下载量 / 速度 / 剩余时间，以及解释器检查和 PIM 修复。使用方法见 [Python 管理指南](docs/MANAGEMENT.zh-CN.md)，已发布的 0.5.1 安装包不包含这些新增功能
 
@@ -40,7 +51,9 @@ PyDeck 是 **Python Install Manager** 的原生 **WinUI 3** 图形界面，支�
 
 PyDeck 面向 **Windows 11 x64**。完整 GUI 需要 **.NET Runtime 10 x64** 和 **Windows App Runtime**；MSI / 非打包 GUI 还需要 **Visual C++ v14 x64**。具体版本、官方下载来源与不同安装格式的要求统一见 [安装说明](docs/INSTALL.zh-CN.md)
 
-原生依赖窗口可在这些运行时尚未安装时打开。**管理 Python 需要 Python Install Manager，但缺少它不会阻止打开 GUI**：可从应用中的官方链接下载，手动安装后重新连接。PyDeck 不内置或静默安装这些依赖
+原生依赖窗口可在这些运行时尚未安装时打开。**管理 Python 需要 Python Install Manager，但缺少它不会阻止打开 GUI**：可从应用中的官方链接下载，手动安装后重新连接。独立 MSI 与 MSIX 需要另行安装运行时
+
+📦 **离线 Setup：**`PyDeck-Setup-0.7.1-fix-win-x64.exe` 可使用内嵌安装程序补装缺失运行时，再进入 MSI 向导；已有兼容运行时会跳过，仅准备依赖模式可供另行安装 MSIX 使用。独立依赖检查器仅显示就绪状态并打开官方下载页面。详见[安装说明](docs/INSTALL.zh-CN.md)，普通用户无需安装 SDK
 
 Windows 10 支持暂缓，下面的 Visual Studio 和编译工具仅供源码构建使用
 
@@ -48,7 +61,7 @@ Windows 10 支持暂缓，下面的 Visual Studio 和编译工具仅供源码构
 
 使用 **Visual Studio 2026**，安装 **WinUI 应用程序开发**、**.NET 10 SDK** 和 **Windows SDK 26100**。SDK 基线见 `global.json`，NuGet 依赖包含锁定文件
 
-编译原生依赖启动器还需要 **MSVC x64/x86 编译工具**组件，包括 C++ 标准头文件与桌面库。发布目录通过 `PyDeck.Launcher.exe` 启动，C++ 基础库静态链接，仅导入 Windows 系统 DLL
+编译原生依赖启动器和取色引擎还需要 **MSVC x64/x86 编译工具**组件，包括 C++ 标准头文件与桌面库。MSBuild 会从固定版本源码生成 `PyDeck.Colors.dll` 并复制到应用输出。发布目录通过 `PyDeck.Launcher.exe` 启动；启动器静态链接 C++ 基础库，仅导入 Windows 系统 DLL
 
 ```powershell
 git clone https://github.com/DM10cn/PyDeck.git
@@ -75,21 +88,25 @@ PyDeck 接受包含 SHA-256 校验值的独立本地离线包，并在安装前�
 
 ## ⏳ 进度与取消
 
-操作面板在切换页面后仍然可见。0.6.0下载官方包时显示真实字节数、平滑速度和可靠时的剩余时间，不足 1 MB 显示 KB。解压仍使用 PIM 输出中的**阶段约数进度**，未知阶段使用不定进度条；已发布的 0.5.1 下载进度也使用约数
+操作面板在切换页面后仍然可见。下载官方包时显示真实字节数、平滑速度和可靠时的剩余时间，不足 1 MB 显示 KB。解压仍使用 PIM 输出中的**阶段约数进度**，未知阶段使用不定进度条。Material 的刷新与操作进度条使用当前主色和对应色调轨道，Fluent 保留原生进度条样式
 
 Python 安装、更新和离线下载支持停止。停止安装需要确认，且**可能留下部分文件**。PyDeck 会等待当前进程退出并刷新安装列表，不承诺自动回滚；Python 卸载不支持中途取消。这里指 PyDeck 内的 Python 操作，不是 MSI / MSIX 安装向导
 
 ## 🎨 外观与语言
 
-Fluent 提供 **透明效果：使用 Windows 设置 / 开 / 关**，并可单独选择 **Mica / Acrylic**。Windows 的辅助功能、电源或硬件策略仍可能使背景回退为实色。Material 3 Expressive 使用实色表面
+Fluent 与 Material 3 Expressive 分别拥有导航与控件外观。Fluent 提供 **透明效果：使用 Windows 设置 / 开 / 关**，并可单独选择 **Mica / Acrylic**。Windows 的辅助功能、电源或硬件策略仍可能使背景回退为实色；Material 使用实色表面和圆角色调控件
+
+Material 默认从本机**桌面壁纸**取色，也可应用**手动基础色**，配色方案提供**均衡**、**表现力**与**双色**。原生引擎结合官方 MCU 的 Celebi 量化、HCT / 动态色彩角色，以及固定版本的 AOSP 壁纸种子色评分，采用 2021 颜色规范。**双色**是 PyDeck 的 `DualSource` 扩展：第一色决定主要操作和背景，第二色决定辅助与第三色强调；壁纸模式在可用时选择第二候选色，手动模式提供两个取色器。这不是 Google CMF 变体或更新颜色规范的完整移植。壁纸图片仅在本机读取，缓存只保存种子色和元数据哈希，详见[实现与源码来源](docs/MONET.md)
+
+更改**界面风格**后会保存选择，并显示**立即重启**与**稍后**。立即重启按钮先灰显 **1.8 秒**，存在活动任务时继续保持禁用；选择稍后会保留当前界面和任务，所选风格在下次启动时生效。重启请求被拒绝时会显示提示。主题、语言和手动应用的配色无需重启；编辑期间自动检测到的新壁纸配色会等待切换页面后应用
 
 语言切换即时生效并保存。文档维护**英语和简体中文**两个版本，应用另支持繁体中文（台湾）和日语。PIM 原始输出及版本标识保持原文
 
 ## 🧪 验证状态
 
-**0.7.0-fix** 开发验收通过 **108 项核心检查**与 **26 组 GUI 检查**。此前历史版本生命周期及 CPython 构建结果另行保留，这次性能优化没有重跑这些完整流程
+**0.7.1-fix** 的最终 GUI 交互及 MSI / MSIX 安装仍待手动验收，本版不宣称完整自动验收通过。编译、打包及实际完成的附件检查会分别记录在[发行详情](https://github.com/DM10cn/PyDeck/releases)
 
-最终安装包的验证单独记录在[GitHub 发行详情](https://github.com/DM10cn/PyDeck/releases/tag/v0.7.0)。干净机器 GUI 部署、MSIX 正式证书信任安装、所有文字缩放设置及外部无障碍仍需独立验收。[功能状态表](docs/FEATURES.zh-CN.md)保留当前与历史结果，运行检查的方法见[开发指南](docs/DEVELOPMENT.zh-CN.md)
+**0.7.0-fix 的 108 项核心检查与 26 组 GUI 检查**等历史结果保留在[功能状态](docs/FEATURES.zh-CN.md)，不代表新安装包已经通过验收。干净机器部署、证书信任、文字缩放和外部无障碍仍需独立确认
 
 ## 🤝 参与贡献
 

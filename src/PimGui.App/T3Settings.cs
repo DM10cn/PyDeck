@@ -81,7 +81,7 @@ public sealed partial class MainWindow
                 list.Children.Clear();
                 foreach (var pair in rules.ToArray())
                 {
-                    var remove = palette.Action("Remove", compact: true);
+                    var remove = palette.Action("Remove", compact: true, role: ActionRole.Destructive);
                     remove.Click += (_, _) => { rules.Remove(pair.Key); changed = true; RenderRules(); };
                     list.Children.Add(SettingRow(pair.Key, pair.Value is JsonValue value && value.TryGetValue<string>(out var command) ? command : pair.Value?.ToJsonString(), remove));
                 }

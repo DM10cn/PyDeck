@@ -13,9 +13,10 @@ public sealed partial class MainWindow
     private readonly HashSet<string> pendingPageRefresh = [];
     private bool pageRefreshQueued;
     private bool busy => workCoordinator.Any;
-    private bool CanWork(WorkKind kind) => workCoordinator.CanStart(kind);
+    private bool CanWork(WorkKind kind) => !restartInProgress && workCoordinator.CanStart(kind);
     private IDisposable? StartWork(WorkKind kind, string? status = null)
     {
+        if (restartInProgress) return null;
         var lease = workCoordinator.TryStart(kind, () => { RefreshAvailability(); UpdateOperationPanel(); });
         if (lease is null) return null;
         if (status is not null) StatusText.Text = T(status);
@@ -32,6 +33,7 @@ public sealed partial class MainWindow
         foreach (var item in availability.ToArray())
             item.Key.IsEnabled = item.Value();
         RefreshDatabaseButton.IsEnabled = CanWork(WorkKind.Runtimes) && CanWork(WorkKind.Catalog);
+        RefreshDesignRestartDialog();
     }
     private void RefreshWorkPage(params string[] pages)
     {

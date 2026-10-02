@@ -10,17 +10,20 @@ public sealed partial class MainWindow
 {
     private TextBlock? managerStateLabel;
     private TextBlock? managerPathLabel;
+    private InfoBar? designRestartNotice;
+    private readonly Dictionary<string, Microsoft.UI.Xaml.Controls.Primitives.ToggleButton> designChoices = [];
     private UIElement BuildSettingsPage()
     {
         var layout = PageGrid(GridLength.Auto, new(1, GridUnitType.Star));
         At(layout, Header("MAKE IT YOURS", "Settings", "Appearance, language, and Python preferences."), 0);
-        var body = new StackPanel { Spacing = 28 };
+        var body = new StackPanel { Spacing = palette.Tokens.SectionSpacing };
         var appearance = palette.Section("Appearance");
+        designChoices.Clear();
         var choices = new Grid { ColumnSpacing = 8, MinWidth = 300, MaxWidth = 380 };
         choices.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); choices.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
         foreach (var (id, title, column) in new[] { ("Material", "Material 3 Expressive", 0), ("Fluent", "Windows Fluent", 1) })
         {
-            var previewTokens = DesignTokens.For(id, Root.ActualTheme == ElementTheme.Light);
+            var previewTokens = DesignTokens.For(id, Root.ActualTheme == ElementTheme.Light, MaterialSeedForRender, preferences.MaterialColorStyle, MaterialSecondSeedForRender);
             var preview = new StackPanel { Spacing = 6 };
             var swatches = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
             const double swatchHeight = 10;
@@ -29,15 +32,23 @@ public sealed partial class MainWindow
                 swatches.Children.Add(new Border { Width = 24, Height = swatchHeight, CornerRadius = new(swatchRadius), Background = Palette.Brush(color) });
             preview.Children.Add(swatches);
             preview.Children.Add(palette.Label(T(title) + (preferences.Design == id ? "  ✓" : ""), 14, true));
-            var button = new Button { Content = preview, HorizontalContentAlignment = HorizontalAlignment.Stretch, HorizontalAlignment = HorizontalAlignment.Stretch,
+            var button = new Microsoft.UI.Xaml.Controls.Primitives.ToggleButton { Content = preview, HorizontalContentAlignment = HorizontalAlignment.Stretch, HorizontalAlignment = HorizontalAlignment.Stretch,
                 Padding = new(12, 8, 12, 8), MinHeight = 56, CornerRadius = new(palette.Tokens.ActionRadius), BorderThickness = new(preferences.Design == id ? 2 : 1),
-                BorderBrush = Palette.Brush(preferences.Design == id ? palette.Accent : palette.Line), IsEnabled = true };
+                BorderBrush = Palette.Brush(preferences.Design == id ? palette.Accent : palette.Line), IsChecked = preferences.Design == id, IsEnabled = true };
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, T(title));
-            palette.ApplySurfaceResources(button);
-            button.Click += (_, _) => SaveAppearance(id, preferences.Theme);
+            palette.ConfigureDesignChoice(button, preferences.Design == id);
+            button.Click += async (_, _) => await SelectDesignAsync(id);
+            designChoices.Add(id, button);
             Grid.SetColumn(button, column); choices.Children.Add(button);
         }
-        appearance.Children.Add(SettingRow("Interface style", "Choose a design for PyDeck", choices));
+        appearance.Children.Add(SettingRow("Interface style", "Changes to interface style apply the next time PyDeck starts.", choices));
+        designRestartNotice = new InfoBar { Severity = InfoBarSeverity.Informational, IsClosable = false,
+            Title = T("Restart to apply interface style"), Message = T("Your selection is saved. Current tasks and the active interface will continue until you close PyDeck.") };
+        var restart = palette.Action("Restart now", compact: true, role: ActionRole.Quiet);
+        restart.Click += async (_, _) => await PromptDesignRestartAsync();
+        designRestartNotice.ActionButton = restart;
+        appearance.Children.Add(designRestartNotice);
+        UpdateDesignSelection();
         appearance.Children.Add(SettingRow("App theme", null, Choice([("System", "System"), ("Light", "Light"), ("Dark", "Dark")], preferences.Theme,
             value => SaveAppearance(preferences.Design, value), "App theme")));
         appearance.Children.Add(SettingRow("Language", "Changes apply immediately.", Choice([("en-US", "English (US)"), ("zh-CN", "简体中文"), ("zh-TW", "繁體中文（台灣）"), ("ja-JP", "日本語")], preferences.Language,
@@ -58,7 +69,11 @@ public sealed partial class MainWindow
         material.IsEnabled = palette.Tokens.SupportsEffects && preferences.Transparency != "Off";
         appearance.Children.Add(SettingRow("Window material", "Mica uses your wallpaper colors. Acrylic blurs what is behind the window.", material));
         appearance.Children.Add(palette.Label(BackdropDescription(), palette.Tokens.CaptionFontSize, muted: true));
+        var gallery = palette.Action("Component gallery", "\uE8A9", compact: true, role: ActionRole.Quiet);
+        gallery.Click += (_, _) => Navigate("components");
+        appearance.Children.Add(gallery);
         body.Children.Add(appearance);
+        if (palette.Tokens.SupportsDynamicColor) body.Children.Add(MaterialColorSettings());
 
         var python = palette.Section("Python");
         python.Children.Add(SettingRow("Confirm before uninstall", null, Toggle(preferences.ConfirmBeforeUninstall,
@@ -119,26 +134,7 @@ public sealed partial class MainWindow
     }
 
     private Grid SettingRow(string title, string? description, FrameworkElement control)
-    {
-        var row = new Grid { ColumnSpacing = 20, RowSpacing = 8, Padding = new(0, 12, 0, 12), Tag = "SettingsRow",
-            BorderBrush = Palette.Brush(palette.Line), BorderThickness = new(0, 0, 0, 1), MinHeight = 56 };
-        row.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); row.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
-        row.RowDefinitions.Add(new() { Height = GridLength.Auto }); row.RowDefinitions.Add(new() { Height = GridLength.Auto });
-        var text = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
-        text.Children.Add(palette.Label(title, palette.Tokens.BodyFontSize, true));
-        if (description is not null) text.Children.Add(palette.Label(description, palette.Tokens.CaptionFontSize, muted: true));
-        row.Children.Add(text); Grid.SetColumn(control, 1); control.VerticalAlignment = VerticalAlignment.Center; row.Children.Add(control);
-        // Narrow settings content stacks the control under its label instead of clipping a fixed two-column form.
-        row.SizeChanged += (_, args) =>
-        {
-            var narrow = args.NewSize.Width < 620;
-            Grid.SetColumnSpan(text, narrow ? 2 : 1);
-            Grid.SetColumn(control, narrow ? 0 : 1); Grid.SetRow(control, narrow ? 1 : 0); Grid.SetColumnSpan(control, narrow ? 2 : 1);
-            control.HorizontalAlignment = narrow ? HorizontalAlignment.Left : HorizontalAlignment.Right;
-            control.MaxWidth = Math.Max(control.MinWidth, narrow ? args.NewSize.Width : Math.Min(380, args.NewSize.Width / 2));
-        };
-        return row;
-    }
+        => presentation.SettingRow(palette, title, description, control);
     private ComboBox Choice((string Id, string Label)[] options, string selected, Action<string> changed, string name)
     {
         var box = new ComboBox { MinWidth = 168, MinHeight = palette.Tokens.ControlHeight, FontSize = palette.Tokens.ControlFontSize,
@@ -171,13 +167,28 @@ public sealed partial class MainWindow
                 distributionFilter = changed.CatalogPackageType!;
             }
             if (previous.Language != changed.Language) ApplyLanguage();
-            if (previous.Design != changed.Design || previous.Theme != changed.Theme ||
+            var materialColorsChanged = previous.MaterialColorSource != changed.MaterialColorSource ||
+                previous.MaterialSeed != changed.MaterialSeed || previous.MaterialSecondSeed != changed.MaterialSecondSeed || previous.MaterialColorStyle != changed.MaterialColorStyle;
+            if (materialColorsChanged) RefreshMaterialColors();
+            if (materialColorsChanged || previous.Theme != changed.Theme ||
                 previous.Transparency != changed.Transparency || previous.Backdrop != changed.Backdrop) ApplyAppearance();
+            else if ((previous with { Design = changed.Design }) == changed) UpdateDesignSelection();
             else RenderPage();
         }
-        catch (Exception ex) { ShowError(ex); }
+        catch (Exception ex) { UpdateDesignSelection(); ShowError(ex); }
     }
     private void SaveAppearance(string design, string theme) => SavePreferences(preferences with { Design = design, Theme = theme });
+
+    private void UpdateDesignSelection()
+    {
+        foreach (var (id, button) in designChoices)
+        {
+            palette.ConfigureDesignChoice(button, preferences.Design == id);
+            if (button.Content is StackPanel preview && preview.Children.LastOrDefault() is TextBlock label)
+                label.Text = T(id == "Fluent" ? "Windows Fluent" : "Material 3 Expressive") + (preferences.Design == id ? "  ✓" : "");
+        }
+        if (designRestartNotice is not null) designRestartNotice.IsOpen = preferences.Design != ActiveDesign;
+    }
 
     private async Task ChangeManagerAsync(string path)
     {

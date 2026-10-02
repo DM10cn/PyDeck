@@ -16,7 +16,7 @@ public sealed partial class MainWindow
             foreach (var language in Strings.Languages)
             foreach (var design in new[] { "Material", "Fluent" })
             {
-                SavePreferences(preferences with { Language = language, Design = design });
+                ApplySmokePreferences(preferences with { Language = language, Design = design });
                 expandedSettings.Add("Network"); Navigate("settings"); Root.UpdateLayout();
                 var originalPage = PageHost.Children.Single();
                 var draft = Descendants(settingsSections["Network"].Section).OfType<TextBox>().First();
@@ -26,7 +26,8 @@ public sealed partial class MainWindow
                 using var catalogWork = StartWork(WorkKind.Catalog);
                 using var updateWork = StartWork(WorkKind.AppUpdate);
                 Require(catalogWork is not null && updateWork is not null, "Independent query refused");
-                Require(theme.IsEnabled && languageChoice.IsEnabled && BuildNav.IsEnabled, "Query disabled unrelated UI");
+                var buildNavigation = Descendants(Root).OfType<Control>().Single(control => control.Tag as string == "build");
+                Require(theme.IsEnabled && languageChoice.IsEnabled && buildNavigation.IsEnabled, "Query disabled unrelated UI");
                 Require(ReferenceEquals(PageHost.Children.Single(), originalPage) && draft.Text == "http://draft.invalid:8123", "Starting work replaced an editor");
                 RefreshWorkPage("catalog"); catalogWork.Dispose();
                 Require(busy && !CanWork(WorkKind.AppUpdate) && CanWork(WorkKind.Catalog), "One query unlocked another query");
@@ -73,7 +74,7 @@ public sealed partial class MainWindow
         finally
         {
             foreach (var item in runningOperations.ToArray()) FinishOperation(item.Operation);
-            expandedSettings.Remove("Network"); SavePreferences(saved); Navigate("runtimes");
+            expandedSettings.Remove("Network"); ApplySmokePreferences(saved); Navigate("runtimes");
         }
     }
 }

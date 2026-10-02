@@ -12,7 +12,12 @@ public partial class App : Application
         CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.GetCultureInfo("en-US");
         UnhandledException += (_, e) =>
         {
-            var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PyDeck", "crash.log");
+            var arguments = Environment.GetCommandLineArgs();
+            var smokeIndex = Array.IndexOf(arguments, "--smoke-test");
+            var logDirectory = smokeIndex >= 0 && smokeIndex + 1 < arguments.Length
+                ? Path.GetFullPath(arguments[smokeIndex + 1])
+                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PyDeck");
+            var path = Path.Combine(logDirectory, "crash.log");
             try
             {
                 PimGui.Core.SafeFiles.RequireNoLinks(path); Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -27,6 +32,13 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         Main = new MainWindow();
-        Main.Activate();
+        if (Main.PerformanceProbe || Main.DesignProbe || Main.RestartProbe)
+        {
+            // Opt-in fixture-only checks run offscreen without taking keyboard focus.
+            Main.AppWindow.IsShownInSwitchers = false;
+            Main.AppWindow.Move(new Windows.Graphics.PointInt32(-32000, -32000));
+            Main.AppWindow.Show(false);
+        }
+        else Main.Activate();
     }
 }

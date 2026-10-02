@@ -46,6 +46,51 @@ internal static class PerformanceChecks
             var retained = log.Entries; log.Clear(); Require(log.Entries.Count == 0 && retained.Count == 2000, "Clear corrupted a snapshot");
             log.Add(new string('x', 10_000)); Require(log.Entries.Single().Message.Length < 2100, "Line limit lost");
         });
+        check("Activity byte retention remains accurate during rolling eviction", () =>
+        {
+            var log = new ActivityLog();
+            for (var i = 0; i < 1500; i++) log.Add(new string('x', 2048), i % 2 == 0 ? ActivityLevel.Error : ActivityLevel.Information);
+            var retained = log.Entries.Sum(entry => entry.Format().Length * sizeof(char));
+            Require(retained <= 1024 * 1024 && retained > 1024 * 1024 - 4200, "Byte retention no longer fills or respects its limit");
+            for (var i = 0; i < 2500; i++) log.Add("short");
+            Require(log.Entries.Count == 2000 && log.Entries.All(entry => entry.Message == "short"), "Rolling size bookkeeping drifted");
+        });
+        check("Catalog snapshot matches filters and ordering across repeated queries", () =>
+        {
+            var source = Enumerable.Range(0, 2000).Select(i => new PythonRuntime("id-" + i,
+                i % 4 == 0 ? "PythonEmbed" : i % 4 == 1 ? "PythonTest" : "PythonCore",
+                $"3.{i % 8 + 8}{(i % 7 == 0 ? "t" : "")}-{(i % 3 == 0 ? "arm64" : i % 3 == 1 ? "32" : "64")}",
+                $"3.{i % 8 + 8}.{i % 40}{(i % 5 == 0 ? "rc1" : "")}", "Python item " + i, "", "", false)).ToList();
+            source.Add(source[2] with { Id = "tied-order" });
+            var snapshot = new RuntimeCatalogSnapshot(source);
+            foreach (var architecture in new[] { "All architectures", "x64", "ARM64", "x86" })
+            foreach (var previews in new[] { false, true })
+            foreach (var filter in new[] { "All", "Standard", "FreeThreaded", "Embedded", "Tests", "Other" })
+            foreach (var search in new[] { "", "3.14", "PYTHONCORE", "item 10", "no match", "With tests" })
+            {
+                var expected = RuntimeCatalog.Filter(source, architecture, previews, search)
+                    .Where(r => filter == "Standard" ? !r.IsSpecialized : RuntimeCatalog.MatchesDistribution(r, filter));
+                Require(snapshot.Filter(architecture, previews, search, filter).SequenceEqual(expected), "Projection changed catalog semantics");
+            }
+            var oldCount = source.Count;
+            source.Clear();
+            Require(snapshot.Filter("All architectures", true, "").Count == oldCount &&
+                new RuntimeCatalogSnapshot(source).Filter("All architectures", true, "").Count == 0, "Catalog snapshots were not independent");
+        });
+        check("Repeated catalog query allocation and timing are measured independently", () =>
+        {
+            var source = Enumerable.Range(0, 20_000).Select(i => new PythonRuntime("id-" + i, "PythonCore", "3.14-64",
+                "3.14." + i, "Python 3.14." + i, "", "", false)).ToArray();
+            var projectionClock = Stopwatch.StartNew(); var before = GC.GetAllocatedBytesForCurrentThread();
+            var snapshot = new RuntimeCatalogSnapshot(source); projectionClock.Stop();
+            var projectionBytes = GC.GetAllocatedBytesForCurrentThread() - before;
+            var queries = new[] { "", "3", "3.", "3.1", "3.14", "3.14.", "3.14.1", "3.14.12" };
+            var legacy = Measure(() => queries.Select(query => RuntimeCatalog.Filter(source, "x64", false, query).Count.ToString()).ToArray());
+            var current = Measure(() => queries.Select(query => snapshot.Filter("x64", false, query).Count.ToString()).ToArray());
+            Require(legacy.Result.SequenceEqual(current.Result), "Repeated search counts changed");
+            Require(current.Bytes < legacy.Bytes, "Projection did not reduce repeated-query allocation");
+            Console.WriteLine($"METRIC catalog projection: {projectionClock.Elapsed.TotalMilliseconds:F1} ms / {projectionBytes} bytes; 8 queries over 20000 rows: previous {legacy.Ms:F1} ms / {legacy.Bytes} bytes; snapshot {current.Ms:F1} ms / {current.Bytes} bytes");
+        });
         check("Shared version keys preserve historical ordering and recommendation ties", () =>
         {
             var versions = new[] { "3.14.0a2", "3.14.0a10", "3.14.0b1", "3.14.0rc1", "3.14.0rc11", "3.14.0", "3.14.1", "3.15.0a1", "3.13.99", "unknown", "3.14", "3.14.0RC2", "3.14.0.1" };

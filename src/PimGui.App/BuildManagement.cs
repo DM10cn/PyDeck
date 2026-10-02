@@ -31,9 +31,7 @@ public sealed partial class MainWindow
     }
     private UIElement StorageSettings()
     {
-        var expander = new Expander { Header = T("Build storage"), Content = StorageSettingsContent(), IsExpanded = storageExpanded,
-            HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch };
-        palette.ApplySurfaceResources(expander);
+        var expander = palette.Expander("Build storage", StorageSettingsContent(), storageExpanded);
         expander.Expanding += (_, _) => storageExpanded = true; expander.Collapsed += (_, _) => storageExpanded = false;
         settingsSections["Build storage"] = (expander, StorageSettingsContent);
         return expander;
@@ -61,7 +59,7 @@ public sealed partial class MainWindow
                 row.Children.Add(palette.Label(T(entry.Kind) + " · " + TransferUnits.Bytes(entry.Bytes), 14, true));
                 var path = palette.Label(entry.Path, 12, muted: true); path.IsTextSelectionEnabled = true; row.Children.Add(path);
                 if (entry.Users > 0) row.Children.Add(palette.Label(T("Used by {0} registered environments", entry.Users), 12));
-                var clean = palette.Action("Clean files", compact: true); BindAvailability(clean, () => CanWork(WorkKind.Storage) && entry.Users == 0);
+                var clean = palette.Action("Clean files", compact: true, role: ActionRole.Destructive); BindAvailability(clean, () => CanWork(WorkKind.Storage) && entry.Users == 0);
                 clean.HorizontalAlignment = HorizontalAlignment.Left;
                 clean.Click += async (_, _) => await CleanStorageAsync(entry); row.Children.Add(clean);
                 panel.Children.Add(palette.CardBox(row, 12));

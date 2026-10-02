@@ -23,7 +23,7 @@ public sealed partial class MainWindow
             foreach (var language in Strings.Languages)
             foreach (var compact in new[] { false, true })
             {
-                SavePreferences(preferences with { Design = design, Language = language });
+                ApplySmokePreferences(preferences with { Design = design, Language = language });
                 var scale = Root.XamlRoot.RasterizationScale;
                 AppWindow.Resize(new((int)((compact ? 930 : 1180) * scale), (int)(850 * scale)));
                 Navigate("environments"); Root.UpdateLayout(); await Task.Delay(100); Root.UpdateLayout();
@@ -47,7 +47,7 @@ public sealed partial class MainWindow
         finally
         {
             packageEnvironment = ""; packageInput = ""; packageSnapshot = null; storageEntries = null; storageExpanded = false;
-            Environments.Remember(environment, remove: true); AppWindow.Resize(originalSize); SavePreferences(originalPreferences); Navigate("runtimes");
+            Environments.Remember(environment, remove: true); AppWindow.Resize(originalSize); ApplySmokePreferences(originalPreferences); Navigate("runtimes");
         }
     }
 }

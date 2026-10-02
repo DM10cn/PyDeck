@@ -11,6 +11,10 @@ public sealed record AppSettings
     public string Language { get; init; } = "en-US";
     public string Transparency { get; init; } = "System";
     public string Backdrop { get; init; } = "Mica";
+    public string MaterialColorSource { get; init; } = "Wallpaper";
+    public uint MaterialSeed { get; init; } = 0xFF1B6EF3;
+    public uint? MaterialSecondSeed { get; init; }
+    public string MaterialColorStyle { get; init; } = "TonalSpot";
     public string DefaultArchitecture { get; init; } = "x64";
     public string CatalogSource { get; init; } = "Online";
     public bool ShowPreviewReleases { get; init; }
@@ -36,6 +40,10 @@ public sealed record AppSettings
             Language = Language is "en-US" or "zh-CN" or "zh-TW" or "ja-JP" ? Language : "en-US",
             Transparency = Transparency is "System" or "On" or "Off" ? Transparency : "System",
             Backdrop = Backdrop is "Mica" or "Acrylic" ? Backdrop : "Mica",
+            MaterialColorSource = MaterialColorSource is "Wallpaper" or "Custom" ? MaterialColorSource : "Wallpaper",
+            MaterialSeed = MaterialSeed | 0xFF000000u,
+            MaterialSecondSeed = MaterialSecondSeed is { } secondSeed ? secondSeed | 0xFF000000u : null,
+            MaterialColorStyle = MaterialColorStyle is "TonalSpot" or "Expressive" or "DualSource" ? MaterialColorStyle : "TonalSpot",
             DefaultArchitecture = DefaultArchitecture is "x64" or "ARM64" or "x86" or "All architectures" ? DefaultArchitecture : "x64",
             CatalogSource = CatalogSource is "Online" or "Offline" ? CatalogSource : "Online",
             CatalogPackageType = packageType,

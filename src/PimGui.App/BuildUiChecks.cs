@@ -32,7 +32,7 @@ public sealed partial class MainWindow
             foreach (var design in new[] { "Fluent", "Material" })
             foreach (var language in Strings.Languages)
             {
-                SavePreferences(preferences with { Design = design, Language = language });
+                ApplySmokePreferences(preferences with { Design = design, Language = language });
                 Navigate("build"); Root.UpdateLayout(); await Task.Delay(80);
                 if (buildVersionPicker!.Text != buildOptions.Version)
                     throw new IOException("Source version is blank or differs from the selected build version");
@@ -50,8 +50,11 @@ public sealed partial class MainWindow
                 if (Descendants(PageHost).OfType<ComboBox>().Any(box => AutomationProperties.GetName(box) == T("Architecture")))
                     throw new IOException("Build UI offers an unsupported architecture");
                 var symbols = Descendants(PageHost).OfType<ToggleSwitch>().Single(toggle => AutomationProperties.GetName(toggle) == T("Debug symbols"));
+                var originalPage = PageHost.Children.Single();
                 symbols.IsOn = !symbols.IsOn; Root.UpdateLayout();
                 await Task.Delay(100);
+                if (!ReferenceEquals(originalPage, PageHost.Children.Single()) || !ReferenceEquals(scroll, buildScroll) || !symbols.IsLoaded)
+                    throw new IOException("Build option changes rebuilt the page instead of updating controls");
                 if (Math.Abs(buildScroll!.VerticalOffset - previousOffset) > 2)
                     throw new IOException("Build option changes reset the scroll position");
                 if (buildOptions.IncludeSymbols == originalOptions.IncludeSymbols) throw new IOException("Build option toggle did not persist");
@@ -60,7 +63,7 @@ public sealed partial class MainWindow
                     throw new IOException("Build option lost during navigation");
                 buildOptions = originalOptions; buildPreset = originalPreset;
             }
-            SavePreferences(preferences with { Design = "Fluent", Language = "zh-CN" });
+            ApplySmokePreferences(preferences with { Design = "Fluent", Language = "zh-CN" });
             Navigate("build"); Root.UpdateLayout(); await Task.Delay(100);
             buildScroll!.ChangeView(null, 0, null, true); await Task.Delay(100);
             await CaptureAsync(Path.Combine(directory, "24-build-python.png"));
@@ -87,7 +90,7 @@ public sealed partial class MainWindow
             Builds.Remove(record.Id);
             localRuntimes = originalLocal; installed = originalInstalled; connected = originalConnected; buildOptions = originalOptions;
             buildVersions = originalVersions; buildPreset = originalPreset;
-            currentBuild = null; SavePreferences(originalPreferences); Navigate("runtimes");
+            currentBuild = null; ApplySmokePreferences(originalPreferences); Navigate("runtimes");
         }
     }
     private static void CheckScrollbarClearance(ScrollViewer scroll)

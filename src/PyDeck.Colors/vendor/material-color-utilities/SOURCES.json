@@ -1,0 +1,235 @@
+{
+  "upstream": "https://github.com/material-foundation/material-color-utilities",
+  "commit": "5b3618b16fdc3825e21d5679bafd144662088ea1",
+  "specVersion": "2021",
+  "files": [
+    {
+      "path": "cpp/cam/cam.cc",
+      "upstreamSha256": "a120f09dbe64512178905c73c1f3098e457ec6e6467f4b44aee4de38d7ec14df",
+      "vendoredSha256": "a120f09dbe64512178905c73c1f3098e457ec6e6467f4b44aee4de38d7ec14df",
+      "patch": null
+    },
+    {
+      "path": "cpp/cam/cam.h",
+      "upstreamSha256": "d35b503dbf6dd49a5052f6b0df774a801d0cf73a8204af90165e827e1aca294d",
+      "vendoredSha256": "d35b503dbf6dd49a5052f6b0df774a801d0cf73a8204af90165e827e1aca294d",
+      "patch": null
+    },
+    {
+      "path": "cpp/cam/hct.cc",
+      "upstreamSha256": "22efdc3d6310332f670dd2239b8564fc460a3eedcc165e2f5561d571daf3e81a",
+      "vendoredSha256": "22efdc3d6310332f670dd2239b8564fc460a3eedcc165e2f5561d571daf3e81a",
+      "patch": null
+    },
+    {
+      "path": "cpp/cam/hct.h",
+      "upstreamSha256": "3d00d51f52779ad53980384f490b1ca26f7d3b03632d7b61c1528c10d37086da",
+      "vendoredSha256": "3d00d51f52779ad53980384f490b1ca26f7d3b03632d7b61c1528c10d37086da",
+      "patch": null
+    },
+    {
+      "path": "cpp/cam/hct_solver.cc",
+      "upstreamSha256": "3c9d2464c769ce76faa935611e0e550b9567fa04e6fdbb3cadad7d04e5639e78",
+      "vendoredSha256": "f9c34916a0d808cd38d09333a6ea5a0132a8ce143b3ee09c4dfe6a5dc66de323",
+      "patch": "MSVC C++ aggregate syntax: (Vec3){...} -> Vec3{...}"
+    },
+    {
+      "path": "cpp/cam/hct_solver.h",
+      "upstreamSha256": "a5c893925ac5c2a3ced3e5cd3280bcf4ee0acf89f7a79c7d62b11040086a6461",
+      "vendoredSha256": "a5c893925ac5c2a3ced3e5cd3280bcf4ee0acf89f7a79c7d62b11040086a6461",
+      "patch": null
+    },
+    {
+      "path": "cpp/cam/viewing_conditions.cc",
+      "upstreamSha256": "1074e89fe9f263c92649956d642c5b5ed04ee4d68680f598c7da0c09792748d9",
+      "vendoredSha256": "1074e89fe9f263c92649956d642c5b5ed04ee4d68680f598c7da0c09792748d9",
+      "patch": null
+    },
+    {
+      "path": "cpp/cam/viewing_conditions.h",
+      "upstreamSha256": "93d91023809794f390b25ebb07f0805e5de4e15ec344144ad0a9c924b4233b89",
+      "vendoredSha256": "21eafd66bfb68338c4a47643f687842fd3a29978756d7a0516fa90641f1c19dd",
+      "patch": "MSVC C++ syntax only: (ViewingConditions){...} to ViewingConditions{...}; numerical values unchanged."
+    },
+    {
+      "path": "cpp/contrast/contrast.cc",
+      "upstreamSha256": "be8e1590b9fc954687e8cfe5c13c798561892ab3ba97d16a8ef1928c45cdd464",
+      "vendoredSha256": "be8e1590b9fc954687e8cfe5c13c798561892ab3ba97d16a8ef1928c45cdd464",
+      "patch": null
+    },
+    {
+      "path": "cpp/contrast/contrast.h",
+      "upstreamSha256": "67dfecb31bc68c7febf0b828991741cad9f5655e759ca1561f3e6e78e50966e6",
+      "vendoredSha256": "67dfecb31bc68c7febf0b828991741cad9f5655e759ca1561f3e6e78e50966e6",
+      "patch": null
+    },
+    {
+      "path": "cpp/dislike/dislike.cc",
+      "upstreamSha256": "91a97494edd3e050d1a43350b886ecc2d67bae56840e26d1ee26e876cd528991",
+      "vendoredSha256": "91a97494edd3e050d1a43350b886ecc2d67bae56840e26d1ee26e876cd528991",
+      "patch": null
+    },
+    {
+      "path": "cpp/dislike/dislike.h",
+      "upstreamSha256": "ee48e74fb68b2b4eb9e62f5931335302a0db26532e44bc32e2be691c3a924851",
+      "vendoredSha256": "ee48e74fb68b2b4eb9e62f5931335302a0db26532e44bc32e2be691c3a924851",
+      "patch": null
+    },
+    {
+      "path": "cpp/dynamiccolor/contrast_curve.h",
+      "upstreamSha256": "de70c32a9fba7dd73d3e82765952368773b46943a70bbd4eae5ee512cbba5c77",
+      "vendoredSha256": "de70c32a9fba7dd73d3e82765952368773b46943a70bbd4eae5ee512cbba5c77",
+      "patch": null
+    },
+    {
+      "path": "cpp/dynamiccolor/dynamic_color.cc",
+      "upstreamSha256": "c9c82831c8f9b0aa0df055fb30f52cea1008e059c89f76207b07354918eee152",
+      "vendoredSha256": "c9c82831c8f9b0aa0df055fb30f52cea1008e059c89f76207b07354918eee152",
+      "patch": null
+    },
+    {
+      "path": "cpp/dynamiccolor/dynamic_color.h",
+      "upstreamSha256": "781edbbf85eb557c3d3959f77760257f7627ffa76dc795d103c004945a9f1421",
+      "vendoredSha256": "781edbbf85eb557c3d3959f77760257f7627ffa76dc795d103c004945a9f1421",
+      "patch": null
+    },
+    {
+      "path": "cpp/dynamiccolor/dynamic_scheme.cc",
+      "upstreamSha256": "3058a377dbdc271854ab4aa2736a8f2f02536fec9814d8b45acd235cd61cd9e2",
+      "vendoredSha256": "3058a377dbdc271854ab4aa2736a8f2f02536fec9814d8b45acd235cd61cd9e2",
+      "patch": null
+    },
+    {
+      "path": "cpp/dynamiccolor/dynamic_scheme.h",
+      "upstreamSha256": "60d7b54a0dc2ee0ebd671988f86f3b1d85549da73d46754410839d0b92103552",
+      "vendoredSha256": "60d7b54a0dc2ee0ebd671988f86f3b1d85549da73d46754410839d0b92103552",
+      "patch": null
+    },
+    {
+      "path": "cpp/dynamiccolor/material_dynamic_colors.cc",
+      "upstreamSha256": "26a44015934c4908d9c0a6cf9c0a283b487abc66af53f2e4777324a5101fc804",
+      "vendoredSha256": "26a44015934c4908d9c0a6cf9c0a283b487abc66af53f2e4777324a5101fc804",
+      "patch": null
+    },
+    {
+      "path": "cpp/dynamiccolor/material_dynamic_colors.h",
+      "upstreamSha256": "cc5cee5ba5f6c39d5a366bb717710a0ed1f6d564ea3ebd679ffcdcaeead4efcc",
+      "vendoredSha256": "cc5cee5ba5f6c39d5a366bb717710a0ed1f6d564ea3ebd679ffcdcaeead4efcc",
+      "patch": null
+    },
+    {
+      "path": "cpp/dynamiccolor/tone_delta_pair.h",
+      "upstreamSha256": "85fdda1526d4722b19c5bf92a74a18fbcd05b955e2f8d89452cb762ebb7ba9da",
+      "vendoredSha256": "85fdda1526d4722b19c5bf92a74a18fbcd05b955e2f8d89452cb762ebb7ba9da",
+      "patch": null
+    },
+    {
+      "path": "cpp/dynamiccolor/variant.h",
+      "upstreamSha256": "01b4da5e079e79409e06469099d066158e54746c78efe979e5b3914e2518b0ed",
+      "vendoredSha256": "01b4da5e079e79409e06469099d066158e54746c78efe979e5b3914e2518b0ed",
+      "patch": null
+    },
+    {
+      "path": "cpp/palettes/tones.cc",
+      "upstreamSha256": "25bc2365553961989b8bb4638144416a1f30dff1afe32d639708a9795f508d7e",
+      "vendoredSha256": "25bc2365553961989b8bb4638144416a1f30dff1afe32d639708a9795f508d7e",
+      "patch": null
+    },
+    {
+      "path": "cpp/palettes/tones.h",
+      "upstreamSha256": "710d877fc2d84987bb45e2a1d9ec51aec7e9138fb9b47baed157ed98073567a0",
+      "vendoredSha256": "710d877fc2d84987bb45e2a1d9ec51aec7e9138fb9b47baed157ed98073567a0",
+      "patch": null
+    },
+    {
+      "path": "cpp/quantize/celebi.cc",
+      "upstreamSha256": "90cc8c20351710cdefd98f0ec929b8f1fd54cc75a401f57327e6da3bc6e1c0a8",
+      "vendoredSha256": "90cc8c20351710cdefd98f0ec929b8f1fd54cc75a401f57327e6da3bc6e1c0a8",
+      "patch": null
+    },
+    {
+      "path": "cpp/quantize/celebi.h",
+      "upstreamSha256": "e1bbf13ce0a92a5793e653e072d794efa8e9995296872a179f203044623b8158",
+      "vendoredSha256": "e1bbf13ce0a92a5793e653e072d794efa8e9995296872a179f203044623b8158",
+      "patch": null
+    },
+    {
+      "path": "cpp/quantize/lab.cc",
+      "upstreamSha256": "971c1255b3d335e52b8a130ce929a89486da179871e1acf40d596e4384a8ba47",
+      "vendoredSha256": "971c1255b3d335e52b8a130ce929a89486da179871e1acf40d596e4384a8ba47",
+      "patch": null
+    },
+    {
+      "path": "cpp/quantize/lab.h",
+      "upstreamSha256": "cd78859472a34ddf24b9e4c0f8475626cdec7d285d46afbba851d742b2f89b35",
+      "vendoredSha256": "cd78859472a34ddf24b9e4c0f8475626cdec7d285d46afbba851d742b2f89b35",
+      "patch": null
+    },
+    {
+      "path": "cpp/quantize/wsmeans.cc",
+      "upstreamSha256": "6d5b237075b9061fb86e1dd60f69fb9856773d176e888d885c716c6989dec6b6",
+      "vendoredSha256": "6d5b237075b9061fb86e1dd60f69fb9856773d176e888d885c716c6989dec6b6",
+      "patch": null
+    },
+    {
+      "path": "cpp/quantize/wsmeans.h",
+      "upstreamSha256": "20bc123e92a36482350f84acac52babd14d5d62314d622445a057eb225212f1b",
+      "vendoredSha256": "20bc123e92a36482350f84acac52babd14d5d62314d622445a057eb225212f1b",
+      "patch": null
+    },
+    {
+      "path": "cpp/quantize/wu.cc",
+      "upstreamSha256": "11b83ff7e721f748f472201e1f6403b491d7067d3b7bc717f43646bc21f0b18d",
+      "vendoredSha256": "11b83ff7e721f748f472201e1f6403b491d7067d3b7bc717f43646bc21f0b18d",
+      "patch": null
+    },
+    {
+      "path": "cpp/quantize/wu.h",
+      "upstreamSha256": "9aabde4d7e14148e58d21e5111ab05179192240f43166623ae9805fd53b16d7b",
+      "vendoredSha256": "9aabde4d7e14148e58d21e5111ab05179192240f43166623ae9805fd53b16d7b",
+      "patch": null
+    },
+    {
+      "path": "cpp/utils/utils.cc",
+      "upstreamSha256": "f85c6065d68c8b45220da9715167907bf0c298471ed848771d7974ef0e426c9a",
+      "vendoredSha256": "8020c8bd39db392186932206ac5229e59ad33aa5371fcbdf2961d1e01861ffd2",
+      "patch": "MSVC C++ aggregate syntax: (Vec3){...} -> Vec3{...}"
+    },
+    {
+      "path": "cpp/utils/utils.h",
+      "upstreamSha256": "7f16dc796049837d4efd0889a377383e359ce5a39d503be6ae88e9fdb00b0cb8",
+      "vendoredSha256": "7f16dc796049837d4efd0889a377383e359ce5a39d503be6ae88e9fdb00b0cb8",
+      "patch": null
+    },
+    {
+      "path": "cpp/scheme/scheme_tonal_spot.h",
+      "upstreamSha256": "c2b62f305fbbd482a9ff78a4d6de53d1092aaa8637c5353128515c11132513d6",
+      "vendoredSha256": "c2b62f305fbbd482a9ff78a4d6de53d1092aaa8637c5353128515c11132513d6",
+      "patch": null
+    },
+    {
+      "path": "cpp/scheme/scheme_tonal_spot.cc",
+      "upstreamSha256": "c2e0b6ce706441bfde3cc9bf0c06523b097f63cdfc3238c2b21d644f0ced6e88",
+      "vendoredSha256": "c2e0b6ce706441bfde3cc9bf0c06523b097f63cdfc3238c2b21d644f0ced6e88",
+      "patch": null
+    },
+    {
+      "path": "cpp/scheme/scheme_expressive.h",
+      "upstreamSha256": "6037ca200b59cbf9bb4350a95feb453f6f9853e069246965f8c66094f938c5b5",
+      "vendoredSha256": "6037ca200b59cbf9bb4350a95feb453f6f9853e069246965f8c66094f938c5b5",
+      "patch": null
+    },
+    {
+      "path": "cpp/scheme/scheme_expressive.cc",
+      "upstreamSha256": "43947c859acf7b0d7a9914f85702e406cc520f34708aafe22e384773cbd6ec94",
+      "vendoredSha256": "43947c859acf7b0d7a9914f85702e406cc520f34708aafe22e384773cbd6ec94",
+      "patch": null
+    },
+    {
+      "path": "LICENSE",
+      "upstreamSha256": "e662e6c2fc7ba7bc613c7e4ddf852d4ad3fcc05faead7cbe16b1dac67b55f426",
+      "vendoredSha256": "e662e6c2fc7ba7bc613c7e4ddf852d4ad3fcc05faead7cbe16b1dac67b55f426",
+      "patch": null
+    }
+  ]
+}

@@ -45,6 +45,7 @@ public sealed partial class MainWindow
             checks.Add("Scoped work: unrelated controls and settings drafts survive parallel tasks; progress, cancellation, completion and resource ownership stay isolated in four languages and two styles.");
             await CheckBatchedUpdatesAsync();
             checks.Add("Batched worker output/progress retain latest state, bounded activity and severity; clear/completion cannot be resurrected by queued notifications; hidden activity preserves settings.");
+            await CheckInteractivePerformanceAsync(checks);
             Navigate("runtimes");
             await CaptureAsync(Path.Combine(directory, "01-material-dark-runtimes.png"));
             if (BrandMark.Child is not Image { Source: BitmapImage { PixelWidth: > 0 } } ||
@@ -82,12 +83,12 @@ public sealed partial class MainWindow
             await ScrollSettingsAsync(bottom: true);
             await CaptureAsync(Path.Combine(directory, "03b-python-settings-about.png"));
             await ScrollSettingsAsync();
-            SavePreferences(preferences with { ShowPreviewReleases = true, CatalogPackageType = "All", DefaultArchitecture = "ARM64" });
+            ApplySmokePreferences(preferences with { ShowPreviewReleases = true, CatalogPackageType = "All", DefaultArchitecture = "ARM64" });
             Navigate("catalog"); Root.UpdateLayout();
             if (architecture != "ARM64" || VisibleRuntimeCount != RuntimeCatalog.Filter(catalog, "ARM64", true, "").Count)
                 throw new InvalidOperationException("Saved catalog filters did not affect the catalog.");
             if (distributionFilter != "All") throw new InvalidOperationException("Package-type preference was not applied.");
-            SavePreferences(preferences with { ShowPreviewReleases = false, CatalogPackageType = "Standard", DefaultArchitecture = "x64" });
+            ApplySmokePreferences(preferences with { ShowPreviewReleases = false, CatalogPackageType = "Standard", DefaultArchitecture = "x64" });
             await CheckCatalogFilterPreferencesAsync(directory);
             checks.Add("Four-language catalog architecture, package type and preview controls persist across navigation and profile reload; live changes preserve focus; My Python filters stay independent; manager location is read-only.");
             await CheckManagementSettingsAsync(directory);
@@ -98,9 +99,9 @@ public sealed partial class MainWindow
             checks.Add("0.7.0: package actions, pip protection, build preparation and used-runtime cleanup guards render in four languages, two designs and two widths.");
             checks.Add("Build page: four languages, both designs, x64-only options, scrollbar clearance, retained scroll positions/drafts, cancellation after navigation and local runtime actions without PIM verified.");
             checks.Add("Four languages and both designs at normal/compact widths: shared header geometry, action metrics, settings rows, environment actions, structured activity and historical micro identities verified.");
-            SaveAppearance("Fluent", "Dark"); Navigate("runtimes"); architecture = "All architectures"; RenderPage();
+            ApplySmokeAppearance("Fluent", "Dark"); Navigate("runtimes"); architecture = "All architectures"; RenderPage();
             await CaptureAsync(Path.Combine(directory, "04-fluent-dark-runtimes.png"));
-            SavePreferences(preferences with { Transparency = "Off" });
+            ApplySmokePreferences(preferences with { Transparency = "Off" });
             if (SystemBackdrop is not null || PopupBrush() is not SolidColorBrush) throw new InvalidOperationException("Off retained a transparent surface.");
             if (palette.Surface.A != 255 || palette.Card.A != 255) throw new InvalidOperationException("Off retained translucent content.");
             await CaptureAsync(Path.Combine(directory, "04b-fluent-off.png"));
@@ -108,23 +109,23 @@ public sealed partial class MainWindow
             await ScrollSettingsAsync();
             await CaptureAsync(Path.Combine(directory, "04c-fluent-settings.png"));
             Navigate("runtimes");
-            SavePreferences(preferences with { Transparency = "On", Backdrop = "Acrylic" });
+            ApplySmokePreferences(preferences with { Transparency = "On", Backdrop = "Acrylic" });
             if (backdropKind == "Acrylic" && SystemBackdrop is not DesktopAcrylicBackdrop) throw new InvalidOperationException("Acrylic request not applied.");
             await CheckBackdropPersistenceAsync("Acrylic", directory);
-            SavePreferences(preferences with { Backdrop = "Mica" });
+            ApplySmokePreferences(preferences with { Backdrop = "Mica" });
             if (backdropKind == "Mica" && SystemBackdrop is not MicaBackdrop) throw new InvalidOperationException("Mica request not applied.");
             await CheckBackdropPersistenceAsync("Mica", directory);
             checks.Add("Acrylic / Mica retain the same native controller across language, architecture, toggle and theme changes; content/card layers are translucent.");
-            SavePreferences(preferences with { Transparency = "System" });
+            ApplySmokePreferences(preferences with { Transparency = "System" });
             checks.Add("Fluent Off, On / Acrylic, On / Mica, and Use Windows setting applied; compositor visuals require manual inspection.");
-            SaveAppearance("Fluent", "Light");
+            ApplySmokeAppearance("Fluent", "Light");
             await CaptureAsync(Path.Combine(directory, "04d-fluent-light.png"));
-            SaveAppearance("Material", "Light");
+            ApplySmokeAppearance("Material", "Light");
             if (SystemBackdrop is not null || PopupBrush() is not SolidColorBrush) throw new InvalidOperationException("Material retained a backdrop.");
             if (palette.Surface.A != 255 || palette.Card.A != 255) throw new InvalidOperationException("Material retained translucent content.");
             await CaptureAsync(Path.Combine(directory, "05-material-light-runtimes.png"));
             checks.Add("Style changed to Fluent and back to Material; light and dark themes rendered.");
-            SaveAppearance("Material", "Dark"); Navigate("activity");
+            ApplySmokeAppearance("Material", "Dark"); Navigate("activity");
             await CaptureAsync(Path.Combine(directory, "06-activity.png"));
             checks.Add("Activity navigation rendered.");
             await CheckOperationPanelAsync(directory);
@@ -137,7 +138,9 @@ public sealed partial class MainWindow
                 languageChoice.SelectedItem = languageChoice.Items.Cast<ComboBoxItem>().Single(item => (string)item.Tag == language);
                 Root.UpdateLayout();
                 if (!Descendants(PageHost).OfType<TextBlock>().Any(label => label.Text == T("App theme"))) throw new InvalidOperationException("Settings not localized: " + language);
-                if (!shellLabels.Any(pair => pair.Key == "My Python" && pair.Element.Text == T("My Python"))) throw new InvalidOperationException("Navigation not localized: " + language);
+                var navigationLabels = Descendants(ShellHost).OfType<TextBlock>().Where(label => label.Tag as string == "NavigationLabel").Select(label => label.Text).ToArray();
+                if (navigationLabels.Length != 6 || new[] { "My Python", "Install Python", "Virtual environments", "Build Python", "Activity", "Settings" }.Any(key => !navigationLabels.Contains(T(key))))
+                    throw new InvalidOperationException("Active presentation navigation not localized: " + language);
                 await CaptureAsync(Path.Combine(directory, "07-settings-" + language + ".png"));
                 await ScrollSettingsAsync(bottom: true);
                 await CaptureAsync(Path.Combine(directory, "07b-settings-about-" + language + ".png"));
@@ -150,7 +153,7 @@ public sealed partial class MainWindow
             var fixtureArgument = Array.IndexOf(arguments, "--offline-fixture");
             if (fixtureArgument >= 0 && fixtureArgument + 1 < arguments.Length)
             {
-                SavePreferences(preferences with { Language = "en-US" });
+                ApplySmokePreferences(preferences with { Language = "en-US" });
                 var pendingCatalog = LoadCatalogAsync();
                 await SwitchCatalogSourceAsync("Offline"); await pendingCatalog;
                 if (busy || catalogCancellation is not null || MessageBar.IsOpen) throw new InvalidOperationException("Online lookup did not cancel cleanly when switching offline.");
@@ -166,14 +169,14 @@ public sealed partial class MainWindow
                 if (VisibleRuntimeCount == 0) throw new InvalidOperationException("Offline catalog failed to load.");
                 foreach (var language in Strings.Languages)
                 {
-                    SavePreferences(preferences with { Language = language });
+                    ApplySmokePreferences(preferences with { Language = language });
                     await CaptureAsync(Path.Combine(directory, "12-offline-" + language + ".png"));
                 }
                 if (store.Load().CatalogSource != "Offline") throw new InvalidOperationException("Offline preference not saved.");
                 checks.Add("Offline bundle loaded with real metadata; four languages rendered; source preference persisted.");
                 await SwitchCatalogSourceAsync("Online");
             }
-            SavePreferences(preferences with { Language = "en-US", Design = "Fluent", Transparency = "Off" }); Navigate("runtimes");
+            ApplySmokePreferences(preferences with { Language = "en-US", Design = "Fluent", Transparency = "Off" }); Navigate("runtimes");
             AppWindow.Resize(new Windows.Graphics.SizeInt32(2560, 1600));
             await CaptureAsync(Path.Combine(directory, "09-fluent-2560x1600.png"));
             if (ContentColumn.ActualWidth > palette.Tokens.ContentWidth + 1) throw new InvalidOperationException("Wide window content is not constrained.");
@@ -181,11 +184,11 @@ public sealed partial class MainWindow
             AppWindow.Resize(new Windows.Graphics.SizeInt32((int)(930 * scale), (int)(620 * scale)));
             await CaptureAsync(Path.Combine(directory, "10-fluent-compact.png"));
             checks.Add("Wide 2560 × 1600 and compact window layouts rendered; content width remains bounded.");
-            SavePreferences(preferences with { Language = "ja-JP" }); Navigate("settings");
+            ApplySmokePreferences(preferences with { Language = "ja-JP" }); Navigate("settings");
             await ScrollSettingsAsync();
             await CaptureAsync(Path.Combine(directory, "11-japanese-compact-settings.png"));
-            SavePreferences(preferences with { Design = "Material", Theme = "Dark" });
-            SavePreferences(preferences with { Language = "en-US" });
+            ApplySmokePreferences(preferences with { Design = "Material", Theme = "Dark" });
+            ApplySmokePreferences(preferences with { Language = "en-US" });
             var persisted = store.Load();
             if (persisted.Theme != "Dark" || persisted.Design != "Material" || persisted.Language != "en-US") throw new InvalidOperationException("Preferences did not persist.");
             checks.Add("Smoke-only preferences round-trip passed; user preferences were not modified.");
@@ -202,7 +205,7 @@ public sealed partial class MainWindow
     {
         foreach (var language in Strings.Languages)
         {
-            SavePreferences(preferences with { Language = language }); Navigate("catalog");
+            ApplySmokePreferences(preferences with { Language = language }); Navigate("catalog");
             var operation = BeginOperation(T("Installing {0}…", "Python 3.14.7"));
             using var work = StartWork(WorkKind.RuntimeMutation);
             operation.Observe(new("Downloading: " + new string('.', 33), false));
@@ -242,13 +245,13 @@ public sealed partial class MainWindow
             FinishOperation(operation); work?.Dispose(); MessageBar.IsOpen = false;
             if (OperationPanel.Visibility != Visibility.Collapsed) throw new InvalidOperationException("Finished progress panel remained visible.");
         }
-        SavePreferences(preferences with { Language = "en-US" });
+        ApplySmokePreferences(preferences with { Language = "en-US" });
     }
     private async Task CheckManagementSettingsAsync(string directory)
     {
         foreach (var language in Strings.Languages)
         {
-            SavePreferences(preferences with { Language = language }); Navigate("settings");
+            ApplySmokePreferences(preferences with { Language = language }); Navigate("settings");
             foreach (var title in new[] { "Network", "PIM configuration", "Installation source", "Shebang rules" })
             {
                 expandedSettings.Clear(); expandedSettings.Add(title); RenderPage(); Root.UpdateLayout();
@@ -266,7 +269,7 @@ public sealed partial class MainWindow
             if (!OperationPhaseText.Text.Contains("MB") || OperationProgressBar.Value != 50) throw new IOException("Measured transfer not displayed");
             FinishOperation(operation);
         }
-        SavePreferences(preferences with { Language = "en-US" });
+        ApplySmokePreferences(preferences with { Language = "en-US" });
         lastPathReport = await PathDiagnostics.ProbeKnownAsync(PathDiagnostics.Inspect(installed, client.Executable), installed, client.Executable);
         expandedSettings.Clear(); expandedSettings.Add("PATH and aliases"); Navigate("settings"); Root.UpdateLayout();
         await CaptureAsync(Path.Combine(directory, "17-path-diagnostics.png"), Descendants(PageHost).OfType<Expander>().Single(e => e.Tag as string == "Management:PATH and aliases"));
@@ -288,7 +291,7 @@ public sealed partial class MainWindow
         var series = Descendants(PageHost).OfType<Expander>().First(e => e.Tag is string tag && tag.StartsWith("CatalogSeries:")); series.IsExpanded = true; Root.UpdateLayout();
         if (!Descendants(series).OfType<TextBlock>().Any(t => t.Text.Contains("Embeddable", StringComparison.OrdinalIgnoreCase))) throw new IOException("Distribution filter did not populate versions");
         await CaptureAsync(Path.Combine(directory, "19-filtered-minor-series.png"));
-        SavePreferences(preferences with { CatalogPackageType = "Standard" });
+        ApplySmokePreferences(preferences with { CatalogPackageType = "Standard" });
     }
     private async Task<ContentDialog> WaitForCancellationDialogAsync(string title = "Stop this installation?")
     {
@@ -341,13 +344,13 @@ public sealed partial class MainWindow
         Navigate("catalog"); Root.UpdateLayout();
         var preview = Descendants(PageHost).OfType<ToggleSwitch>().Single(toggle => Microsoft.UI.Xaml.Automation.AutomationProperties.GetName(toggle) == T("Show preview releases"));
         preview.IsOn = !preview.IsOn; Root.UpdateLayout();
-        SavePreferences(preferences with { DefaultArchitecture = "ARM64", CatalogPackageType = "All", ConfirmBeforeUninstall = false });
-        SavePreferences(preferences with { Theme = "Light" });
+        ApplySmokePreferences(preferences with { DefaultArchitecture = "ARM64", CatalogPackageType = "All", ConfirmBeforeUninstall = false });
+        ApplySmokePreferences(preferences with { Theme = "Light" });
         Root.UpdateLayout();
         if (!ReferenceEquals(controller, SystemBackdrop)) throw new InvalidOperationException(material + " controller replaced by unrelated settings.");
         if (((SolidColorBrush)PageSurface.Background).Color.A == 255 || ((SolidColorBrush)ConnectionCard.Background).Color.A == 255 || palette.Card.A == 255)
             throw new InvalidOperationException(material + " covered by an opaque content layer.");
-        SavePreferences(preferences with { Language = "en-US", Theme = "Dark", DefaultArchitecture = "x64", ShowPreviewReleases = false, CatalogPackageType = "Standard", ConfirmBeforeUninstall = true });
+        ApplySmokePreferences(preferences with { Language = "en-US", Theme = "Dark", DefaultArchitecture = "x64", ShowPreviewReleases = false, CatalogPackageType = "Standard", ConfirmBeforeUninstall = true });
         Navigate("settings");
         await ScrollSettingsAsync();
         await CaptureAsync(Path.Combine(directory, "04-effects-" + material + ".png"));

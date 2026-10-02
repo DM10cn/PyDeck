@@ -29,13 +29,11 @@ public sealed partial class MainWindow
             ("PIM configuration", BuildPimEditor), ("PATH and aliases", BuildPathEditor), ("Refresh aliases", BuildAliasEditor),
             ("Network", BuildNetworkEditor), ("Installation source", BuildSourceEditor), ("Shebang rules", BuildShebangEditor) })
         {
-            var section = new Expander { Header = palette.Label(title, palette.Tokens.BodyFontSize, true), Tag = "Management:" + title, IsExpanded = expandedSettings.Contains(title),
-                HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                CornerRadius = new(palette.Tokens.ActionRadius), FontSize = palette.Tokens.ControlFontSize,
-                IsEnabled = (connected || title is "Network" or "Installation source") && (title != "Shebang rules" || client.SupportsMutations) };
+            var section = palette.Expander(palette.Label(title, palette.Tokens.BodyFontSize, true), expanded: expandedSettings.Contains(title));
+            section.Tag = "Management:" + title;
+            section.IsEnabled = (connected || title is "Network" or "Installation source") && (title != "Shebang rules" || client.SupportsMutations);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(section, T(title));
             BindAvailability(section, () => (connected || title is "Network" or "Installation source") && (title != "Shebang rules" || client.SupportsMutations));
-            palette.ApplySurfaceResources(section);
             settingsSections[title] = (section, build);
             void Populate() { try { section.Content = build(); } catch (Exception ex) { section.Content = palette.Label(T(ex.Message), 13); } }
             if (section.IsExpanded) Populate();
@@ -68,7 +66,6 @@ public sealed partial class MainWindow
     }
     private UIElement BuildNetworkEditor()
     {
-            var previous = preferences;
             var mode = preferences.Network.Mode;
             var body = new StackPanel { Spacing = 12 };
             var address = new TextBox { Header = T("Proxy address"), Text = preferences.Network.Address, PlaceholderText = "http://localhost:7890", FontSize = palette.Tokens.ControlFontSize };
@@ -85,6 +82,7 @@ public sealed partial class MainWindow
         InlineAction(body, "Save", async result => {
             var settings = new NetworkSettings(mode, address.Text.Trim(), username.Text.Trim()).Validate();
             var secret = clear.IsChecked == true ? "" : password.Password.Length > 0 ? password.Password : ProxyCredential.Load(settings.Address, settings.Username) ?? "";
+            var previous = preferences;
             var next = preferences with { Network = settings };
             store.Save(next);
             try { ProxyCredential.Save(settings.Address, settings.Username, secret); }

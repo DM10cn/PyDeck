@@ -9,6 +9,8 @@ public sealed partial class MainWindow
 {
     private string distributionFilter = "Standard";
     private readonly HashSet<string> expandedSeries = [];
+    private IReadOnlyList<PythonRuntime>? runtimeSnapshotSource;
+    private RuntimeCatalogSnapshot? runtimeSnapshot;
     private Grid PageGrid(params GridLength[] rows)
     {
         var grid = new Grid { RowSpacing = palette.Tokens.SectionSpacing, Tag = "PageShell" };
@@ -25,24 +27,7 @@ public sealed partial class MainWindow
         VerticalContentAlignment = VerticalAlignment.Top, Tag = "PageScroll"
     };
     private Grid Header(string eyebrow, string title, string description, FrameworkElement? action = null)
-    {
-        var grid = new Grid { ColumnSpacing = 20, RowSpacing = 4, Tag = "PageHeader" };
-        for (var i = 0; i < 3; i++) grid.RowDefinitions.Add(new() { Height = GridLength.Auto });
-        grid.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
-        grid.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
-        var kicker = palette.Label(eyebrow, palette.Tokens.CaptionFontSize, muted: true);
-        Grid.SetColumnSpan(kicker, 2); grid.Children.Add(kicker);
-        var heading = palette.Label(title, palette.Tokens.PageTitleSize, true); heading.Tag = "PageTitle";
-        heading.VerticalAlignment = VerticalAlignment.Center; Grid.SetRow(heading, 1); grid.Children.Add(heading);
-        var subtitle = palette.Label(description, palette.Tokens.BodyFontSize, muted: true);
-        Grid.SetRow(subtitle, 2); Grid.SetColumnSpan(subtitle, 2); grid.Children.Add(subtitle);
-        if (action is not null)
-        {
-            var actions = new Grid { Tag = "HeaderActions", VerticalAlignment = VerticalAlignment.Center };
-            actions.Children.Add(action); Grid.SetRow(actions, 1); Grid.SetColumn(actions, 1); grid.Children.Add(actions);
-        }
-        return grid;
-    }
+        => presentation.Header(palette, eyebrow, title, description, action);
     private StackPanel Toolbar(params UIElement[] children)
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = palette.Tokens.ToolbarSpacing, Tag = "PageToolbar" };
@@ -70,7 +55,7 @@ public sealed partial class MainWindow
         }
         At(layout, FilterBar(false), 1);
         runtimeRows = new StackPanel { Spacing = 6 };
-        At(layout, new ScrollViewer { Content = runtimeRows, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }, 2);
+        At(layout, PageScroll(runtimeRows), 2);
         PopulateRuntimes();
         return layout;
     }
@@ -82,7 +67,7 @@ public sealed partial class MainWindow
         At(layout, CatalogSourceBar(), 1);
         At(layout, FilterBar(true), 2);
         runtimeRows = new StackPanel { Spacing = 10 };
-        At(layout, new ScrollViewer { Content = runtimeRows, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }, 3);
+        At(layout, PageScroll(runtimeRows), 3);
         At(layout, palette.Label(OfflineSource ? "Use bundles from a source you trust. A checksum verifies the files, not the publisher." : "Replacing an installed micro version requires confirmation", 11, muted: true), 4);
         PopulateRuntimes();
         return layout;
@@ -93,9 +78,10 @@ public sealed partial class MainWindow
         var outer = new StackPanel { Spacing = 12 };
         var filters = new Grid { ColumnSpacing = palette.Tokens.ToolbarSpacing, Tag = "PageToolbar" };
         filters.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); filters.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); filters.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
-        var find = new AutoSuggestBox { PlaceholderText = T(online ? "Search versions or distributions" : "Search your Python versions"), Text = search, QueryIcon = new SymbolIcon(Symbol.Find), CornerRadius = new(palette.Tokens.InputRadius), MinWidth = 120, FontSize = palette.Tokens.ControlFontSize, MinHeight = palette.Tokens.ControlHeight };
+        var find = palette.Search(online ? "Search versions or distributions" : "Search your Python versions", search);
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(find, T("Search Python versions"));
-        find.TextChanged += (sender, _) => { search = sender.Text; PopulateRuntimes(); };
+        find.TextChanged += (sender, _) => { search = sender.Text; ScheduleSearchRefresh(PopulateRuntimes); };
+        find.QuerySubmitted += (_, _) => PopulateRuntimes();
         filters.Children.Add(find);
         var architectureFilter = Choice([("All architectures", "All architectures"), ("x64", "x64"), ("ARM64", "ARM64"), ("x86", "x86")], architecture,
             value =>
@@ -155,12 +141,18 @@ public sealed partial class MainWindow
 
     private void PopulateRuntimes()
     {
+        CancelSearchRefresh();
         if (runtimeRows is null) return;
         runtimeRows.Children.Clear();
         var online = page == "catalog";
-        IEnumerable<PythonRuntime> source = online ? (OfflineSource ? offlineBundle?.Runtimes : catalog) ?? [] : installed.Where(r => connected || r.IsLocalBuild);
-        var filtered = RuntimeCatalog.Filter(source, architecture, !online || preferences.ShowPreviewReleases, search)
-            .Where(r => !online || (distributionFilter == "Standard" ? !r.IsSpecialized : RuntimeCatalog.MatchesDistribution(r, distributionFilter))).ToArray();
+        IReadOnlyList<PythonRuntime> source = online ? (OfflineSource ? offlineBundle?.Runtimes : catalog) ?? [] : installed;
+        if (!ReferenceEquals(source, runtimeSnapshotSource))
+        {
+            runtimeSnapshot = new(source);
+            runtimeSnapshotSource = source;
+        }
+        var filtered = runtimeSnapshot!.Filter(architecture, !online || preferences.ShowPreviewReleases, search, online ? distributionFilter : "All")
+            .Where(r => online || connected || r.IsLocalBuild).ToArray();
         VisibleRuntimeCount = filtered.Length;
         if (resultLabel is not null) resultLabel.Text = online ? T(OfflineSource ? "Offline packages" : "RELEASE CATALOG") : T("INSTALLED VERSIONS  /  {0}", filtered.Length);
         if (online && OfflineSource && offlineBundle is null)
@@ -210,24 +202,24 @@ public sealed partial class MainWindow
         if (recommended is not null)
         {
             runtimeRows.Children.Add(palette.Label("Recommended", palette.Tokens.SectionTitleSize, true));
-            var card = RuntimeCard(recommended, true); card.Tag = "RecommendedRuntime";
+            var card = RuntimeCard(recommended, true, recommended: true); card.Tag = "RecommendedRuntime";
             runtimeRows.Children.Add(card);
         }
         runtimeRows.Children.Add(palette.Label("All versions", palette.Tokens.SectionTitleSize, true));
         foreach (var series in filtered.GroupBy(RuntimeCatalog.MinorSeries).OrderByDescending(g => RuntimeCatalog.VersionKey(g.Key)))
         {
             var items = new StackPanel { Spacing = 0 };
-            var section = new Expander { Header = "Python " + series.Key, Tag = "CatalogSeries:" + series.Key,
-                HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                Content = items, IsExpanded = expandedSeries.Contains(series.Key) || search.Length > 0,
-                CornerRadius = new(palette.Tokens.InputRadius), Padding = new(0) };
-            palette.ApplySurfaceResources(section);
+            var section = palette.Expander("Python " + series.Key, items, expandedSeries.Contains(series.Key) || search.Length > 0);
+            section.Tag = "CatalogSeries:" + series.Key;
+            section.Padding = new(0);
             // One expandable level per minor. Release rows use dividers, not nested cards.
             section.Resources["ExpanderContentBackground"] = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
             void PopulateItems()
             {
                 if (items.Children.Count != 0) return;
                 foreach (var release in series) items.Children.Add(RuntimeCard(release, true, inGroup: true));
+                // Material separates adjacent releases without outlining the group's foot.
+                palette.FinishReleaseGroup(section, items);
             }
             if (section.IsExpanded) PopulateItems();
             section.Expanding += (_, _) => { expandedSeries.Add(series.Key); PopulateItems(); };
@@ -235,7 +227,7 @@ public sealed partial class MainWindow
             runtimeRows.Children.Add(section);
         }
     }
-    private Border RuntimeCard(PythonRuntime runtime, bool online, bool inGroup = false)
+    private Border RuntimeCard(PythonRuntime runtime, bool online, bool inGroup = false, bool recommended = false)
     {
         var grid = new Grid { ColumnSpacing = 16 };
         grid.ColumnDefinitions.Add(new() { Width = new(inGroup ? 44 : 52) }); grid.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); grid.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
@@ -247,9 +239,9 @@ public sealed partial class MainWindow
         titleLine.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); titleLine.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
         titleLine.Children.Add(title);
         var badges = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
-        if (runtime.IsDefault && !online) badges.Children.Add(palette.Chip("Default", true));
-        if (runtime.IsPrerelease) badges.Children.Add(palette.Chip("Preview"));
-        if (!online && !runtime.IsManaged) badges.Children.Add(palette.Chip(runtime.IsLocalBuild ? "Local build" : "External"));
+        if (runtime.IsDefault && !online) badges.Children.Add(palette.Badge("Default", true));
+        if (runtime.IsPrerelease) badges.Children.Add(palette.Badge("Preview"));
+        if (!online && !runtime.IsManaged) badges.Children.Add(palette.Badge(runtime.IsLocalBuild ? "Local build" : "External"));
         Grid.SetColumn(badges, 1); titleLine.Children.Add(badges); details.Children.Add(titleLine);
         details.Children.Add(palette.Label($"{runtime.Company}  ·  {runtime.Architecture}", 12, muted: true));
         if (!online)
@@ -265,7 +257,7 @@ public sealed partial class MainWindow
         if (online)
         {
             var existing = installed.FirstOrDefault(r => r.Id.Equals(runtime.Id, StringComparison.OrdinalIgnoreCase) && r.Version == runtime.Version);
-            var install = palette.Action(existing is null ? "Install" : "Installed", existing is null ? "\uE896" : "\uE73E", primary: existing is null, compact: true);
+            var install = palette.Action(existing is null ? "Install" : "Installed", existing is null ? "\uE896" : "\uE73E", compact: !recommended, role: existing is null ? (recommended ? ActionRole.Primary : ActionRole.Secondary) : ActionRole.Quiet);
             BindAvailability(install, () => existing is null && CanWork(WorkKind.RuntimeMutation) && connected && client.SupportsMutations);
             install.Click += async (_, _) => { if (OfflineSource) await InstallOfflineRuntimeAsync(runtime); else await ChangeRuntimeAsync(RuntimeAction.Install, runtime); };
             actions.Children.Add(install);
@@ -282,7 +274,7 @@ public sealed partial class MainWindow
         }
         else
         {
-            var terminal = palette.Action("Terminal", "\uE756", compact: true); BindAvailability(terminal, () => !workCoordinator.Contains(WorkKind.RuntimeMutation) && !workCoordinator.Contains(WorkKind.Storage)); terminal.Click += (_, _) => OpenTerminal(runtime); actions.Children.Add(terminal);
+            var terminal = palette.Action("Terminal", "\uE756", compact: true, role: ActionRole.Quiet); BindAvailability(terminal, () => !workCoordinator.Contains(WorkKind.RuntimeMutation) && !workCoordinator.Contains(WorkKind.Storage)); terminal.Click += (_, _) => OpenTerminal(runtime); actions.Children.Add(terminal);
             var more = palette.IconAction(T("More options for {0}", RuntimeTitle(runtime)), "\uE712");
             var menu = RuntimeMenu();
             MenuFlyoutItem Item(string text, string glyph, Action action, bool enabled = true)

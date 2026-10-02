@@ -1,0 +1,68 @@
+{
+  "androidTag": "android-16.0.0_r1",
+  "files": [
+    {
+      "file": "AospColorScheme.java",
+      "upstream": "https://android.googlesource.com/platform/frameworks/libs/systemui/+/9aacbcb77aa9353e75bc7c4ebc51d20b8b241b62/monet/src/com/android/systemui/monet/ColorScheme.java",
+      "commit": "9aacbcb77aa9353e75bc7c4ebc51d20b8b241b62",
+      "sha256": "49e1dc26499f0403b57d8f649087e3dfe36a8c29550bfe7095bdec9dc413ae1e",
+      "modified": false
+    },
+    {
+      "file": "AospWallpaperColors.java",
+      "upstream": "https://android.googlesource.com/platform/frameworks/base/+/99b01a65cc4c104933788b3143285ab6bae65827/core/java/android/app/WallpaperColors.java",
+      "commit": "99b01a65cc4c104933788b3143285ab6bae65827",
+      "sha256": "956ecf75929f055a6fc5243b7a7e49ecb544114227f6d9f08ae3a16765711a6f",
+      "modified": false
+    },
+    {
+      "file": "cam_test.cc",
+      "upstream": "https://github.com/material-foundation/material-color-utilities/blob/5b3618b16fdc3825e21d5679bafd144662088ea1/cpp/cam/cam_test.cc",
+      "commit": "5b3618b16fdc3825e21d5679bafd144662088ea1",
+      "sha256": "23011d3cb23eb40afdcb4eb8938c9dcc057630cfb29e276df10f965b211f465f",
+      "modified": false
+    },
+    {
+      "file": "celebi_test.cc",
+      "upstream": "https://github.com/material-foundation/material-color-utilities/blob/5b3618b16fdc3825e21d5679bafd144662088ea1/cpp/quantize/celebi_test.cc",
+      "commit": "5b3618b16fdc3825e21d5679bafd144662088ea1",
+      "sha256": "d707e440691582fa90a9e7f183a1308a9c9a1a458fd5da788340b0874370a06d",
+      "modified": false
+    },
+    {
+      "file": "SchemeExpressiveTests.swift",
+      "upstream": "https://github.com/material-foundation/material-color-utilities/blob/5b3618b16fdc3825e21d5679bafd144662088ea1/swift/Tests/MaterialColorUtilitiesTests/SchemeTests/SchemeExpressiveTests.swift",
+      "commit": "5b3618b16fdc3825e21d5679bafd144662088ea1",
+      "sha256": "bdf9d14694c3ca72650f2dd28a316a8e61ea97405fa8c5142d6d0868b1215eaf",
+      "modified": false
+    },
+    {
+      "file": "SchemeTonalSpotTests.swift",
+      "upstream": "https://github.com/material-foundation/material-color-utilities/blob/5b3618b16fdc3825e21d5679bafd144662088ea1/swift/Tests/MaterialColorUtilitiesTests/SchemeTests/SchemeTonalSpotTests.swift",
+      "commit": "5b3618b16fdc3825e21d5679bafd144662088ea1",
+      "sha256": "ec0ef46f7e963b80e638919cda317581e4a5aedce228bb5e40fda481a263bf7c",
+      "modified": false
+    },
+    {
+      "file": "tones_test.cc",
+      "upstream": "https://github.com/material-foundation/material-color-utilities/blob/5b3618b16fdc3825e21d5679bafd144662088ea1/cpp/palettes/tones_test.cc",
+      "commit": "5b3618b16fdc3825e21d5679bafd144662088ea1",
+      "sha256": "9a338ccb97b6accc5f542dac33e6f30f3487631cd2906a584f85c86b54f1986e",
+      "modified": false
+    },
+    {
+      "file": "wsmeans_test.cc",
+      "upstream": "https://github.com/material-foundation/material-color-utilities/blob/5b3618b16fdc3825e21d5679bafd144662088ea1/cpp/quantize/wsmeans_test.cc",
+      "commit": "5b3618b16fdc3825e21d5679bafd144662088ea1",
+      "sha256": "bd1a55ab6bb751d6456b7bc5419e68e545eef5995fd7f6d46f4534526d9b2d32",
+      "modified": false
+    },
+    {
+      "file": "wu_test.cc",
+      "upstream": "https://github.com/material-foundation/material-color-utilities/blob/5b3618b16fdc3825e21d5679bafd144662088ea1/cpp/quantize/wu_test.cc",
+      "commit": "5b3618b16fdc3825e21d5679bafd144662088ea1",
+      "sha256": "8a6ffe02d79374610f27c229f646857a3246317aea98a6a253dca831ce927a86",
+      "modified": false
+    }
+  ]
+}

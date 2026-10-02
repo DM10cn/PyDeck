@@ -16,7 +16,9 @@ PyDeck 与 Microsoft 不存在隶属或背书关系，Windows、.NET、WinUI 等
 
 项目通过 NuGet 还原 Microsoft .NET / Windows App SDK 组件，依赖清单见项目文件及 `packages.lock.json`，各依赖保留自己的许可证和声明。源码仓库不内置还原后的包与运行时二进制文件
 
-原生依赖启动器、独立检查工具与 MSI 文件夹浏览操作使用 Microsoft C++ 编译，静态链接发行版基础库，对应组件仍遵循 Microsoft 的适用条款。这些原生工具无需另外安装 Visual C++ Redistributable，完整 MSI / 非打包 WinUI 应用则需要；完整运行依赖统一见[安装指南](INSTALL.zh-CN.md)
+原生依赖启动器、独立检查工具、离线 Setup 与 MSI 文件夹浏览操作使用 Microsoft C++ 编译，静态链接发行版基础库，对应组件仍遵循 Microsoft 的适用条款。这些原生工具无需另外安装 Visual C++ Redistributable，完整 MSI / 非打包 WinUI 应用则需要；完整运行依赖统一见[安装指南](INSTALL.zh-CN.md)
+
+0.7.1-fix 新增的离线 Setup 包含未修改、带微软签名的 .NET Runtime、Windows App Runtime 与 Visual C++ Redistributable 安装器，它们仍适用各自的许可证与声明，PyDeck 的 MIT 协议不替代这些条款。已核对的下载来源和哈希记录在 `packaging/setup/prerequisites.json`，源码仓库不包含这些二进制文件
 
 Python Install Manager、Python 发行包和离线包是独立软件，适用各自许可证，PyDeck 的 MIT 协议不替代这些条款。分发编译产物时，请检查实际包含组件的许可证和声明要求
 

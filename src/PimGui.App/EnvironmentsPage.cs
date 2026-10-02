@@ -47,6 +47,7 @@ public sealed partial class MainWindow
         var count = palette.Label("", palette.Tokens.CaptionFontSize, muted: true);
         void Populate()
         {
+            CancelSearchRefresh();
             var matches = environments.Where(environment =>
                 (environment.Name + " " + environment.Path + " " + environment.Version + " " + environment.BasePath)
                     .Contains(environmentSearch, StringComparison.OrdinalIgnoreCase) &&
@@ -62,10 +63,11 @@ public sealed partial class MainWindow
             if (matches.Length == 0) rows.Children.Add(Empty("\uE721", "No environments match", "Try another search or status"));
             foreach (var environment in matches) rows.Children.Add(EnvironmentRow(environment));
         }
-        var search = new AutoSuggestBox { Text = environmentSearch, PlaceholderText = T("Search environments"), QueryIcon = new SymbolIcon(Symbol.Find),
-            FontSize = palette.Tokens.ControlFontSize, MinHeight = palette.Tokens.ControlHeight, MinWidth = 160 };
+        var search = palette.Search("Search environments", environmentSearch);
+        search.MinWidth = 160;
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(search, T("Search environments"));
-        search.TextChanged += (sender, _) => { environmentSearch = sender.Text; Populate(); };
+        search.TextChanged += (sender, _) => { environmentSearch = sender.Text; ScheduleSearchRefresh(Populate); };
+        search.QuerySubmitted += (_, _) => Populate();
         var status = Choice([("All", "All statuses"), ("Ready", "Ready"), ("Unchecked", "Not checked"), ("Attention", "Needs attention")],
             environmentStatus, value => { environmentStatus = value; Populate(); }, "Environment status");
         var toolbar = new Grid { RowSpacing = 8, ColumnSpacing = palette.Tokens.ToolbarSpacing, Tag = "PageToolbar" };
@@ -94,7 +96,7 @@ public sealed partial class MainWindow
         Grid.SetColumnSpan(details, 2); body.Children.Add(details);
         var state = palette.Label(environment.State, palette.Tokens.CaptionFontSize, muted: environment.State == "Not checked");
         state.VerticalAlignment = VerticalAlignment.Center; Grid.SetRow(state, 1); body.Children.Add(state);
-        var terminal = palette.Action("Terminal", "\uE756", compact: true); BindAvailability(terminal, () => CanWork(WorkKind.Environments));
+        var terminal = palette.Action("Terminal", "\uE756", compact: true, role: ActionRole.Quiet); BindAvailability(terminal, () => CanWork(WorkKind.Environments));
         terminal.Click += async (_, _) => await OpenEnvironmentTerminalAsync(environment);
         var more = palette.IconAction(T("Environment actions") + " · " + environment.Name, "\uE712");
         var menu = RuntimeMenu();

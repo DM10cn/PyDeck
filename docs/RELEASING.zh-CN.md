@@ -1,8 +1,10 @@
 # 🚀 发行流程
 
-可选的 `InformationalVersion` 指定应用显示版本及下载文件名，例如 `0.7.0-fix`，必须以数字 `Version` 开头。安装器内部版本和正式 Git 标签仍使用数字，构建记录同时保存两者。仅修改显示名称不构成安装升级，后续发行必须递增 `Version`
-
 [English](RELEASING.md) · **简体中文** · [🏠 首页](../README.zh-CN.md)
+
+## 📋 0.7.1-fix 验证范围
+
+**2026-10-03 · Asia/Taipei：**显示与下载版本为 **0.7.1-fix**，MSI 为 **0.7.1**，MSIX 为 **0.7.1.0**，标签为 **v0.7.1**。本次进行编译、打包与静态验包，不执行自动回归脚本；GUI 交互、安装、升级与回滚、MSIX 证书信任安装均待人工验证。只记录实际取得的构建、签名和包检查结果，不沿用历史测试数量；下文命令保留为通常的开发与发行流程
 
 ## 🧰 工具
 
@@ -30,6 +32,8 @@ $thumbprint = .\scripts\New-PreviewCertificate.ps1
 
 ## 📦 构建
 
+可选的 `InformationalVersion` 指定应用显示版本及下载文件名，例如 `0.7.1-fix`，必须以数字 `Version` 开头。安装器内部版本和正式 Git 标签仍使用数字，构建记录同时保存两者。仅修改显示名称不构成安装升级，后续发行必须递增 `Version`
+
 先审查并提交修改。包版本取自 `PimGui.App.csproj`，要求三个数字段；MSI 使用该版本，MSIX 追加第四段零。每次升级都应提高安装器版本，包括后续预览版
 
 ```powershell
@@ -40,11 +44,24 @@ $release = (Get-Content .\artifacts\latest-release.txt -Raw).Trim()
 
 `Build-Release.ps1` 按锁定依赖还原、运行核心与原生检查、发布不带调试符号或内置共享运行时的应用、生成具有稳定组件身份的每用户 MSI、验证并创建 MSIX，最后签名。原生启动器与 MSI 操作 DLL 静态链接 C++ 基础库。中间文件与日志保留在已忽略的 `artifacts/`，仅 `assets/` 用于公开上传
 
-`-AllowUnsigned` 用于本地打包试验，生成的 MSIX 不能宣称可直接安装。`-SkipChecks` 跳过核心与原生测试，仅用于这些测试通过后的打包迭代，不用于最终发行构建。脚本不会自动安装依赖或更改证书信任
+📦 **从 0.7.1-fix 起：**脚本还会生成并签署 `PyDeck-Setup-<版本>-win-x64.exe`，其中包含已签名的 MSI 和未修改的微软运行时安装程序。这是新增的离线安装入口，独立 MSI 和 MSIX 继续保留，应用仍使用共享运行时，历史发行附件不变
+
+`packaging/setup/prerequisites.json` 固定官方下载地址、长度及 SHA-256。`Build-Setup.ps1` 将缺少的文件下载到已忽略的 `.local/setup-prerequisites`，核对哈希与微软签名后再嵌入；下载内容变更会阻止构建，必须核实新官方版本及签名后才能更新记录。不要提交安装器缓存。可针对同版本的现有 MSI 单独构建和验证
+
+```powershell
+.\scripts\Build-Setup.ps1 -MsiPath <已签名MSI> -OutputDirectory .\artifacts\setup-test -Checks
+.\scripts\Test-Setup.ps1 -SetupPath <Setup文件> -MsiPath <已签名MSI>
+```
+
+单独运行 `Build-Setup.ps1` 生成的是供本地验证使用的未签名外层 EXE，发行签名由 `Build-Release.ps1` 完成；`-AllowUnsignedMsi` 仅供本地测试包使用。原生 Setup 静态链接基础库，与启动器共用依赖检测，在 MSI 事务开始前顺序补装依赖，再打开原有目录和快捷方式向导
+
+`-AllowUnsigned` 用于本地打包试验，生成的 MSIX 不能宣称可直接安装。`-SkipChecks` 只编译和打包，不运行核心与原生测试；使用时应在发行说明中注明跳过的验证，构建成功不代表回归或实装测试通过。脚本不会自动安装依赖或更改证书信任
 
 ## 🧪 验证
 
 `Test-Release.ps1` 检查包身份、外部运行时、私密 / 调试文件排除、MSIX 块映射和密码学签名、签名者、MSI 品牌名称、目录浏览事件、可选快捷方式、版本、每用户范围及升级身份。它只检查包内容，不安装产品或操作 GUI。除非测试者手动信任，自签证书链仍不受系统信任
+
+包含 Setup 的构建还会验证其签名，并调用 `Test-Setup.ps1`，提取四个内嵌安装器、核对固定哈希与独立 MSI、保留报告，全程不执行安装器。原生检查覆盖依赖组合、安装后复查、取消、重启结果、篡改拒绝、文件锁定和四语言控件。发行前还需在一次性环境实测缺失依赖补装、UAC 取消、标准用户注册、失败重试、重启续装、断网安装、MSI 升级，以及仅准备 MSIX 依赖；自动状态测试不能替代这些实装验收
 
 🗂️ MSI 使用原生 `IFileOpenDialog` 选择文件夹，将安装目录和快捷方式选项保存在当前用户的安装器设置中。`Build-Launcher.ps1` 在收到 `-InstallerActionsDirectory` 参数时，才会额外编译 `/MT` 自定义操作 DLL 并检查其只导入系统 DLL；`Build-Release.ps1` 会传入该参数。该 DLL 嵌入 MSI，不作为应用依赖分发
 
@@ -88,12 +105,12 @@ powershell.exe -NoProfile -File .\scripts\Smoke-Packaged.ps1
 | MSIX 发布者 | `CN=DM10cn` |
 | MSIX 应用 ID | `App` |
 
-MSIX 为桌面应用禁用文件系统 / 注册表虚拟化，使 PIM 配置、解释器文件和跨实例锁能与非打包工具共享。两个格式均不内置 .NET、Windows App Runtime 或 PIM，MSI 与 MSIX 是独立安装渠道，不自动跨格式迁移
+MSIX 为桌面应用禁用文件系统 / 注册表虚拟化，使 PIM 配置、解释器文件和跨实例锁能与非打包工具共享。两种独立包均不内置 .NET、Windows App Runtime 或 PIM；新增的 Setup 内含共享运行时安装器，应用并未改为自包含。MSI 与 MSIX 是独立安装渠道，不自动跨格式迁移
 
-## 🔁 从 0.6.1 起，每次发行必须验证 MSI 覆盖升级
+## 🔁 从 0.6.1 起的 MSI 覆盖升级
 
 每版提供完整 MSI，不生成 MSP 或二进制差分包。运行新版 MSI，在同一次安装事务中替换旧版，无需用户先卸载。保留 UpgradeCode、每用户范围和稳定组件标识，在 InstallInitialize 后移除旧产品，失败时可回滚旧版；每次发行提高三段版本号
 
-每版必须运行 `Test-MsiOptions.ps1`，独立测试产品验证目录和快捷方式保留、旧版专属文件清理、无关用户文件保留，以及主动制造失败后的回滚。另用隔离安装验证上一正式 MSI → 新 MSI。应用设置和虚拟环境记录位于安装包之外，此规则仅适用于 MSI，MSIX 继续由 Windows 管理；完整包覆盖升级不宣称缩小下载量
+进行自动化 MSI 验收时，运行 `Test-MsiOptions.ps1`，由独立测试产品验证目录和快捷方式保留、旧版专属文件清理、无关用户文件保留，以及主动制造失败后的回滚。另用隔离安装验证上一正式 MSI → 新 MSI，未执行时明确标为待验收。应用设置和虚拟环境记录位于安装包之外，此规则仅适用于 MSI，MSIX 继续由 Windows 管理；完整包覆盖升级不宣称缩小下载量
 
 使用 `Test-MsiUpgrade.ps1 -ReleaseDirectory <新版> -PreviousReleaseDirectory <旧版>` 核对上一公开 MSI 覆盖升级后的文件哈希、应用数据与安装选项。脚本拒绝覆盖已有的 PyDeck 安装。一次性环境没有 WinUI 依赖时可加 `-SkipGui` 仅验收安装器，GUI 烟雾检查需单独执行，并注明这一边界

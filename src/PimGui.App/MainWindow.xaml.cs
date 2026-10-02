@@ -3,6 +3,7 @@ using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using PimGui.Core;
 using System.Diagnostics;
@@ -18,7 +19,9 @@ public sealed partial class MainWindow : Window
     private PimClient client = new(new ProcessRunner());
     private readonly SettingsStore store;
     private AppSettings preferences;
-    private Palette palette = new(DesignTokens.For("Material", false));
+    private DesktopPresentation presentation = null!;
+    private string ActiveDesign => presentation.Design;
+    private Palette palette = null!;
     private IReadOnlyList<PythonRuntime> installed = [];
     private IReadOnlyList<PythonRuntime>? catalog;
     private CancellationTokenSource? catalogCancellation;
@@ -41,6 +44,9 @@ public sealed partial class MainWindow : Window
     private ScrollViewer? settingsScroll;
     private double settingsOffset;
     private readonly string? smokeDirectory;
+    internal bool PerformanceProbe { get; }
+    internal bool DesignProbe { get; }
+    internal bool RestartProbe { get; }
     internal int VisibleRuntimeCount { get; private set; }
 
     public MainWindow()
@@ -51,12 +57,27 @@ public sealed partial class MainWindow : Window
         var args = Environment.GetCommandLineArgs();
         var smokeIndex = Array.IndexOf(args, "--smoke-test");
         if (smokeIndex >= 0 && smokeIndex + 1 < args.Length) smokeDirectory = Path.GetFullPath(args[smokeIndex + 1]);
+        PerformanceProbe = smokeDirectory is not null && args.Contains("--performance-only");
+        DesignProbe = smokeDirectory is not null && args.Contains("--design-only");
+        RestartProbe = smokeDirectory is not null && args.Contains("--restart-only");
         store = new(smokeDirectory is null
             ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PyDeck")
             : Path.Combine(smokeDirectory, "preferences"));
         preferences = store.Load();
         if (smokeDirectory is null && !File.Exists(store.FilePath))
-            preferences = new SettingsStore(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PimGui")).Load();
+        {
+            var legacyStore = new SettingsStore(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PimGui"));
+            preferences = legacyStore.Load();
+            if (!File.Exists(legacyStore.FilePath))
+            {
+                using var installer = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\DM10cn\PyDeck\Installer");
+                if (installer?.GetValue("InterfaceStyle") is string initialDesign && initialDesign is "Fluent" or "Material")
+                    preferences = preferences with { Design = initialDesign };
+            }
+        }
+        InitializePresentation(preferences.Design);
+        InitializeMaterialColors();
+        palette = new(DesignTokens.For(ActiveDesign, preferences.Theme == "Light", MaterialSeedForRender, preferences.MaterialColorStyle, MaterialSecondSeedForRender));
         client = CreateClient();
         InitializeSystemAppearance();
         ExtendsContentIntoTitleBar = true;
@@ -64,20 +85,45 @@ public sealed partial class MainWindow : Window
         SetTitleBar(TitleBar);
         AppWindow.Resize(new SizeInt32(1200, 820));
         AppWindow.Closing += OnClosing;
+        Closed += (_, _) => CancelSearchRefresh();
         Root.Loaded += async (_, _) =>
         {
             if (initialized) return;
             initialized = true;
             CollectShellLabels(Root);
             ApplyLanguage();
-            SizeForDisplay();
+            if (!PerformanceProbe && !DesignProbe && !RestartProbe) SizeForDisplay();
             ApplyAppearance();
+            RefreshMaterialColors();
+            if (RestartProbe) { await RunRestartProbeAsync(smokeDirectory!); return; }
+            if (DesignProbe) { await RunDesignProbeAsync(smokeDirectory!); return; }
+            if (PerformanceProbe) { await RunPerformanceProbeAsync(smokeDirectory!); return; }
             try { Builds.RecoverInterrupted(); ReloadLocalRuntimes(); } catch (Exception ex) { ShowError(ex); }
             await ConnectAsync();
             if (store.LoadWarning is { } warning) Notify(warning, InfoBarSeverity.Warning);
             if (smokeDirectory is not null) await RunSmokeTestAsync(smokeDirectory);
         };
-        Root.ActualThemeChanged += (_, _) => { if (initialized) ApplyColors(); };
+        Root.ActualThemeChanged += OnActualThemeChanged;
+    }
+
+    private void OnActualThemeChanged(FrameworkElement sender, object args)
+    {
+        if (initialized && !closed) QueueAppearance();
+    }
+
+    private void InitializePresentation(string design)
+    {
+        // Production calls this once. Isolated visual fixtures may explicitly create another presentation.
+        presentation?.Detach();
+        ShellHost.Children.Clear();
+        presentation = design == "Fluent" ? new FluentPresentation() : new MaterialPresentation();
+        ShellHost.Children.Add(presentation.CreateShell(PageSurface, BrandPanel, ConnectionCard, Navigate));
+        if (initialized)
+        {
+            // Shared chrome keeps its original translation keys. Navigation labels belong
+            // to the new presentation and are translated when its selection is updated.
+            ApplyLanguage();
+        }
     }
 
     private void SizeForDisplay()
@@ -96,6 +142,7 @@ public sealed partial class MainWindow : Window
 
     private void ApplyAppearance()
     {
+        if (closed) return;
         Root.RequestedTheme = preferences.Theme switch { "Light" => ElementTheme.Light, "System" => ElementTheme.Default, _ => ElementTheme.Dark };
         ApplyBackdrop();
         ApplyColors();
@@ -103,13 +150,18 @@ public sealed partial class MainWindow : Window
 
     private void ApplyColors()
     {
-        palette = new(AccessibleTokens(DesignTokens.For(preferences.Design, Root.ActualTheme == ElementTheme.Light).WithBackdrop(SystemBackdrop is not null)));
+        if (closed) return;
+        palette = new(AccessibleTokens(DesignTokens.For(ActiveDesign, Root.ActualTheme == ElementTheme.Light, MaterialSeedForRender, preferences.MaterialColorStyle, MaterialSecondSeedForRender).WithBackdrop(SystemBackdrop is not null)));
+        palette.InstallResources(Root.Resources);
+        palette.ConfigureProgress(BusyProgress);
+        palette.ConfigureProgress(OperationProgressBar);
+        palette.ConfigureAction(RefreshDatabaseButton, ActionRole.Quiet, compact: true);
+        palette.ConfigureAction(CancelOperationButton, ActionRole.Secondary, compact: true);
         ApplyPopupResources();
         Root.Background = SystemBackdrop is null ? Palette.Brush(palette.Shell) : new SolidColorBrush(Colors.Transparent);
         TitleBar.RequestedTheme = Root.RequestedTheme;
-        PageSurface.Background = Palette.Brush(palette.Surface);
-        PageSurface.CornerRadius = new(palette.Tokens.SurfaceRadius);
-        ContentColumn.MaxWidth = palette.Tokens.ContentWidth;
+        presentation.ApplyShell(palette);
+        ContentColumn.MaxWidth = Math.Min(palette.Tokens.ContentWidth, presentation.ContentWidth(page));
         BrandMark.Background = new SolidColorBrush(Colors.Transparent);
         BrandMark.CornerRadius = new(palette.Tokens.IconRadius);
         ConnectionCard.Background = new SolidColorBrush(Colors.Transparent);
@@ -122,23 +174,37 @@ public sealed partial class MainWindow : Window
         AppWindow.TitleBar.ButtonInactiveForegroundColor = palette.Muted;
         UpdateOperationPanel();
         RenderPage();
+        MarkMaterialColorsApplied();
+        MarkSystemAppearanceApplied();
     }
 
-    private void Nav_Click(object sender, RoutedEventArgs e)
+    private bool CanApplyPreparedAppearance()
     {
-        if (sender is Button { Tag: string destination }) Navigate(destination);
+        // Wallpaper updates may arrive at any time. Preserve in-progress editors and dialogs;
+        // the next explicit navigation consumes the prepared palette without losing input.
+        if (!initialized || closed ||
+            confirmationOpen || closeDialogOpen || cancelDialogOpen || page is "settings" or "build" or "environments") return false;
+        return FocusManager.GetFocusedElement(Root.XamlRoot) is not (TextBox or PasswordBox or RichEditBox or ComboBox or AutoSuggestBox);
     }
+
+    private void ApplyPreparedMaterialColors()
+    {
+        if (ActiveDesign == "Material" && MaterialColorsPending && CanApplyPreparedAppearance()) ApplyAppearance();
+    }
+
     private void Navigate(string destination)
     {
         page = destination;
         search = "";
         architecture = destination == "catalog" ? preferences.DefaultArchitecture : "All architectures";
         if (destination == "catalog") distributionFilter = preferences.CatalogPackageType ?? "Standard";
-        RenderPage();
+        if (SystemAppearancePending || MaterialColorsPending && ActiveDesign == "Material") ApplyAppearance();
+        else RenderPage();
         if (destination == "catalog" && !OfflineSource && catalog is null && connected && CanWork(WorkKind.Catalog)) _ = LoadCatalogAsync();
     }
     private void RenderPage()
     {
+        CancelSearchRefresh();
         availability.Clear();
         settingsSections.Clear();
         RefreshDatabaseButton.IsEnabled = CanWork(WorkKind.Runtimes) && CanWork(WorkKind.Catalog);
@@ -149,22 +215,13 @@ public sealed partial class MainWindow : Window
         activityList = null; activityEmpty = null;
         runtimeRows = null;
         resultLabel = null;
-        foreach (var button in new[] { RuntimesNav, CatalogNav, EnvironmentsNav, BuildNav, ActivityNav, SettingsNav })
-        {
-            bool selected = (string)button.Tag == page;
-            button.Background = selected ? Palette.Brush(palette.Tokens.NavigationSelected) : new SolidColorBrush(Colors.Transparent);
-            button.Foreground = Palette.Brush(selected ? palette.Accent : palette.Muted);
-            button.BorderThickness = new(selected ? palette.Tokens.NavigationIndicator : 0, 0, 0, 0);
-            button.BorderBrush = Palette.Brush(palette.Accent);
-            button.CornerRadius = new(palette.Tokens.NavigationRadius);
-            button.Padding = new(12, 8, 12, 8); button.MinHeight = 40; button.FontSize = palette.Tokens.ControlFontSize;
-            button.FontWeight = selected ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal;
-        }
+        ContentColumn.MaxWidth = Math.Min(palette.Tokens.ContentWidth, presentation.ContentWidth(page));
+        presentation.SelectPage(page, palette);
         PageHost.Children.Clear();
         PageHost.Children.Add(page switch
         {
             "build" => BuildPythonPage(), "catalog" => BuildCatalogPage(), "activity" => BuildActivityPage(),
-            "settings" => BuildSettingsPage(), "environments" => BuildEnvironmentsPage(), _ => BuildRuntimesPage()
+            "settings" => BuildSettingsPage(), "environments" => BuildEnvironmentsPage(), "components" => BuildComponentGallery(), _ => BuildRuntimesPage()
         });
     }
 
@@ -348,7 +405,8 @@ public sealed partial class MainWindow : Window
     }
     private async void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
-        if (!busy) return;
+        if (restartInProgress) { args.Cancel = true; return; }
+        if (!RestartBlockedByWork) return;
         args.Cancel = true;
         if (closeDialogOpen || confirmationOpen || cancelDialogOpen) return;
         closeDialogOpen = true;

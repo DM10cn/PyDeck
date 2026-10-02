@@ -46,6 +46,22 @@ public sealed partial class MainWindow
         At(layout, scroll, 1);
         var profile = palette.Section("Build configuration");
         profile.Spacing = 12;
+        var syncingProfile = false;
+        ComboBox? presetPicker = null, configurationPicker = null;
+        TextBlock? commandPreview = null;
+        var componentBindings = new List<(ToggleSwitch Control, Func<BuildOptions, bool> Value)>();
+        void SyncProfile()
+        {
+            syncingProfile = true;
+            try
+            {
+                if (presetPicker is not null) presetPicker.SelectedItem = presetPicker.Items.Cast<ComboBoxItem>().Single(item => (string)item.Tag == buildPreset);
+                if (configurationPicker is not null) configurationPicker.SelectedItem = configurationPicker.Items.Cast<ComboBoxItem>().Single(item => (string)item.Tag == buildOptions.Configuration);
+                foreach (var binding in componentBindings) binding.Control.IsOn = binding.Value(buildOptions);
+                if (commandPreview is not null && buildTools is { } tools) commandPreview.Text = BuildCommandText(tools);
+            }
+            finally { syncingProfile = false; }
+        }
         var version = new ComboBox { IsEditable = true, ItemsSource = buildVersions.Append(buildOptions.Version).Distinct().ToArray(),
             SelectedItem = buildOptions.Version, Text = buildOptions.Version,
             MinWidth = 210, MinHeight = palette.Tokens.ControlHeight, Padding = new(12, 4, 32, 4),
@@ -86,25 +102,28 @@ public sealed partial class MainWindow
                 }
             }
         };
-        fields.Add(BuildField("Build profile", BuildChoice([("Standard", "Standard"), ("Performance", "Performance"), ("Debug", "Debug"), ("Minimal", "Minimal"), ("Custom", "Custom")], buildPreset,
-            value => { buildPreset = value; buildOptions = BuildOptions.Preset(value, buildOptions); RenderPage(); }, "Build profile")));
-        fields.Add(BuildField("Build type", BuildChoice([("Release", "Release"), ("Debug", "Debug")], buildOptions.Configuration,
-            value => { buildOptions = buildOptions with { Configuration = value, Pgo = value == "Release" && buildOptions.Pgo }; buildPreset = "Custom"; RenderPage(); }, "Build type")));
+        presetPicker = BuildChoice([("Standard", "Standard"), ("Performance", "Performance"), ("Debug", "Debug"), ("Minimal", "Minimal"), ("Custom", "Custom")], buildPreset,
+            value => { if (syncingProfile) return; buildPreset = value; buildOptions = BuildOptions.Preset(value, buildOptions); SyncProfile(); }, "Build profile");
+        fields.Add(BuildField("Build profile", presetPicker));
+        configurationPicker = BuildChoice([("Release", "Release"), ("Debug", "Debug")], buildOptions.Configuration,
+            value => { if (syncingProfile) return; buildOptions = buildOptions with { Configuration = value, Pgo = value == "Release" && buildOptions.Pgo }; buildPreset = "Custom"; SyncProfile(); }, "Build type");
+        fields.Add(BuildField("Build type", configurationPicker));
         profile.Children.Add(BuildCompactGrid(fields, 230));
         profile.Children.Add(Toolbar(refresh, palette.Chip("x64")));
         profile.Children.Add(palette.Label("Release uses CPython's link-time optimization; Debug requires the Visual C++ debug runtime", 12, muted: true));
         var components = new List<FrameworkElement>();
-        foreach (var (label, value, change) in new (string, bool, Action<bool>)[] {
-            ("Profile-guided optimization", buildOptions.Pgo, v => buildOptions = buildOptions with { Pgo = v, Configuration = v ? "Release" : buildOptions.Configuration }),
-            ("pip", buildOptions.IncludePip, v => buildOptions = buildOptions with { IncludePip = v, IncludeSsl = v || buildOptions.IncludeSsl }),
-            ("SSL", buildOptions.IncludeSsl, v => buildOptions = buildOptions with { IncludeSsl = v, IncludePip = v && buildOptions.IncludePip }),
-            ("SQLite", buildOptions.IncludeSqlite, v => buildOptions = buildOptions with { IncludeSqlite = v }),
-            ("ctypes", buildOptions.IncludeCtypes, v => buildOptions = buildOptions with { IncludeCtypes = v }),
-            ("Tcl/Tk and IDLE", buildOptions.IncludeTk, v => buildOptions = buildOptions with { IncludeTk = v }),
-            ("Test suite", buildOptions.IncludeTests, v => buildOptions = buildOptions with { IncludeTests = v }),
-            ("Debug symbols", buildOptions.IncludeSymbols, v => buildOptions = buildOptions with { IncludeSymbols = v }) })
+        foreach (var (label, value, change) in new (string, Func<BuildOptions, bool>, Action<bool>)[] {
+            ("Profile-guided optimization", o => o.Pgo, v => buildOptions = buildOptions with { Pgo = v, Configuration = v ? "Release" : buildOptions.Configuration }),
+            ("pip", o => o.IncludePip, v => buildOptions = buildOptions with { IncludePip = v, IncludeSsl = v || buildOptions.IncludeSsl }),
+            ("SSL", o => o.IncludeSsl, v => buildOptions = buildOptions with { IncludeSsl = v, IncludePip = v && buildOptions.IncludePip }),
+            ("SQLite", o => o.IncludeSqlite, v => buildOptions = buildOptions with { IncludeSqlite = v }),
+            ("ctypes", o => o.IncludeCtypes, v => buildOptions = buildOptions with { IncludeCtypes = v }),
+            ("Tcl/Tk and IDLE", o => o.IncludeTk, v => buildOptions = buildOptions with { IncludeTk = v }),
+            ("Test suite", o => o.IncludeTests, v => buildOptions = buildOptions with { IncludeTests = v }),
+            ("Debug symbols", o => o.IncludeSymbols, v => buildOptions = buildOptions with { IncludeSymbols = v }) })
         {
-            var toggle = Toggle(value, v => { change(v); buildPreset = "Custom"; RenderPage(); }, label); BindAvailability(toggle, () => CanWork(WorkKind.Build));
+            var toggle = Toggle(value(buildOptions), v => { if (syncingProfile) return; change(v); buildPreset = "Custom"; SyncProfile(); }, label);
+            componentBindings.Add((toggle, value)); BindAvailability(toggle, () => CanWork(WorkKind.Build));
             var item = new Grid { ColumnSpacing = 12, MinHeight = 44 };
             item.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
             item.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
@@ -113,9 +132,11 @@ public sealed partial class MainWindow
             Grid.SetColumn(toggle, 1); toggle.VerticalAlignment = VerticalAlignment.Center; item.Children.Add(toggle);
             components.Add(item);
         }
-        profile.Children.Add(BuildCompactGrid(components, 330));
         body.Children.Add(profile);
         body.Children.Add(BuildSourceSection());
+        var componentSection = palette.Section("Components");
+        componentSection.Children.Add(BuildCompactGrid(components, 330));
+        body.Children.Add(componentSection);
         var dependencies = palette.Section("Build tools");
         if (buildBootstrap.Length == 0) buildBootstrap = new BuildDependencies(store.DirectoryPath).Existing ?? "";
         var prepare = palette.Action("Prepare build tools", "\uE896", compact: true); BindAvailability(prepare, () => CanWork(WorkKind.Build));
@@ -157,9 +178,9 @@ public sealed partial class MainWindow
             dependencies.Children.Add(palette.Label("MSVC " + tools.CompilerVersion + " · " + tools.PlatformToolset + " · Windows SDK " + tools.SdkVersion, 14));
             dependencies.Children.Add(palette.Label(tools.VisualStudio, 12, muted: true));
             if (tools.PlatformToolset == "v145") dependencies.Children.Add(palette.Label("v145 differs from the compiler used for official CPython builds", 12, muted: true));
-            var command = palette.Label("PCbuild\\build.bat " + BuildRecipe.CompilerArguments(buildOptions, tools) + (buildOptions.Pgo ? "\nPCbuild\\amd64\\instrumented\\python.exe " + string.Join(' ', BuildRecipe.TrainingArguments(Builds.Root)) + "\nPCbuild\\build.bat " + BuildRecipe.CompilerArguments(buildOptions, tools, "PGUpdate") : ""), 12, muted: true);
+            var command = commandPreview = palette.Label(BuildCommandText(tools), 12, muted: true);
             command.IsTextSelectionEnabled = true;
-            dependencies.Children.Add(new Expander { Header = T("Build command"), Content = command, HorizontalAlignment = HorizontalAlignment.Stretch });
+            dependencies.Children.Add(palette.Expander("Build command", command));
         }
         else dependencies.Children.Add(palette.Label("Requires Visual Studio C++ desktop tools and a Windows SDK", 12, muted: true));
         var help = palette.Action("Build tools guide", "\uE8A7");
@@ -202,13 +223,17 @@ public sealed partial class MainWindow
                 }
                 var provenance = palette.Label(T(entry.SourceUrl) + "\n" + T(entry.SourceVerification) + "\nSHA-256: " + entry.SourceSha256, 12, muted: true);
                 provenance.IsTextSelectionEnabled = true;
-                details.Children.Add(new Expander { Header = T("Source details"), Content = provenance, HorizontalAlignment = HorizontalAlignment.Stretch });
+                details.Children.Add(palette.Expander("Source details", provenance));
                 details.Children.Add(actions); history.Children.Add(palette.CardBox(details, 16));
             }
         }
         catch (Exception ex) { history.Children.Add(palette.Label(SensitiveText.Redact(ex.Message), 12)); }
         return layout;
     }
+
+    private string BuildCommandText(BuildToolchain tools) => "PCbuild\\build.bat " + BuildRecipe.CompilerArguments(buildOptions, tools) +
+        (buildOptions.Pgo ? "\nPCbuild\\amd64\\instrumented\\python.exe " + string.Join(' ', BuildRecipe.TrainingArguments(Builds.Root)) +
+            "\nPCbuild\\build.bat " + BuildRecipe.CompilerArguments(buildOptions, tools, "PGUpdate") : "");
 
     private static string BuildStateLabel(BuildState state) => state switch
     {

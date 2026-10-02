@@ -12,13 +12,13 @@ public sealed record ActivityEntry(DateTime Timestamp, ActivityLevel Level, stri
 
 public sealed partial class ActivityLog
 {
-    private readonly Queue<ActivityEntry> entries = new();
+    private readonly Queue<(ActivityEntry Entry, int Characters)> entries = new();
     private readonly object gate = new();
     private int retainedCharacters;
     private IReadOnlyCollection<ActivityEntry>? snapshot;
     public IReadOnlyCollection<ActivityEntry> Entries
     {
-        get { lock (gate) return snapshot ??= Array.AsReadOnly(entries.ToArray()); }
+        get { lock (gate) return snapshot ??= Array.AsReadOnly(entries.Select(item => item.Entry).ToArray()); }
     }
 
     public void Add(string message, ActivityLevel? level = null, ActivityOrigin origin = ActivityOrigin.Application)
@@ -27,12 +27,13 @@ public sealed partial class ActivityLog
         var severity = level ?? Classify(clean);
         if (clean.Length > 2048) clean = clean[..2048] + " [shortened]";
         var entry = new ActivityEntry(DateTime.Now, severity, clean, clean.StartsWith("> ", StringComparison.Ordinal) ? ActivityOrigin.Command : origin);
+        var characters = entry.Format().Length;
         lock (gate)
         {
-            entries.Enqueue(entry);
-            retainedCharacters += entry.Format().Length;
+            entries.Enqueue((entry, characters));
+            retainedCharacters += characters;
             while (entries.Count > 2000 || retainedCharacters * sizeof(char) > 1024 * 1024)
-                retainedCharacters -= entries.Dequeue().Format().Length;
+                retainedCharacters -= entries.Dequeue().Characters;
             snapshot = null;
         }
     }

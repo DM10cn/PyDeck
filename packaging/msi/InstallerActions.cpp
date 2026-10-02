@@ -68,6 +68,16 @@ void ChooseFolder(FolderChoice& choice) {
 
 extern "C" __declspec(dllexport) UINT __stdcall InitializeOptions(MSIHANDLE install) {
     try {
+        auto style = Property(install, L"PYDECKSTYLE");
+        if (style.empty()) {
+            style = Property(install, L"PREVIOUS_INTERFACE_STYLE");
+            if (style != L"Fluent" && style != L"Material") style = L"Material";
+        }
+        if (style != L"Fluent" && style != L"Material") {
+            ShowError(install, L"PYDECKSTYLE must be Fluent or Material.");
+            return ERROR_INSTALL_FAILURE;
+        }
+        if (Set(install, L"PYDECKSTYLE", style) != ERROR_SUCCESS) return ERROR_INSTALL_FAILURE;
         // UI selections must survive the subsequent execute-sequence AppSearch.
         if (Property(install, L"PYDECK_OPTIONS_INITIALIZED") == L"1") return ERROR_SUCCESS;
         if (Property(install, L"INSTALLFOLDER").empty()) {

@@ -1,4 +1,4 @@
-param([string]$BuildDirectory, [string]$OfflineFixture, [ValidateRange(30, 1800)][int]$TimeoutSeconds = 300)
+param([string]$BuildDirectory, [string]$OfflineFixture, [ValidateRange(30, 1800)][int]$TimeoutSeconds = 300, [switch]$PerformanceOnly, [switch]$DesignOnly)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 if (!$BuildDirectory) { $BuildDirectory = (Get-Content -LiteralPath (Join-Path $projectRoot 'artifacts\latest-build.txt') -Raw).Trim() }
@@ -7,6 +7,8 @@ if (!(Test-Path -LiteralPath $appPath)) { throw 'Build the app with scripts/Buil
 $outputDirectory = Join-Path $projectRoot ('artifacts\smoke-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 $appArguments = @('--smoke-test', ('"' + $outputDirectory + '"'))
 if ($OfflineFixture) { $appArguments += @('--offline-fixture', ('"' + $OfflineFixture + '"')) }
+if ($PerformanceOnly) { $appArguments += '--performance-only' }
+if ($DesignOnly) { $appArguments += '--design-only' }
 $appProcess = Start-Process -FilePath $appPath -ArgumentList $appArguments -WorkingDirectory $BuildDirectory -WindowStyle Hidden -PassThru
 if (!$appProcess.WaitForExit($TimeoutSeconds * 1000)) { throw "Smoke test is still running as process $($appProcess.Id). Output: $outputDirectory" }
 if ($appProcess.ExitCode -ne 0) { throw "GUI exited with code $($appProcess.ExitCode)." }
@@ -16,4 +18,4 @@ $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
 if (!$result.passed) { throw $result.error }
 $result.checks | ForEach-Object { Write-Output "PASS $_" }
 Set-Content -LiteralPath (Join-Path $projectRoot 'artifacts\latest-smoke.txt') -Value $outputDirectory -Encoding utf8
-Write-Output "Screenshots and result: $outputDirectory"
+Write-Output "$(if ($PerformanceOnly) { 'Offscreen fixture result' } else { 'Screenshots and result' }): $outputDirectory"

@@ -19,7 +19,7 @@ public sealed partial class MainWindow
         panel.Children.Add(palette.Label(environment.Executable, 12, muted: true));
         Button Action(string title, Func<Task> action, bool enabled = true)
         {
-            var button = palette.Action(title, compact: true); BindAvailability(button, () => CanWork(WorkKind.Packages) && enabled);
+            var button = palette.Action(title, compact: true, role: title == "Uninstall" ? ActionRole.Destructive : ActionRole.Secondary); BindAvailability(button, () => CanWork(WorkKind.Packages) && enabled);
             button.Click += async (_, _) => await action(); return button;
         }
         panel.Children.Add(Toolbar(Action("Refresh packages", () => OpenPackagesAsync(environment)),
@@ -45,6 +45,7 @@ public sealed partial class MainWindow
             var rows = new StackPanel { Spacing = 6 };
             void Populate(string filter)
             {
+                CancelSearchRefresh();
                 rows.Children.Clear();
                 foreach (var package in snapshot.Packages.Where(p => p.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)))
                 {
@@ -57,7 +58,9 @@ public sealed partial class MainWindow
                 }
             }
             var search = new TextBox { PlaceholderText = T("Search packages") };
-            search.TextChanged += (_, _) => Populate(search.Text); panel.Children.Add(search); Populate("");
+            search.TextChanged += (_, _) => ScheduleSearchRefresh(() => Populate(search.Text));
+            search.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Enter) Populate(search.Text); };
+            panel.Children.Add(search); Populate("");
             panel.Children.Add(new ScrollViewer { Content = rows, MaxHeight = 300, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new(0, 0, 20, 0) });
         }

@@ -2,9 +2,28 @@
 
 **English** · [简体中文](FEATURES.zh-CN.md) · [🏠 Home](../README.md)
 
-**Current version: 0.7.0-fix** — this page is the reference for feature and acceptance status. “Implemented” means the code and UI exist; completed checks are recorded below. A feature can be implemented while its full acceptance testing remains outstanding. Ideas under consideration are not commitments.
+**Current version: 0.7.1-fix** — this page is the reference for feature and acceptance status. “Implemented” means the code and UI exist; completed checks are recorded below. A feature can be implemented while its full acceptance testing remains outstanding. Ideas under consideration are not commitments.
 
-## 🧰 0.7.0-fix
+## 🎨 New in 0.7.1-fix
+
+| Area | Implemented behavior |
+| --- | --- |
+| 🧭 Separate interfaces | Fluent uses native WinUI navigation and controls; Material 3 Expressive has its own navigation, component shapes, spacing, and tonal surfaces. Both use the same Python management operations |
+| 🎨 Monet colors | Material defaults to local desktop wallpaper extraction. Pinned official MCU Celebi, HCT, and dynamic color roles use the AOSP seed scorer and 2021 color specification; Balanced and Expressive are separate palette choices |
+| 🌈 Two colors | Opt-in PyDeck `DualSource` extension combines primary/background palettes from the first source with secondary/tertiary palettes from the second. Wallpaper mode uses two candidates when available, otherwise repeats the first; manual mode saves two picker values together. It is not a complete Google CMF implementation |
+| 🖼️ Wallpaper privacy and updates | Read locally with bounded sampling; cache only opaque seed colors and a metadata hash. Keep the last usable colors if reading fails. Automatic palette changes wait during editing and apply on a page change |
+| 🔁 Interface restart | Save the style, then offer Restart now / Later. Restart now stays gray for 1.8 seconds and remains disabled while any task is active. Later preserves the current session; the saved style applies at next launch. Rejected restart requests show a message |
+| 🔎 Search and expandable sections | Native text input, clear/query behavior and expandable content retain their Windows control behavior, with design-specific sizing and Material colors |
+| 🔽 Material dropdowns | Rounded tonal popup and selected rows, trailing selection checkmark, matching pointer/pressed/disabled/focus states, and no Fluent selection stripe; native selection, scrolling, keyboard and UI Automation behavior are retained |
+| 🖱️ Scrollbars and progress | Material scroll thumbs and refresh/operation progress follow its current colors. Determinate and indeterminate indicators use primary with a tonal track; Fluent preserves native styling and Windows contrast colors take precedence |
+| 🗂️ Initial interface choice | MSI and Setup offer Material or Fluent in one package. This seeds a first launch only; existing app preferences take precedence on upgrade or reinstall |
+| 📦 Offline Setup | Embeds three Microsoft runtime installers and the MSI, skips compatible dependencies, rechecks after installation, and opens the MSI wizard. Dependencies-only mode prepares for separate MSIX installation; the standalone dependency checker remains available |
+
+See [appearance and language](../README.md#-appearance-and-language), [color source provenance](MONET.md), and [installation](INSTALL.md). The `DualSource` name describes PyDeck's extension of the pinned solver, not parity with Google's CMF or newer color specifications.
+
+**0.7.1-fix acceptance:** final GUI interaction, actual restart behavior, missing-runtime installation, and MSI/MSIX installation remain for manual acceptance. No complete automated acceptance pass is claimed for these final packages. Artifact-specific build and packaging results belong in the [release details](https://github.com/DM10cn/PyDeck/releases); older results below are historical.
+
+## 🧰 0.7.0-fix — retained features
 
 Private build-Python preparation, build storage cleanup, runtime usage and venv pip management are included in 0.7.0-fix. Application verification passed 108 core checks and 26 GUI groups; final package checks are recorded on the release. See the [0.7.0 management guide](MANAGEMENT_070.md) for usage and boundaries.
 
@@ -83,7 +102,7 @@ The table describes 0.6.1. See [Python management](MANAGEMENT.md) for usage. Onl
 | Idea | Notes |
 | --- | --- |
 | 📊 Persistent transfer history | Current activity remains session-only |
-| 🧰 Package management | 0.7.0 development adds venv pip management; uv, conda and environment migration remain outside scope |
+| 🧰 Package management | Venv pip management is available; uv, conda and environment migration remain outside scope |
 | 💻 ARM64 application builds | Catalog architecture filtering does not mean the GUI has a native ARM64 build |
 
 ⏸️ **Windows 10 support is deferred**. Windows 7, 8, and 8.1 are outside the target scope.

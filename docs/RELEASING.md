@@ -2,6 +2,10 @@
 
 **English** · [简体中文](RELEASING.zh-CN.md) · [🏠 Home](../README.md)
 
+## 📋 0.7.1-fix validation scope
+
+**2026-10-03 · Asia/Taipei:** display/download version **0.7.1-fix**, MSI **0.7.1**, MSIX **0.7.1.0**, tag **v0.7.1**. This release uses compilation, packaging and static package inspection; automated regression scripts are not run. GUI interaction, installation, upgrade/rollback and MSIX certificate-trust installation remain pending manual verification. Record actual build/signing/package results without carrying forward historical test counts. The commands below describe the general development and release workflow.
+
 ## 🧰 Tools
 
 Use the [development toolchain](DEVELOPMENT.md), PowerShell 7, **WiX 7.0.0**, and Windows SDK **MakeAppx / SignTool**. These are packaging tools, not end-user dependencies. Install the matching WiX UI extension:
@@ -28,7 +32,7 @@ The native `PyDeck.Launcher.exe` is also signed. An identical signed copy is exp
 
 ## 📦 Build
 
-An optional `InformationalVersion` supplies the app display label and asset filenames (for example, `0.7.0-fix`). It must start with the numeric `Version`. Installer identity and the stable Git tag remain numeric; the build records both values. A display-label change alone is not an installer upgrade: subsequent releases must increase `Version`.
+An optional `InformationalVersion` supplies the app display label and asset filenames (for example, `0.7.1-fix`). It must start with the numeric `Version`. Installer identity and the stable Git tag remain numeric; the build records both values. A display-label change alone is not an installer upgrade: subsequent releases must increase `Version`.
 
 Review and commit the changes first. Package version comes from `PimGui.App.csproj` and must be three numeric components. MSI uses that version; MSIX adds a fourth zero. Increase the installer version for each upgrade, including subsequent previews.
 
@@ -40,11 +44,24 @@ $release = (Get-Content .\artifacts\latest-release.txt -Raw).Trim()
 
 `Build-Release.ps1` restores locked dependencies, runs core and native checks, publishes without debug symbols or bundled shared runtimes, generates per-user MSI components with stable identities, validates/creates MSIX, and signs the output. It compiles the native launcher and MSI action DLL with static C++ support libraries. Internal files and logs remain under ignored `artifacts/`; only `assets/` is intended for publication.
 
-`-AllowUnsigned` permits local packaging experiments; the resulting MSIX must not be advertised as ready to install. `-SkipChecks` skips core and native tests for packaging-only iteration after those tests have passed; do not use it for the final release build. No script automatically installs dependencies or changes certificate trust.
+📦 **From 0.7.1-fix:** it also creates and signs `PyDeck-Setup-<version>-win-x64.exe`, containing the already-signed MSI and unmodified Microsoft runtime installers. This is an additional offline entry point; retain the standalone MSI and MSIX. The app remains framework-dependent. Existing releases are unchanged.
+
+`packaging/setup/prerequisites.json` pins the official download URLs, lengths and SHA-256 values. `Build-Setup.ps1` downloads missing files into ignored `.local/setup-prerequisites`, verifies their hashes and Microsoft signatures, then embeds them. A changed download fails the build; review the new official version and its signature before updating the pin. Do not commit cached installers. To build and verify Setup against an existing matching-version MSI locally:
+
+```powershell
+.\scripts\Build-Setup.ps1 -MsiPath <signed-msi> -OutputDirectory .\artifacts\setup-test -Checks
+.\scripts\Test-Setup.ps1 -SetupPath <setup-exe> -MsiPath <signed-msi>
+```
+
+Standalone `Build-Setup.ps1` produces an unsigned outer EXE for local checks; release signing occurs in `Build-Release.ps1`. `-AllowUnsignedMsi` is only for local fixtures. Native Setup is statically linked and shares the launcher's prerequisite detector. It runs dependencies sequentially before opening MSI, outside the MSI transaction; the existing folder and shortcut choices remain available.
+
+`-AllowUnsigned` permits local packaging experiments; the resulting MSIX must not be advertised as ready to install. `-SkipChecks` selects compilation and packaging without the core/native test runs. When using it, disclose the skipped validation in the release notes; build success does not establish passing regression or installation tests. No script automatically installs dependencies or changes certificate trust.
 
 ## 🧪 Validate
 
 `Test-Release.ps1` checks package identity, external runtimes, excluded private/debug files, the MSIX block map and cryptographic signature, signer identity, MSI branding, folder-browser wiring, optional shortcuts, version, per-user scope, and upgrade identity. It inspects packages; it does not install them or exercise the GUI. A self-signed certificate's chain remains untrusted unless the tester explicitly trusts it.
+
+For builds containing Setup, it also verifies the outer signer and invokes `Test-Setup.ps1`. That check extracts and hashes all four embedded installers, compares them with the reviewed pins and standalone MSI, and retains its report without running any installer. Native checks cover dependency combinations, post-install rechecks, cancellation, restart results, tampered payloads, file locking and four-language controls. Before release, separately test actual missing-runtime installation, UAC cancellation, standard-user registration, failure/retry, reboot/resume, offline use, MSI upgrade and dependencies-only MSIX preparation on disposable machines. Automated state tests do not prove those installation paths.
 
 🗂️ The MSI uses a native `IFileOpenDialog` folder picker and stores the chosen folder and shortcut flags in the current user's installer preferences. When passed `-InstallerActionsDirectory`, `Build-Launcher.ps1` also compiles the `/MT` custom-action DLL and verifies system-only imports; `Build-Release.ps1` supplies that argument. The DLL is embedded in the MSI, not shipped as an application dependency.
 
@@ -88,12 +105,12 @@ Starting with **0.6.0**, publish a normal GitHub release with an immutable `v<ve
 | MSIX publisher | `CN=DM10cn` |
 | MSIX application ID | `App` |
 
-MSIX filesystem/registry virtualization is disabled for the desktop app so PIM configuration, interpreter files, and the cross-instance lock remain shared with unpackaged tools. Neither format bundles .NET, Windows App Runtime, or PIM. MSI and MSIX are separate installation channels and do not perform automatic cross-format migration.
+MSIX filesystem/registry virtualization is disabled for the desktop app so PIM configuration, interpreter files, and the cross-instance lock remain shared with unpackaged tools. Neither standalone package bundles .NET, Windows App Runtime, or PIM. The new Setup entry point includes shared-runtime installers, not self-contained application runtimes. MSI and MSIX are separate installation channels and do not perform automatic cross-format migration.
 
-## 🔁 MSI replacement upgrades — required from 0.6.1
+## 🔁 MSI replacement upgrades — from 0.6.1
 
 Every release ships a full MSI, not an MSP/binary-delta patch. Running a newer MSI upgrades in one installation transaction without requiring manual removal first. Keep the UpgradeCode, per-user scope and stable component identities; schedule old-product removal after InstallInitialize so a failed upgrade can restore it. Increment the three-part version for every release.
 
-Run `Test-MsiOptions.ps1` for every release. Its isolated fixtures verify retained folder/shortcuts, removed obsolete installer-owned files, preserved unrelated user files, and rollback after an intentional upgrade failure. Also validate the previous published MSI → new MSI on a disposable installation. App preferences and venv records remain outside the MSI payload. This policy applies to MSI only; MSIX remains managed by Windows. Do not call full-package replacement a reduced-size delta download.
+For automated MSI acceptance, run `Test-MsiOptions.ps1`. Its isolated fixtures verify retained folder/shortcuts, removed obsolete installer-owned files, preserved unrelated user files, and rollback after an intentional upgrade failure. Also validate the previous published MSI → new MSI on a disposable installation, or mark that path pending when it has not been exercised. App preferences and venv records remain outside the MSI payload. This policy applies to MSI only; MSIX remains managed by Windows. Do not call full-package replacement a reduced-size delta download.
 
 Use `Test-MsiUpgrade.ps1 -ReleaseDirectory <new> -PreviousReleaseDirectory <previous>` to compare installed file hashes and preserve application data / installer choices across the previous published MSI. It refuses to overwrite an existing PyDeck installation. `-SkipGui` permits installer-only checks in a disposable system without WinUI prerequisites; run GUI smoke checks separately and report that boundary.

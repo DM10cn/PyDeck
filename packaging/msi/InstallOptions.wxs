@@ -2,6 +2,10 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Fragment>
     <UI Id="PyDeckInstallOptions">
+      <RadioButtonGroup Property="PYDECKSTYLE">
+        <RadioButton Value="Material" X="0" Y="0" Width="190" Height="18" Text="&amp;Material 3 Expressive (recommended)" />
+        <RadioButton Value="Fluent" X="202" Y="0" Width="128" Height="18" Text="&amp;Windows Fluent" />
+      </RadioButtonGroup>
       <!-- The higher-order navigation replaces the stock directory page only. -->
       <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="PyDeckInstallOptionsDlg" Order="2" Condition="LicenseAccepted = &quot;1&quot;" />
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="PyDeckInstallOptionsDlg" Order="3" Condition="NOT Installed" />
@@ -18,8 +22,10 @@
         <Control Id="DiskCost" Type="PushButton" X="283" Y="128" Width="67" Height="19" Text="Disk &amp;space...">
           <Publish Event="SpawnDialog" Value="DiskCostDlg" />
         </Control>
-        <Control Id="DesktopShortcut" Type="CheckBox" X="20" Y="156" Width="310" Height="18" Property="DESKTOPSHORTCUT" CheckBoxValue="1" Text="Create a &amp;desktop shortcut" />
-        <Control Id="StartMenuShortcut" Type="CheckBox" X="20" Y="183" Width="310" Height="18" Property="STARTMENUSHORTCUT" CheckBoxValue="1" Text="Add PyDeck to the &amp;Start menu" />
+        <Control Id="DesktopShortcut" Type="CheckBox" X="20" Y="149" Width="310" Height="18" Property="DESKTOPSHORTCUT" CheckBoxValue="1" Text="Create a &amp;desktop shortcut" />
+        <Control Id="StartMenuShortcut" Type="CheckBox" X="20" Y="171" Width="310" Height="18" Property="STARTMENUSHORTCUT" CheckBoxValue="1" Text="Add PyDeck to the &amp;Start menu" />
+        <Control Id="InterfaceStyleLabel" Type="Text" X="20" Y="193" Width="330" Height="12" Text="Initial look (existing app settings stay unchanged):" />
+        <Control Id="InterfaceStyle" Type="RadioButtonGroup" X="20" Y="208" Width="330" Height="18" Property="PYDECKSTYLE" />
         <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
         <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="&amp;Back">
           <Publish Event="NewDialog" Value="LicenseAgreementDlg" />

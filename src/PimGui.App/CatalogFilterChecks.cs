@@ -35,7 +35,7 @@ public sealed partial class MainWindow
             expandedSeries.Clear();
             foreach (var language in Strings.Languages)
             {
-                SavePreferences(preferences with { Language = language, CatalogSource = "Online", DefaultArchitecture = "x64", CatalogPackageType = "Standard", ShowPreviewReleases = false });
+                ApplySmokePreferences(preferences with { Language = language, CatalogSource = "Online", DefaultArchitecture = "x64", CatalogPackageType = "Standard", ShowPreviewReleases = false });
                 Navigate("settings"); Root.UpdateLayout(); RequireCatalogFiltersAbsentFromSettings();
                 Navigate("catalog"); Root.UpdateLayout();
                 var originalContent = PageHost.Children.Single();
@@ -88,7 +88,7 @@ public sealed partial class MainWindow
         {
             installed = originalInstalled; catalog = originalCatalog;
             expandedSeries.Clear(); foreach (var series in originalExpanded) expandedSeries.Add(series);
-            SavePreferences(originalPreferences); Navigate(originalPage); Root.UpdateLayout();
+            ApplySmokePreferences(originalPreferences); Navigate(originalPage); Root.UpdateLayout();
         }
     }
 

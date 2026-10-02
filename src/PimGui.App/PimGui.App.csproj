@@ -24,8 +24,8 @@
     <AssemblyName>PyDeck</AssemblyName>
     <RootNamespace>PimGui.App</RootNamespace>
     <DefaultLanguage>en-US</DefaultLanguage>
-    <Version>0.7.0</Version>
-    <InformationalVersion>0.7.0-fix</InformationalVersion>
+    <Version>0.7.1</Version>
+    <InformationalVersion>0.7.1-fix</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
   <ItemGroup>

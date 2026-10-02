@@ -57,10 +57,11 @@ function Invoke-Msi([string]$Verb, [string]$Package, [string[]]$Properties = @()
     if (!$process.WaitForExit(240000)) { throw "MSI fixture is still running as $($process.Id); inspect $work" }
     if ($process.ExitCode -ne $ExpectedExit) { throw "MSI $Verb returned $($process.ExitCode), expected $ExpectedExit; inspect step-$script:step.log" }
 }
-function Assert-Installation([string]$Folder, [int]$DesktopEnabled, [int]$MenuEnabled) {
+function Assert-Installation([string]$Folder, [int]$DesktopEnabled, [int]$MenuEnabled, [string]$InterfaceStyle) {
     if (!(Test-Path -LiteralPath (Join-Path $Folder 'PyDeck.Launcher.exe'))) { throw 'Custom install folder was not used.' }
     $state = Get-ItemProperty -LiteralPath ('HKCU:\' + $key)
     if ($state.InstallFolder.TrimEnd('\') -ne $Folder.TrimEnd('\') -or $state.DesktopShortcutEnabled -ne [string]$DesktopEnabled -or $state.StartMenuShortcutEnabled -ne [string]$MenuEnabled) { throw 'Installer choices were not saved correctly.' }
+    if ($state.InterfaceStyle -ne $InterfaceStyle) { throw 'The initial interface style was not saved correctly.' }
     $shell = New-Object -ComObject WScript.Shell
     try {
         foreach ($shortcut in @(@($desktop, $DesktopEnabled), @($menu, $MenuEnabled))) {
@@ -74,11 +75,15 @@ function Assert-Installation([string]$Folder, [int]$DesktopEnabled, [int]$MenuEn
     } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell) }
 }
 $cases = @(
-    @{ Name = 'defaults'; Desktop = 0; Menu = 1; Options = @() },
-    @{ Name = 'no-shortcuts'; Desktop = 0; Menu = 0; Options = @('DESKTOPSHORTCUT=0', 'STARTMENUSHORTCUT=0') },
-    @{ Name = 'desktop-only'; Desktop = 1; Menu = 0; Options = @('DESKTOPSHORTCUT=1', 'STARTMENUSHORTCUT=0') },
-    @{ Name = 'both'; Desktop = 1; Menu = 1; Options = @('DESKTOPSHORTCUT=1', 'STARTMENUSHORTCUT=1') }
+    @{ Name = 'defaults'; Desktop = 0; Menu = 1; Style = 'Material'; Options = @() },
+    @{ Name = 'no-shortcuts'; Desktop = 0; Menu = 0; Style = 'Material'; Options = @('DESKTOPSHORTCUT=0', 'STARTMENUSHORTCUT=0', 'PYDECKSTYLE=Material') },
+    @{ Name = 'desktop-only'; Desktop = 1; Menu = 0; Style = 'Fluent'; Options = @('DESKTOPSHORTCUT=1', 'STARTMENUSHORTCUT=0', 'PYDECKSTYLE=Fluent') },
+    @{ Name = 'both'; Desktop = 1; Menu = 1; Style = 'Fluent'; Options = @('DESKTOPSHORTCUT=1', 'STARTMENUSHORTCUT=1', 'PYDECKSTYLE=Fluent') }
 )
+$invalidFolder = Join-Path $work 'invalid-style'
+Invoke-Msi '/i' $packages[$metadata.version] @('INSTALLFOLDER="' + $invalidFolder + '"', 'PYDECKSTYLE=Invalid') 1603
+if ((Test-Path -LiteralPath ('HKCU:\' + $key)) -or (Test-Path -LiteralPath (Join-Path $invalidFolder 'PyDeck.Launcher.exe'))) { throw 'An invalid style was accepted.' }
+Write-Output 'PASS invalid interface style is rejected before installation'
 foreach ($case in $cases) {
     $folder = Join-Path $work ('安装目录 with spaces\' + $case.Name)
     New-Item -ItemType Directory -Path $folder -Force | Out-Null
@@ -88,24 +93,24 @@ foreach ($case in $cases) {
     try {
         Invoke-Msi '/i' $packages[$metadata.version] (@('INSTALLFOLDER="' + $folder + '"') + $case.Options)
         $active = $packages[$metadata.version]
-        Assert-Installation $folder $case.Desktop $case.Menu
-        Write-Output "PASS $($case.Name): custom Unicode/spaced folder and shortcut targets"
+        Assert-Installation $folder $case.Desktop $case.Menu $case.Style
+        Write-Output "PASS $($case.Name): custom Unicode/spaced folder, shortcut targets, and initial $($case.Style) style"
         if ($case.Name -eq 'desktop-only') {
             Invoke-Msi '/fa' $active
-            Assert-Installation $folder 1 0
-            Write-Output 'PASS repair retains installation folder and shortcut choices'
+            Assert-Installation $folder 1 0 'Fluent'
+            Write-Output 'PASS repair retains installation folder, shortcut choices, and interface style seed'
             Invoke-Msi '/i' $packages[$upgradeVersion] @('PYDECK_TEST_FAIL=1') 1603
-            Assert-Installation $folder 1 0
+            Assert-Installation $folder 1 0 'Fluent'
             if (!(Test-Path -LiteralPath (Join-Path $folder 'legacy-only.txt'))) { throw 'Rollback did not restore old payload.' }
             Assert-RegisteredVersion $packages[$metadata.version] $metadata.version
             if ((Get-Content -LiteralPath $sentinel -Raw) -ne 'This unrelated file must survive uninstall.') { throw 'Rollback changed user files.' }
             Write-Output 'PASS failed major upgrade rolls back the old installation and preserves user files'
             Invoke-Msi '/i' $packages[$upgradeVersion]
             $active = $packages[$upgradeVersion]
-            Assert-Installation $folder 1 0
+            Assert-Installation $folder 1 0 'Fluent'
             if (Test-Path -LiteralPath (Join-Path $folder 'legacy-only.txt')) { throw 'Upgrade left obsolete installer-owned files.' }
             if ((Get-Content -LiteralPath $sentinel -Raw) -ne 'This unrelated file must survive uninstall.') { throw 'Upgrade changed user files.' }
-            Write-Output 'PASS major upgrade retains installation folder and shortcut choices'
+            Write-Output 'PASS major upgrade retains installation folder, shortcut choices, and interface style seed'
             Write-Output 'PASS full MSI replacement removes obsolete payload and retains unrelated user files'
         }
     } finally { if ($active) { Invoke-Msi '/x' $active } }

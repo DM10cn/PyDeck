@@ -32,7 +32,7 @@ public sealed partial class MainWindow
             installed = [latest, anotherSeries];
             catalog = [latest, previous, older, anotherSeries, embedded];
             expandedSeries.Clear();
-            SavePreferences(preferences with { Language = "en-US", CatalogSource = "Online", DefaultArchitecture = "x64", CatalogPackageType = "Standard", ShowPreviewReleases = false });
+            ApplySmokePreferences(preferences with { Language = "en-US", CatalogSource = "Online", DefaultArchitecture = "x64", CatalogPackageType = "Standard", ShowPreviewReleases = false });
             Navigate("catalog"); Root.UpdateLayout();
             var series = Descendants(PageHost).OfType<Expander>().Single(e => e.Tag as string == "CatalogSeries:3.14");
             series.IsExpanded = true; Root.UpdateLayout();
@@ -52,17 +52,20 @@ public sealed partial class MainWindow
             if (Environments.Read().Count != 0) throw new IOException("Environment layout fixture requires a fresh smoke profile");
 
             foreach (var design in new[] { "Fluent", "Material" })
+            foreach (var theme in new[] { "Light", "Dark" })
             foreach (var language in Strings.Languages)
             foreach (var compact in new[] { false, true })
             {
-                SavePreferences(preferences with { Design = design, Language = language, Transparency = "Off" });
+                ApplySmokePreferences(preferences with { Design = design, Theme = theme, Language = language, Transparency = "Off" });
                 var scale = Root.XamlRoot.RasterizationScale;
                 AppWindow.Resize(new SizeInt32((int)((compact ? 930 : 1180) * scale), (int)((compact ? 620 : 850) * scale)));
                 foreach (var destination in new[] { "runtimes", "catalog", "environments", "build", "activity", "settings" })
                 {
                     Navigate(destination); Root.UpdateLayout(); await Task.Delay(80); Root.UpdateLayout();
-                    var context = $"{design}/{language}/{(compact ? "compact" : "normal")}/{destination}";
+                    var context = $"{design}/{theme}/{language}/{(compact ? "compact" : "normal")}/{destination}";
                     CheckPageGeometry(context);
+                    if (!compact && language == "zh-CN" && destination is "runtimes" or "catalog" or "settings" or "build")
+                        await CaptureAsync(Path.Combine(directory, $"page-{design}-{theme}-{destination}-zh-CN.png"));
                     if (destination == "catalog")
                     {
                         var preview = Descendants(PageHost).OfType<ToggleSwitch>().Single(toggle => AutomationProperties.GetName(toggle) == T("Show preview releases"));
@@ -101,7 +104,7 @@ public sealed partial class MainWindow
                             if (Grid.GetRow(control) != (row.ActualWidth < 620 ? 1 : 0)) throw new IOException("Settings controls did not adapt to the available width: " + context);
                             RequireHorizontalBounds(control, row, context);
                         }
-                        if (compact && language == "ja-JP") await CaptureAsync(Path.Combine(directory, "23-layout-" + design + "-ja-JP-compact.png"));
+                        if (compact && language == "ja-JP") await CaptureAsync(Path.Combine(directory, "23-layout-" + design + "-" + theme + "-ja-JP-compact.png"));
                     }
                 }
             }
@@ -144,14 +147,14 @@ public sealed partial class MainWindow
             expandedSeries.Clear(); foreach (var key in originalExpanded) expandedSeries.Add(key);
             activityFilter = originalActivityFilter;
             AppWindow.Resize(originalWindowSize);
-            SavePreferences(originalPreferences); Navigate(originalPage); Root.UpdateLayout();
+            ApplySmokePreferences(originalPreferences); Navigate(originalPage); Root.UpdateLayout();
         }
     }
 
     private void CheckPageGeometry(string context)
     {
-        if (palette.Tokens.ControlHeight != 32 || palette.Tokens.ControlFontSize != 14 || palette.Tokens.ControlIconSize != 16)
-            throw new IOException("Action metrics must remain 32 DIP / 14 text / 16 icon: " + context);
+        if (palette.Tokens.ControlHeight < 32 || palette.Tokens.CompactControlHeight >= palette.Tokens.ControlHeight)
+            throw new IOException("Desktop actions must have distinct regular and compact metrics: " + context);
         var header = Descendants(PageHost).OfType<Grid>().Single(grid => grid.Tag as string == "PageHeader");
         var title = Descendants(header).OfType<TextBlock>().Single(label => label.Tag as string == "PageTitle");
         if (Math.Abs(header.TransformToVisual(PageHost).TransformPoint(new Point()).X) > 1)
@@ -161,22 +164,32 @@ public sealed partial class MainWindow
         {
             var titleCenter = title.TransformToVisual(header).TransformPoint(new Point(0, title.ActualHeight / 2)).Y;
             var actionCenter = actions.TransformToVisual(header).TransformPoint(new Point(0, actions.ActualHeight / 2)).Y;
-            if (Math.Abs(titleCenter - actionCenter) > 1) throw new IOException("Header actions do not align with the title: " + context);
+            if (Grid.GetRow(actions) == Grid.GetRow(title) && Math.Abs(titleCenter - actionCenter) > 1)
+                throw new IOException($"Header actions do not align with the title ({titleCenter:F2} vs {actionCenter:F2}, header {header.ActualWidth:F2}x{header.ActualHeight:F2}, margin {actions.Margin}): {context}");
+            if (Grid.GetRow(actions) != Grid.GetRow(title) && actions.TransformToVisual(header).TransformPoint(new Point()).Y < titleCenter)
+                throw new IOException("Stacked header actions overlap the title: " + context);
         }
         foreach (var button in Descendants(PageHost).OfType<Button>().Where(button => (button.Tag as string is "ActionButton" or "IconButton") && button.ActualWidth > 0))
         {
             RequireHorizontalBounds(button, PageHost, context);
-            if (Math.Abs(button.MinHeight - palette.Tokens.ControlHeight) > 0.1) throw new IOException("Action minimum height diverged from semantic metrics: " + context);
+            var compact = button.Resources.ContainsKey("PyDeckActionCompact") && button.Resources["PyDeckActionCompact"] is true;
+            var minimumHeight = compact ? palette.Tokens.CompactControlHeight : palette.Tokens.ControlHeight;
+            var iconSize = compact ? palette.Tokens.CompactIconSize : palette.Tokens.ControlIconSize;
+            if (Math.Abs(button.MinHeight - minimumHeight) > 0.1) throw new IOException("Action minimum height diverged from its density role: " + context);
             var content = (FrameworkElement)button.Content;
-            var expectedHeight = Math.Max(palette.Tokens.ControlHeight, content.ActualHeight + button.Padding.Top + button.Padding.Bottom + button.BorderThickness.Top + button.BorderThickness.Bottom);
+            // Fluent's native presenter measures its border. Material draws the outline
+            // over the container, keeping outlined and filled actions the same height.
+            var measuredBorder = ActiveDesign == "Fluent" ? button.BorderThickness.Top + button.BorderThickness.Bottom : 0;
+            var expectedHeight = Math.Max(minimumHeight, content.ActualHeight + button.Padding.Top + button.Padding.Bottom + measuredBorder);
             if (Math.Abs(button.ActualHeight - expectedHeight) > 1) throw new IOException($"Action height is {button.ActualHeight}, expected {expectedHeight}: {context}");
-            if (button.Tag as string == "IconButton" && Math.Abs(button.ActualWidth - palette.Tokens.ControlHeight) > 1) throw new IOException("Icon button is not square: " + context);
+            if (button.Tag as string == "IconButton" && Math.Abs(button.ActualWidth - button.ActualHeight) > 1) throw new IOException("Icon button is not square: " + context);
             foreach (var label in (content as StackPanel)?.Children.OfType<TextBlock>() ?? [])
                 if (Math.Abs(label.FontSize - palette.Tokens.ControlFontSize) > 0.1 || label.IsTextTrimmed)
                     throw new IOException("Action label is clipped or has inconsistent typography: " + context);
             foreach (var icon in new[] { content }.Concat(Descendants(content).OfType<FrameworkElement>()).OfType<FontIcon>())
-                if (Math.Abs(icon.FontSize - palette.Tokens.ControlIconSize) > 0.1) throw new IOException("Action icon size is inconsistent: " + context);
-            if (content.ActualWidth + button.Padding.Left + button.Padding.Right + button.BorderThickness.Left + button.BorderThickness.Right > button.ActualWidth + 1)
+                if (Math.Abs(icon.FontSize - iconSize) > 0.1) throw new IOException("Action icon size is inconsistent: " + context);
+            var horizontalBorder = ActiveDesign == "Fluent" ? button.BorderThickness.Left + button.BorderThickness.Right : 0;
+            if (content.ActualWidth + button.Padding.Left + button.Padding.Right + horizontalBorder > button.ActualWidth + 1)
                 throw new IOException("Action content exceeds its button bounds: " + context);
         }
     }

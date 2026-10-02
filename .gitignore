@@ -10,6 +10,7 @@ artifacts/
 
 # Private planning material and local settings
 /产品设计问题.txt
+/docs/superpowers/specs/2026-10-03-independent-desktop-ui-plan.md
 *.local.json
 *.local.config
 .env
@@ -36,6 +37,7 @@ secrets.json
 *.etl
 *.binlog
 TestResults/
+**/PyDeck-Diagnostics/
 .DS_Store
 Thumbs.db
 Desktop.ini

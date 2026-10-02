@@ -75,7 +75,7 @@ try {
     if (Get-ChildItem -LiteralPath $payload -Recurse -File -Filter '*.pdb') { throw 'Debug symbols must not be included in public packages.' }
     Copy-Item -LiteralPath 'LICENSE','THIRD-PARTY-NOTICES.md' -Destination $payload
     $notices = Join-Path $payload 'ThirdPartyNotices'
-    New-Item -ItemType Directory -Path $notices | Out-Null
+    New-Item -ItemType Directory -Path $notices -Force | Out-Null
     $lock = Get-Content -LiteralPath 'src/PimGui.App/packages.lock.json' -Raw | ConvertFrom-Json
     $dependencyVersions = @{}
     foreach ($framework in $lock.dependencies.PSObject.Properties) {
@@ -176,9 +176,18 @@ try {
             Invoke-Checked (Join-Path $sdkTools 'signtool.exe') @('sign', '/fd', 'SHA256', '/sha1', $CertificateThumbprint, '/s', 'My', $package)
         }
     }
+    # Chain the shared runtime installers outside the MSI transaction, preserving its full UI.
+    & (Join-Path $PSScriptRoot 'Build-Setup.ps1') -MsiPath $msi -OutputDirectory $assets -AllowUnsignedMsi:(!$certificate) -Checks:(!$SkipChecks)
+    $setup = Join-Path $assets "PyDeck-Setup-$releaseLabel-win-x64.exe"
+    if ($certificate) {
+        Invoke-Checked (Join-Path $sdkTools 'signtool.exe') @('sign', '/fd', 'SHA256', '/sha1', $CertificateThumbprint, '/s', 'My', $setup)
+    }
     $metadata = [ordered]@{ version = $version; sourceCommit = $sourceCommit; sourceDirty = $sourceDirty; signed = [bool]$certificate; certificateThumbprint = $CertificateThumbprint; certificateExpires = $(if ($certificate) { $certificate.NotAfter.ToUniversalTime().ToString('o') } else { $null }); assets = $assets; payload = $payload }
     $metadata.releaseLabel = $releaseLabel
-    $metadata | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'build.json') -Encoding utf8
+    $metadata.automatedChecksRun = !$SkipChecks
+    $metadata.setup = $setup
+    $metadata.setupPrerequisites = @(Get-Content -LiteralPath 'packaging/setup/prerequisites.json' -Raw | ConvertFrom-Json)
+    $metadata | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $output 'build.json') -Encoding utf8
     Set-Content -LiteralPath (Join-Path $repoRoot 'artifacts\latest-release.txt') -Value $output -Encoding utf8
     Write-Output "Release packages: $assets"
     if ($sourceDirty) { Write-Warning 'Built from a working tree with changes. Commit and rebuild before public release.' }

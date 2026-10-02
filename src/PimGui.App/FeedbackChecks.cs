@@ -12,7 +12,7 @@ public sealed partial class MainWindow
         var originalLanguage = preferences.Language;
         try
         {
-            SavePreferences(preferences with { Language = "en-US" });
+            ApplySmokePreferences(preferences with { Language = "en-US" });
             foreach (var kind in new[] { "PIM configuration", "Shebang rules" })
             {
                 Navigate("settings");
@@ -77,7 +77,7 @@ public sealed partial class MainWindow
         finally
         {
             MessageBar.IsOpen = false;
-            SavePreferences(preferences with { Language = originalLanguage }); Navigate("settings");
+            ApplySmokePreferences(preferences with { Language = originalLanguage }); Navigate("settings");
         }
     }
 
@@ -85,7 +85,7 @@ public sealed partial class MainWindow
     {
         foreach (var language in Strings.Languages)
         {
-            SavePreferences(preferences with { Language = language });
+            ApplySmokePreferences(preferences with { Language = language });
             foreach (var severity in new[] { InfoBarSeverity.Success, InfoBarSeverity.Warning, InfoBarSeverity.Error })
             {
                 Notify("Configuration saved and Python list refreshed", severity);
@@ -97,7 +97,7 @@ public sealed partial class MainWindow
             await CaptureAsync(Path.Combine(directory, "20-notification-" + language + ".png"), MessageBar);
         }
         MessageBar.IsOpen = false;
-        SavePreferences(preferences with { Language = "en-US" });
+        ApplySmokePreferences(preferences with { Language = "en-US" });
     }
 
     private async Task CheckRuleEntryAndActivityAsync(string directory)
@@ -105,7 +105,7 @@ public sealed partial class MainWindow
         static string NormalizeLines(string text) => text.Replace("\r\n", "\n").Replace('\r', '\n');
         foreach (var language in Strings.Languages)
         {
-            SavePreferences(preferences with { Language = language }); Navigate("settings");
+            ApplySmokePreferences(preferences with { Language = language }); Navigate("settings");
             // Use the real editor and its click handlers without reviewing/saving any config.
             var editor = BuildShebangEditor();
             PageHost.Children.Clear(); PageHost.Children.Add(editor); Root.UpdateLayout();
@@ -176,6 +176,6 @@ public sealed partial class MainWindow
             await CaptureAsync(Path.Combine(directory, "22-activity-errors-" + language + ".png"));
         }
         activityFilter = null; MessageBar.IsOpen = false;
-        SavePreferences(preferences with { Language = "en-US" });
+        ApplySmokePreferences(preferences with { Language = "en-US" });
     }
 }

@@ -13,7 +13,12 @@ public sealed partial class MainWindow
     private readonly UISettings systemUi = new();
     private bool closed;
     private string backdropKind = "Solid";
-    private bool EffectsRequested => BackdropPolicy.RequestsEffects(preferences, systemUi.AdvancedEffectsEnabled, IsHighContrast);
+    private SystemAppearanceSnapshot? appliedSystemAppearance;
+    private bool SystemAppearancePending { get; set; }
+    private readonly record struct ContrastColors(Windows.UI.Color Background, Windows.UI.Color Foreground,
+        Windows.UI.Color Highlight, Windows.UI.Color HighlightText);
+    private readonly record struct SystemAppearanceSnapshot(ElementTheme Theme, bool Effects, string Backdrop, ContrastColors? Contrast);
+    private bool EffectsRequested => BackdropPolicy.RequestsEffects(preferences with { Design = ActiveDesign }, systemUi.AdvancedEffectsEnabled, IsHighContrast);
     // AccessibilitySettings.HighContrastChanged requires a UWP CoreWindow. This unpackaged desktop window
     // reads the desktop flag and observes UISettings.ColorValuesChanged instead.
     [StructLayout(LayoutKind.Sequential)]
@@ -37,17 +42,55 @@ public sealed partial class MainWindow
         Closed += (_, _) =>
         {
             closed = true;
+            Root.ActualThemeChanged -= OnActualThemeChanged;
             systemUi.AdvancedEffectsEnabledChanged -= OnEffectsChanged;
             systemUi.ColorValuesChanged -= OnEffectsChanged;
             SystemBackdrop = null;
         };
     }
     private void OnEffectsChanged(UISettings sender, object args) => QueueAppearance();
-    private void QueueAppearance() => DispatcherQueue.TryEnqueue(() => { if (initialized && !closed) ApplyAppearance(); });
+    private void QueueAppearance() => DispatcherQueue.TryEnqueue(() =>
+    {
+        if (!initialized || closed) return;
+        var current = CaptureSystemAppearance();
+        if (appliedSystemAppearance == current)
+        {
+            // Wallpaper-driven Windows accent changes do not affect either PyDeck palette.
+            SystemAppearancePending = false;
+            return;
+        }
+        // Contrast mode and contrast-scheme changes must remain immediately accessible.
+        // Other system changes wait until navigation when a form or dialog is in progress.
+        var contrastChanged = appliedSystemAppearance is { } previous && previous.Contrast != current.Contrast;
+        if (!contrastChanged && !CanApplyPreparedAppearance())
+        {
+            SystemAppearancePending = true;
+            return;
+        }
+        ApplyAppearance();
+    });
+
+    private SystemAppearanceSnapshot CaptureSystemAppearance()
+    {
+        var highContrast = IsHighContrast;
+        var windowsEffects = systemUi.AdvancedEffectsEnabled;
+        var activePreferences = preferences with { Design = ActiveDesign };
+        ContrastColors? contrast = highContrast ? new(systemUi.UIElementColor(UIElementType.Window),
+            systemUi.UIElementColor(UIElementType.WindowText), systemUi.UIElementColor(UIElementType.Highlight),
+            systemUi.UIElementColor(UIElementType.HighlightText)) : null;
+        return new(Root.ActualTheme, BackdropPolicy.RequestsEffects(activePreferences, windowsEffects, highContrast),
+            BackdropPolicy.Resolve(activePreferences, windowsEffects, highContrast, MicaController.IsSupported(), DesktopAcrylicController.IsSupported()), contrast);
+    }
+
+    private void MarkSystemAppearanceApplied()
+    {
+        appliedSystemAppearance = CaptureSystemAppearance();
+        SystemAppearancePending = false;
+    }
 
     private void ApplyBackdrop()
     {
-        var requested = BackdropPolicy.Resolve(preferences, systemUi.AdvancedEffectsEnabled, IsHighContrast,
+        var requested = BackdropPolicy.Resolve(preferences with { Design = ActiveDesign }, systemUi.AdvancedEffectsEnabled, IsHighContrast,
             MicaController.IsSupported(), DesktopAcrylicController.IsSupported());
         // Keep the native controller attached across language, theme and preference changes.
         // Replacing it on every save tears down the composition target while the new one connects.
@@ -65,10 +108,14 @@ public sealed partial class MainWindow
         var background = systemUi.UIElementColor(UIElementType.Window);
         var foreground = systemUi.UIElementColor(UIElementType.WindowText);
         var highlight = systemUi.UIElementColor(UIElementType.Highlight);
+        var highlightText = systemUi.UIElementColor(UIElementType.HighlightText);
         return tokens with { Shell = background, Surface = background, Card = background, Hero = background, ControlFill = background,
             Text = foreground, Muted = foreground, Line = foreground, Green = foreground,
-            Accent = highlight, OnAccent = systemUi.UIElementColor(UIElementType.HighlightText),
-            AccentContainer = background, NavigationSelected = background, CardBorder = 1 };
+            Accent = highlight, OnAccent = highlightText,
+            AccentContainer = background, OnAccentContainer = foreground, NavigationSelected = highlight, NavigationForeground = highlightText, CardBorder = 1, HighContrast = true,
+            Secondary = foreground, SecondaryContainer = background, OnSecondaryContainer = foreground,
+            Error = foreground, OnError = background, SurfaceHighest = background, Outline = foreground,
+            DisabledTextOpacity = 1, DisabledContainerOpacity = 1 };
     }
 
     private Brush PopupBrush() => EffectsRequested ? new AcrylicBrush

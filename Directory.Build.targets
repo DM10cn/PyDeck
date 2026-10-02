@@ -1,0 +1,17 @@
+<Project>
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'PimGui.App' Or '$(MSBuildProjectName)' == 'PimGui.Checks'">
+    <PyDeckColorsDirectory>$(MSBuildThisFileDirectory)artifacts\native-colors</PyDeckColorsDirectory>
+  </PropertyGroup>
+  <Target Name="BuildPyDeckColors" BeforeTargets="PrepareForBuild"
+          Condition="'$(PyDeckColorsDirectory)' != '' And '$(DesignTimeBuild)' != 'true' And '$(OS)' == 'Windows_NT'">
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)scripts\Build-Colors.ps1&quot; -OutputDirectory &quot;$(PyDeckColorsDirectory)&quot;" />
+  </Target>
+  <ItemGroup Condition="'$(PyDeckColorsDirectory)' != ''">
+    <Content Include="$(PyDeckColorsDirectory)\PyDeck.Colors.dll" Link="PyDeck.Colors.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'PimGui.App'">
+    <Content Include="$(MSBuildThisFileDirectory)src\PyDeck.Colors\vendor\material-color-utilities\LICENSE" Link="ThirdPartyNotices\Material-Color-Utilities-APACHE-2.0.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(MSBuildThisFileDirectory)src\PyDeck.Colors\LICENSE-AOSP.txt" Link="ThirdPartyNotices\AOSP-APACHE-2.0.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(MSBuildThisFileDirectory)docs\MONET.md" Link="ThirdPartyNotices\Monet-source-notes.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

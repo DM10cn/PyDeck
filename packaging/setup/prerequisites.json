@@ -1,0 +1,26 @@
+[
+  {
+    "file": "dotnet-runtime-10.0.12-win-x64.exe",
+    "url": "https://builds.dotnet.microsoft.com/dotnet/Runtime/10.0.12/dotnet-runtime-10.0.12-win-x64.exe",
+    "sha256": "02ea072c08f890f9dc0d3ac71b5fd4c2bfcdced4e1133e2d917ce5422b025585",
+    "length": 30663104,
+    "version": "10.0.12.36422",
+    "signer": "CN=.NET, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
+  },
+  {
+    "file": "windowsappruntimeinstall-2.5.1-x64.exe",
+    "url": "https://aka.ms/windowsappsdk/2.5/2.5.1/windowsappruntimeinstall-x64.exe",
+    "sha256": "931a421e8dc3e6e67724806cb67fecdbb88dfe323f0170842eb4a4b4b149f1e2",
+    "length": 120199480,
+    "version": "2.5",
+    "signer": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
+  },
+  {
+    "file": "vc_redist.x64.exe",
+    "url": "https://aka.ms/vc14/vc_redist.x64.exe",
+    "sha256": "843068991daaa1f73ad9f6239bce4d0f6a07a51f18c37ea2a867e9beca71295c",
+    "length": 18731856,
+    "version": "14.51.36247.0",
+    "signer": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
+  }
+]

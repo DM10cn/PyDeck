@@ -10,13 +10,24 @@
 
 PyDeck is a native **WinUI 3** companion for **Python Install Manager**. Browse interpreters, install a version, choose your default, and keep offline packages close at hand — in a desktop interface with **Windows Fluent** and **Material 3 Expressive** styles.
 
-📦 **Stable release · 0.7.0-fix** · 🪟 **Windows 11 x64** · 📄 **MIT**
+📦 **Stable release · 0.7.1-fix** · 🪟 **Windows 11 x64** · 📄 **MIT**
 
 ## 📦 Download
 
-Get **MSI**, **MSIX**, and the **standalone dependency helper** from [GitHub Releases](https://github.com/DM10cn/PyDeck/releases). For source, use GitHub's automatic **Source code (zip)** / **Source code (tar.gz)** links in Assets. Follow the [installation guide](docs/INSTALL.md) for dependencies, installer choices, and MSIX certificate trust.
+Get the packages from [GitHub Releases](https://github.com/DM10cn/PyDeck/releases). Choose one installation format:
 
-New in **0.7.0-fix**: 🧰 private build-Python preparation, 🧹 build storage cleanup, 🔗 runtime usage, and 📦 virtual-environment package / pip management. Background operations have independent controls and progress, with batched updates and consistent environment refresh. See the [release notes](docs/releases/0.7.0-fix.md), [management guide](docs/MANAGEMENT_070.md), and [performance notes](docs/PERFORMANCE_070.md).
+| Download | Purpose |
+| --- | --- |
+| `PyDeck-Setup-0.7.1-fix-win-x64.exe` | Offline runtime preparation followed by the MSI wizard |
+| `PyDeck-0.7.1-fix-win-x64.msi` | Standalone per-user installer; prepare runtimes separately |
+| `PyDeck-0.7.1-fix-win-x64.msix` | Windows-managed package; requires runtime dependencies and certificate trust |
+| `PyDeck-Dependencies-0.7.1-fix-win-x64.exe` | Readiness checklist and official download links; does not install PyDeck |
+
+For source, use GitHub's automatic **Source code (zip)** / **Source code (tar.gz)** links in Assets. Follow the [installation guide](docs/INSTALL.md) for dependencies, installer choices, and MSIX certificate trust.
+
+New in **0.7.1-fix**: 🎨 separate Fluent and Material 3 Expressive presentations, wallpaper-based Monet colors, manual base colors and an optional two-color palette, plus a cancellable restart prompt for switching interface style. Material search fields, dropdowns, expanders, scrollbars, and refresh/operation progress now follow the selected design and colors. See [appearance](#-appearance-and-language), [feature status](docs/FEATURES.md), and the [color-engine source notes](docs/MONET.md).
+
+The **0.7.0-fix** management features remain available: private build-Python preparation, build storage cleanup, runtime usage, and virtual-environment package / pip management. See the [management guide](docs/MANAGEMENT_070.md) and [historical performance notes](docs/PERFORMANCE_070.md).
 
 Features introduced in **0.6.1** remain available: 🧰 virtual environments, 🌐 custom HTTPS installation sources, 📜 Shebang rules, 🔔 browser-based app update checks, inline Python settings, Python / variant / EAP icons, and database refresh. MSI uses full-package replacement upgrades while retaining settings and installer choices.
 
@@ -27,10 +38,10 @@ Features introduced in **0.6.1** remain available: 🧰 virtual environments, �
 - 📦 **Work offline** — download a portable PIM bundle on one computer and install it on another
 - ⏳ **Follow an operation** — persistent stage progress and cancellation for installation, updates, and offline downloads
 - 🛠️ **Manage a runtime** — update, uninstall, set the default, open a terminal or folder, and copy its path
-- 🎨 **Make it yours** — Fluent or Material 3 Expressive, System / Light / Dark themes, and optional Fluent Mica or Acrylic
+- 🎨 **Make it yours** — separate Fluent and Material 3 Expressive interfaces, System / Light / Dark themes, Fluent Mica or Acrylic, and Material wallpaper / manual dynamic colors
 - 🌏 **Choose your language** — English by default, plus Simplified Chinese, Traditional Chinese (Taiwan), and Japanese
 - 🧰 **Recover missing dependencies** — open official runtime or Python Install Manager download pages, install the missing software yourself, then recheck or reconnect
-- 🗂️ **Choose how to install** — MSI folder selection with Browse, optional desktop and Start menu shortcuts, and preferences retained during upgrades
+- 🗂️ **Choose how to install** — MSI folder selection with Browse, optional desktop and Start menu shortcuts, an initial interface choice, and existing preferences retained during upgrades
 
 New in **0.6.0**: verified operation results, PATH / alias diagnostics, PIM configuration with backup / restore, HTTP proxies with Windows Credential Manager, measured download bytes / speed / ETA, and interpreter health checks / PIM repair. See the [Python management guide](docs/MANAGEMENT.md). These additions are not in the published 0.5.1 installers.
 
@@ -40,7 +51,9 @@ See the [feature status and roadmap](docs/FEATURES.md) for implementation detail
 
 PyDeck targets **Windows 11 x64**. The full GUI needs **.NET Runtime 10 x64** and **Windows App Runtime**; the MSI / unpackaged GUI also needs **Visual C++ v14 x64**. Exact versions, official downloads, and format-specific requirements are maintained in the [installation guide](docs/INSTALL.md).
 
-The native dependency window can open before those runtimes are installed. **Python Install Manager is needed to manage Python, but its absence does not block the GUI**: download it from the app's official link, install it, then reconnect. None of these dependencies is bundled or silently installed by PyDeck.
+The native dependency window can open before those runtimes are installed. **Python Install Manager is needed to manage Python, but its absence does not block the GUI**: download it from the app's official link, install it, then reconnect. The standalone MSI and MSIX require separate runtime installation.
+
+📦 **Offline Setup:** `PyDeck-Setup-0.7.1-fix-win-x64.exe` can install missing runtimes from its embedded installers, then open the MSI wizard. Compatible runtimes are skipped; dependencies-only mode prepares for a separate MSIX installation. The separate dependency checker only reports readiness and opens official download pages. See the [installation guide](docs/INSTALL.md); end users do not need an SDK.
 
 Windows 10 support is deferred. Visual Studio and the build tools below are only needed when building from source.
 
@@ -48,7 +61,7 @@ Windows 10 support is deferred. Visual Studio and the build tools below are only
 
 Use **Visual Studio 2026** with **WinUI application development**, the **.NET 10 SDK**, and **Windows SDK 26100**. The SDK baseline is pinned in `global.json`; NuGet dependencies have committed lock files.
 
-The prerequisite launcher also needs the **MSVC x64/x86 build tools** component, including C++ headers and desktop libraries. Published output starts through `PyDeck.Launcher.exe`; it statically links its C++ support library and imports only Windows system DLLs.
+The prerequisite launcher and native color engine also need the **MSVC x64/x86 build tools** component, including C++ headers and desktop libraries. MSBuild builds `PyDeck.Colors.dll` from pinned sources and copies it into the app output. Published output starts through `PyDeck.Launcher.exe`; the launcher statically links its C++ support library and imports only Windows system DLLs.
 
 ```powershell
 git clone https://github.com/DM10cn/PyDeck.git
@@ -75,21 +88,25 @@ PyDeck requires a standalone local bundle with SHA-256 checksums and stages a ve
 
 ## ⏳ Progress and cancellation
 
-The operation panel stays visible across pages. In 0.6.0, official package downloads show measured bytes, smoothed speed, and ETA when reliable. Values below 1 MB use KB. Extraction percentages remain **approximate stage progress** derived from PIM output; unknown phases use an indeterminate bar. Published 0.5.1 uses approximate download progress too.
+The operation panel stays visible across pages. Official package downloads show measured bytes, smoothed speed, and ETA when reliable. Values below 1 MB use KB. Extraction percentages remain **approximate stage progress** derived from PIM output; unknown phases use an indeterminate bar. In Material, refresh and operation indicators use the current primary color over a tonal track; Fluent retains native progress styling.
 
 You can stop Python installation, updates, and offline downloads. Stopping an installation requires confirmation and **may leave partial files**. PyDeck waits for the current process to exit and refreshes the installed list; it does not promise rollback. Python uninstallation cannot be cancelled mid-operation. These controls apply to Python operations inside PyDeck, not to the MSI / MSIX setup wizard.
 
 ## 🎨 Appearance and language
 
-Fluent provides **Transparency effects: Use Windows setting / On / Off**, with a separate **Mica / Acrylic** choice. Windows accessibility, power, and hardware policies can still apply a solid fallback. Material 3 Expressive uses opaque surfaces.
+Fluent and Material 3 Expressive have separate navigation and component presentations. Fluent provides **Transparency effects: Use Windows setting / On / Off**, with a separate **Mica / Acrylic** choice. Windows accessibility, power, and hardware policies can still apply a solid fallback. Material uses opaque surfaces and rounded tonal controls.
+
+Material defaults to local **desktop wallpaper** colors. You can instead apply a **custom base color**, and choose **Balanced**, **Expressive**, or **Two colors**. The native engine combines official MCU Celebi quantization and HCT/dynamic roles with the pinned AOSP wallpaper seed scorer, using the 2021 color specification. **Two colors** is PyDeck's `DualSource` extension: the first source shapes primary actions and backgrounds, and the second shapes secondary/tertiary accents. Wallpaper mode selects a second candidate when available; manual mode provides two pickers. This is not a full port of Google's CMF variant or newer color specifications. Wallpaper images stay local; only color seeds and a metadata hash are cached. See [implementation and source provenance](docs/MONET.md).
+
+Changing **interface style** saves the choice and offers **Restart now** or **Later**. Restart now remains gray for **1.8 seconds** and stays unavailable while any task is active. Later keeps the current interface and tasks running; the saved style applies on the next launch. A rejected restart request displays a message. Theme, language, and explicitly applied colors do not require a restart. Automatic wallpaper changes wait while you are editing, then apply on a page change.
 
 Language changes apply immediately and are saved. Documentation is maintained in **English and Simplified Chinese**; the application also supports Traditional Chinese (Taiwan) and Japanese. Raw PIM output and version identifiers remain unchanged.
 
 ## 🧪 Validation status
 
-Version **0.7.0-fix** passed **108 core checks** and **26 GUI check groups** in development. Earlier historical-version lifecycle and CPython build results remain documented separately; they were not rerun as part of this performance change.
+Final GUI interaction and MSI/MSIX installation for **0.7.1-fix** still require manual acceptance. This release does not claim a complete automated acceptance pass. Compilation, packaging, and any artifact checks are reported separately in the [release details](https://github.com/DM10cn/PyDeck/releases).
 
-Final package validation is recorded in the [GitHub release details](https://github.com/DM10cn/PyDeck/releases/tag/v0.7.0); clean-machine GUI deployment, production MSIX certificate-trust installation, all text-scaling settings and external accessibility remain separate acceptance work. The [feature-status table](docs/FEATURES.md) retains current and historical results, and the [development guide](docs/DEVELOPMENT.md) explains how to run the checks.
+Historical results, including **0.7.0-fix's 108 core checks and 26 GUI groups**, remain in [feature status](docs/FEATURES.md) and do not certify these new packages. Clean-machine deployment, certificate trust, text scaling, and external accessibility remain separate acceptance work.
 
 ## 🤝 Contributing
 

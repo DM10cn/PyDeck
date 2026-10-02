@@ -515,6 +515,7 @@ await BuildChecks.RunAsync(Check, CheckAsync, scratch);
 Management070Checks.Run(Check, scratch);
 WorkCoordinatorChecks.Run(Check);
 PerformanceChecks.Run(Check);
+ColorsChecks.Run(Check, scratch);
 if (args.Contains("--live-history"))
 {
     await CheckAsync("Official paginated history contains earlier micros without changing installed Python", async () =>

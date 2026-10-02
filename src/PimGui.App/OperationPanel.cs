@@ -47,6 +47,8 @@ public sealed partial class MainWindow
     }
     private void UpdateOperationPanel()
     {
+        palette.ConfigureProgress(BusyProgress);
+        RefreshDesignRestartDialog();
         OperationPanel.Visibility = activeOperation is null ? Visibility.Collapsed : Visibility.Visible;
         BusyProgress.Visibility = busy && activeOperation is null ? Visibility.Visible : Visibility.Collapsed;
         if (activeOperation is null) return;
@@ -80,11 +82,11 @@ public sealed partial class MainWindow
         }
         OperationProgressBar.IsIndeterminate = progress.Percent is null;
         OperationProgressBar.Value = progress.Percent ?? 0;
-        OperationProgressBar.Foreground = Palette.Brush(palette.Accent);
+        palette.ConfigureProgress(OperationProgressBar);
         AutomationProperties.SetName(OperationProgressBar, OperationPhaseText.Text);
         CancelOperationButton.Content = T(activeOperation.IsCancellationRequested ? "Stopping…" : "Cancel");
         CancelOperationButton.IsEnabled = operationCanCancel && !activeOperation.IsCancellationRequested;
-        palette.ApplySurfaceResources(CancelOperationButton);
+        palette.ConfigureAction(CancelOperationButton, ActionRole.Secondary, compact: true);
     }
     private void RefreshOperationChoices()
     {
