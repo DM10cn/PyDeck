@@ -49,7 +49,7 @@ The GUI requires **.NET Runtime 10 x64**, **Windows App Runtime** and **Visual C
 
 For offline Python installation, use **Install Python → Online → ⋯ → Download offline package**, copy the complete generated folder, then select it under **Install Python → Offline** on the destination computer.
 
-📖 [Installation](docs/INSTALL.md) · [Python management](docs/MANAGEMENT.md) · [Packages and build storage](docs/MANAGEMENT_070.md) · [Build Python](docs/BUILD_PYTHON.md)
+📖 [Installation](docs/INSTALL.md) · [Python management](docs/MANAGEMENT.md) · [Build Python](docs/BUILD_PYTHON.md)
 
 ## 🧑‍💻 Build from source
 

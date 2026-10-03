@@ -1,10 +1,8 @@
 # 🛠️ Build Python
 
-English · [简体中文](#简体中文)
+## English
 
-📦 Available in 0.6.3 · x64 only
-
-🧰 The 0.7.0 development version adds private bootstrap preparation and reviewed storage cleanup; see [management additions](MANAGEMENT_070.md). The instructions below also describe the 0.6.3 baseline.
+🧰 x64 builds with private Python preparation and reviewed storage cleanup; see [Python management](MANAGEMENT.md).
 
 ## 🚀 Configuration
 
@@ -42,9 +40,7 @@ Manifests and logs remain in `%LOCALAPPDATA%\PyDeck\Builds\Jobs`; default output
 
 ## 简体中文
 
-📦 0.6.3 新增 · 仅支持 x64
-
-🧰 0.7.0 开发版增加独立辅助 Python 准备与确认后空间清理，见[管理功能](MANAGEMENT_070.md#简体中文)；以下同时保留 0.6.3 基线说明
+🧰 支持 x64 构建、独立辅助 Python 准备与确认后的空间清理，见[Python 管理](MANAGEMENT.zh-CN.md)。
 
 ### 🚀 使用方法
 
@@ -60,7 +56,7 @@ Release 使用 CPython 自带的链接时优化；Debug 使用 `python_d.exe`，
 
 ### 🔎 兼容性与校验
 
-不再写死 3.14.7，但旧版不一定能用当前编译器构建。执行脚本前检查源码版本、PCbuild、打包脚本和所选功能，缺少适配时明确停止；编译器错误保留在日志。目前检测 MSVC v141/v142/v143/v145 x64 与 Windows SDK；v145 与 CPython 官方编译器不同
+可指定完整版本号，但旧版不一定能用当前编译器构建。执行脚本前检查源码版本、PCbuild、打包脚本和所选功能，缺少适配时明确停止；编译器错误保留在日志。目前检测 MSVC v141/v142/v143/v145 x64 与 Windows SDK；v145 与 CPython 官方编译器不同
 
 官方源码仅从 python.org 下载。有 Sigstore 元数据时比对 SHA-256，3.14.7 另有固定摘要；尚未验证 Sigstore 签名、身份与透明日志。旧版元数据不存在时记录 HTTPS 下载文件的指纹，与已发布摘要区分；其他元数据错误不会降级忽略。本地源码记录指纹，执行前确认来源可信
 

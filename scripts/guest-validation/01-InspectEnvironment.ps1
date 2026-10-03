@@ -1,11 +1,11 @@
 #Requires -Version 5.1
 <#
-Read-only guest preflight for PyDeck 0.7.0-fix. Run as the guest user who will
+Read-only guest preflight for PyDeck. Run as the guest user who will
 use PyDeck. Writes only its report directory; no installs, downloads, elevation,
 execution-policy changes, application launches or Hyper-V operations.
 #>
 [CmdletBinding()]
-param([string]$OutputDirectory)
+param([string]$OutputDirectory, [string]$ReferenceRelease)
 
 $ErrorActionPreference = 'Stop'
 # Windows PowerShell 5.1 can evaluate parameter defaults before PSScriptRoot
@@ -84,7 +84,7 @@ Inspect-Section 'windows' {
     $family = if ($os.InstallationType -eq 'Client') { if ($build -ge 22000) { 'Windows 11' } else { 'Windows 10' } } else { $os.ProductName }
     Add-Check 'windows.version' 'INFO' ('{0}; edition {1}; build {2}.{3}; {4}' -f $family, $os.EditionID, $build, $os.UBR, $architecture) $os
     $supported = $architecture -eq 'AMD64' -and $build -ge 22000
-    Add-Check 'windows.currentRelease' $(if ($supported) { 'PASS' } else { 'FAIL' }) 'Published PyDeck 0.7.0-fix requires Windows 11 x64 (build 22000+); this script does not bypass that gate.'
+    Add-Check 'windows.currentRelease' $(if ($supported) { 'PASS' } else { 'FAIL' }) 'PyDeck requires Windows 11 x64 (build 22000+); this script does not bypass that gate.'
     if (!$supported -and $architecture -eq 'AMD64' -and $build -ge 19041) {
         Add-Check 'windows.compatibilityCandidate' 'INFO' 'Candidate for a separate Windows 10 compatibility build, not a supported or validated release target.'
     }
@@ -149,7 +149,7 @@ $warnings = @($checks | Where-Object status -eq 'WARN')
 $status = if ($errors.Count) { 'INCOMPLETE_COLLECTION' } elseif ($failed.Count) { 'PREREQUISITES_BLOCKED' } else { 'PREFLIGHT_ONLY' }
 $report = [ordered]@{
     schemaVersion = 1; step = '01-environment'; collectedAt = [DateTimeOffset]::Now.ToString('o')
-    referenceRelease = '0.7.0-fix'; status = $status
+    referenceRelease = $ReferenceRelease; status = $status
     collectionComplete = ($script:sectionFailures -eq 0)
     limitations = @('Read-only prerequisite inspection, not an installation or GUI compatibility pass.',
         'PIM was located, not executed; its version and Python operations remain untested.',

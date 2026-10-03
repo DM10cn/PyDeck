@@ -7,7 +7,7 @@
 - Windows 11 x64
 - PowerShell 7，用于仓库的构建与发行脚本
 - Visual Studio 2026，安装 **WinUI 应用程序开发**
-- **MSVC x64/x86 编译工具**（`Microsoft.VisualStudio.Component.VC.Tools.x86.x64`），包括 C++ 标准头文件与桌面库，用于原生启动器和 MSI 操作
+- **MSVC x64/x86 编译工具**（`Microsoft.VisualStudio.Component.VC.Tools.x86.x64`），包括 C++ 标准头文件与桌面库，包含 MASM（ml64），用于颜色引擎、原生启动器、Setup 和 MSI 操作
 - .NET SDK **10.0.400** 或同一 **10.0.4xx** 功能带的后续补丁，以 `global.json` 的 `latestPatch` 为准
 - Windows SDK **10.0.26100**
 
@@ -44,6 +44,8 @@ dotnet restore PimGui.slnx --locked-mode -p:Platform=x64
 | --- | --- |
 | `src/PimGui.Core` | PIM 发现与协议、进程调用、离线包、设置、版本目录和语言资源 |
 | `src/PimGui.App` | WinUI 页面、语义设计 token、外观策略、操作面板和应用内冒烟检查 |
+| `src/PyDeck.Colors` | C++ 颜色引擎、AVX2 / SSSE3 汇编与上游算法参考 |
+| `src/PyDeck.Setup` | 原生离线安装器、依赖准备与维护操作 |
 | `src/PyDeck.Launcher` | Win32 依赖窗口、系统 DLL 导入、官方下载链接和受控 GUI 启动 |
 | `packaging/msi` | WiX 安装选项、原生文件夹选择与设置操作，静态链接 C++ 基础库 |
 | `tests/PimGui.E2E` | 破坏性 Python 生命周期测试，仅在一次性 Windows Sandbox 中运行 |
@@ -86,7 +88,7 @@ dotnet run --project tests/PimGui.Checks -- --offline-fixture "C:\TestBundles\Py
 
 这些检查需要 PIM，可能创建临时测试文件，下载检查还会访问网络；不会安装到常规 PIM 管理的解释器目录。日志和截图可能包含本地路径，分享前请检查
 
-已完成的验证与待验收项目统一见[功能状态](FEATURES.zh-CN.md)。MSI / MSIX 安装检查见[发行流程](RELEASING.zh-CN.md)，这些检查不能证明完整 Python 解释器生命周期已经通过
+历史开发记录见[归档索引](archive/README.md)，具体运行结果保留在对应的本地 artifacts 中。MSI / MSIX 安装检查见[发行流程](RELEASING.zh-CN.md)，这些检查不能证明完整 Python 解释器生命周期已经通过
 
 ## 🐍 隔离生命周期验收
 
@@ -98,17 +100,19 @@ dotnet run --project tests/PimGui.Checks -- --offline-fixture "C:\TestBundles\Py
 
 覆盖官方 PIM 25.2 → 26.3、真实 Python 补丁更新、损坏与修复、下载统计、取消、默认切换、卸载和离线重装。`-SeedBundleDirectory` 可指定平铺的较旧官方离线包；`-InstallerDirectory` 可复用缓存的 `pim-25.2.msi` / `pim-26.3.msi`，仍检查 PSF Authenticode 签名。结果位于 `artifacts/pim-e2e-*`，某项失败会停止后续依赖项，未执行不能计为通过
 
-🕰️ **历史版本检查（0.6.2）**：`Test-PimLifecycle.ps1 -HistoryOnly` 创建自己的临时沙盒，安装 PIM 26.3，从实时官方历史目录选择同一系列的最新和前一稳定版 x64 micro，检查精确安装、替换确认、陈旧状态拒绝、损坏历史版本修复、实际解释器执行、原来源元数据保留和卸载清理。该模式跳过旧 PIM 种子，不可与 `-T3Only` 同用。定义测试项目不代表已经通过，请按实际逐项 JSON 结果报告
+🕰️ **历史版本检查**：`Test-PimLifecycle.ps1 -HistoryOnly` 创建自己的临时沙盒，安装 PIM 26.3，从实时官方历史目录选择同一系列的最新和前一稳定版 x64 micro，检查精确安装、替换确认、陈旧状态拒绝、损坏历史版本修复、实际解释器执行、原来源元数据保留和卸载清理。该模式跳过旧 PIM 种子，不可与 `-T3Only` 同用。定义测试项目不代表已经通过，请按实际逐项 JSON 结果报告
 
 不要在宿主机创建标记来运行测试。即使安装目录隔离，PIM 的注册清理仍有用户级影响。沙盒使用一次性的 System 账号，因此不能替代所有交互用户、Store 包、管理员策略或干净机器 GUI 验收。详见 [Python 管理](MANAGEMENT.zh-CN.md)
 
 ## 🎨 外观与本地化
 
+两套界面的结构与控件规范见[设计系统](DESIGN_SYSTEMS.md)，动态颜色来源见[Monet](MONET.md)。使用现行语义 token 和原生控件状态；旧版尺寸记录不作为当前布局规范。
+
 颜色、间距和表面层次通过 `DesignTokens` 与外观策略定义，避免在各个页面中加入按风格分支的布局逻辑。Fluent 可使用 Mica / Acrylic，Material 3 Expressive 使用实色；无关设置变化应保留现有原生背景控制器
 
 应用文案位于 `src/PimGui.Core/Strings` 的嵌入式 JSON 资源中，`en-US`、`zh-CN`、`zh-TW`、`ja-JP` 的键需要一致，默认英语。界面优先使用自然、简短的词句，CJK 标签减少不必要的句末标点，PIM 标识和原始输出不翻译
 
-仓库 Markdown 文档仅维护英语和简体中文，修改时请同步更新并保持章节对应。用户依赖统一维护在 `INSTALL`，功能与验收状态在 `FEATURES`，构建方法在本页，打包流程在 `RELEASING`；README 概述并链接这些页面，避免再维护一份独立版本表
+仓库 Markdown 文档仅维护英语和简体中文，修改时请同步更新并保持章节对应。用户依赖统一维护在 `INSTALL`，现行功能索引在 `FEATURES`，历史开发记录在 `archive/`，构建方法在本页，打包流程在 `RELEASING`；README 概述并链接这些页面，避免再维护一份独立版本表
 
 ## 🔐 本地数据与贡献
 
@@ -120,10 +124,22 @@ dotnet run --project tests/PimGui.Checks -- --offline-fixture "C:\TestBundles\Py
 
 ## 🧰 T3 检查
 
-⚡ 通知合并、版本排序测量和登记并发检查见 [性能与状态一致性](PERFORMANCE_070.md#简体中文)，完整 GUI 检查支持 `-TimeoutSeconds`，默认 300 秒
+⚡ 通知合并、版本排序测量和登记并发检查见 [性能与状态一致性](archive/PERFORMANCE_070.md#简体中文)，完整 GUI 检查支持 `-TimeoutSeconds`，默认 300 秒
 
-🧪 0.7.0 可运行 `dotnet run --project tests/PimGui.Checks -c Release -- --management-live <全新临时目录> <可信python.exe> -`，下载独立辅助 Python、检测编译器、创建隔离 venv、补装 pip 并从 PyPI 安装和卸载 colorama，同时检查 requirements 往返、外部 PIP_TARGET 隔离和预取消。只能使用全新的临时目录；将 `-` 换为已验证的本地 NuGet 包可测试缓存准备。普通核心检查覆盖参数注入、陈旧清理、确认后新增环境依赖和归档越界，GUI 检查覆盖四种语言、两种风格与两档宽度
+🧪 可运行 `dotnet run --project tests/PimGui.Checks -c Release -- --management-live <全新临时目录> <可信python.exe> -`，下载独立辅助 Python、检测编译器、创建隔离 venv、补装 pip 并从 PyPI 安装和卸载 colorama，同时检查 requirements 往返、外部 PIP_TARGET 隔离和预取消。只能使用全新的临时目录；将 `-` 换为已验证的本地 NuGet 包可测试缓存准备。普通核心检查覆盖参数注入、陈旧清理、确认后新增环境依赖和归档越界，GUI 检查覆盖四种语言、两种风格与两档宽度
 
 核心检查覆盖正式版本信息、源地址与跨站重定向确认、过期源快照、Shebang 保留与冲突，以及未完成环境的保留。将 `PYDECK_TEST_VENV_PYTHON` 设为可信的本机 Python 路径，可追加真实临时 venv 创建、检查和移除记录测试，测试文件留在已忽略的 artifacts 目录
 
 `Test-PimLifecycle.ps1 -T3Only` 在一次性 Windows Sandbox 中运行安装源、Shebang 和 venv 验收。HTTPS 测试仅在沙箱内创建短期 localhost 证书，结束后移除其信任条目，不更改宿主机证书信任。不加 `-T3Only` 则运行完整生命周期
+
+## ⚡ 原生颜色引擎
+
+`Directory.Build.targets` 在应用构建时生成并复制 `PyDeck.Colors.dll`。仓库维护 C++ 与 `.asm` 源码，DLL 是构建产物。RGBA 转换优先使用 AVX2，回退 SSSE3；调用方保留托管后备。颜色量化的最近中心搜索使用 AVX2，不满足条件时采用标量实现。
+
+```powershell
+.\scripts\Build-Colors.ps1 -Checks
+```
+
+检查比较像素转换、量化结果和最终种子色，并核对颜色引擎导入。发行构建默认调用此命令；`-SkipChecks` 才跳过。原生构建按源码和 DLL 哈希缓存，匹配且已检查的结果可以复用。
+
+`src/PyDeck.Colors/reference` 与 `vendor/material-color-utilities` 中的 Java / Swift 是算法参考，不参与编译。保留许可证、`SOURCES.json`、上游版本与本地补丁摘要，以便追溯和更新。

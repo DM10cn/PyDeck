@@ -12,14 +12,14 @@ Fluent 与 Material 保留各自的 presentation 和原生交互，共享现有 
 
 | 界面职责 | 主要源文件 | 本轮实现与保留边界 |
 |---|---|---|
-| 全宽工作区与滚动 | [MainWindow.xaml](../src/PimGui.App/MainWindow.xaml)、[MainWindow.xaml.cs](../src/PimGui.App/MainWindow.xaml.cs)、[RuntimePages.cs](../src/PimGui.App/RuntimePages.cs) | 移除 `ContentColumn` 整体限宽；`PageHost` 和列表 viewport 铺满内容面，保留 Grid 星号行的有限高度。设置/构建等表单只在 ScrollViewer 内部限宽，滚动条仍位于工作区右侧 |
-| 独立侧栏与页头 | [MaterialPresentation.cs](../src/PimGui.App/MaterialPresentation.cs)、[FluentPresentation.cs](../src/PimGui.App/FluentPresentation.cs)、[DesktopPresentation.cs](../src/PimGui.App/DesktopPresentation.cs) | Material 展开/紧凑侧栏保留全部目的地、设置与可访问名称；当前导航使用 tonal 状态。窄侧栏显式清除原生 `MinWidth` 约束，并检查控件位于分配槽内 |
-| 语义 token 与原生状态 | [DesignTokens.cs](../src/PimGui.App/DesignTokens.cs)、[DesignComponents.cs](../src/PimGui.App/DesignComponents.cs)、[MaterialTemplates.cs](../src/PimGui.App/MaterialTemplates.cs)、[Appearance.cs](../src/PimGui.App/Appearance.cs) | 统一字号/行高、角色表面与密度；保留 hover、pressed、disabled、focus；运行期间动画偏好变化更新现有模板过渡，不重建当前页面 |
-| 我的 Python 与安装操作 | [RuntimePages.cs](../src/PimGui.App/RuntimePages.cs)、[Visuals.cs](../src/PimGui.App/Visuals.cs)、[RuntimeListView.cs](../src/PimGui.App/RuntimeListView.cs) | 默认 badge 靠近标题，默认容器采用轻量 tonal 区别；保留版本、发行来源、架构、路径与复制入口。安装/已安装共享真实文本测量占位，隐藏测量内容不进入普通 UIA 视图；原有命令及禁用条件保留 |
-| 连续版本分组与回收 | [RuntimeListView.cs](../src/PimGui.App/RuntimeListView.cs)、[DesignExpanderStyles.cs](../src/PimGui.App/DesignExpanderStyles.cs) | 将组头与 release 展平为同一原生 `ListView` 数据序列，由 `ItemsStackPanel` 回收；native Expander 负责展开语义。按稳定 key 更新条目、同步搜索展开状态、保留滚动锚点；回收时清除旧内容和标记 |
-| 搜索与筛选 | [RuntimePages.cs](../src/PimGui.App/RuntimePages.cs) | 搜索保持弹性宽度，筛选按内容需求和文字缩放换行；结果摘要区分全部与筛选数量，无匹配可清除筛选。继续使用原生输入、已有查询/排序/筛选语义 |
-| Activity | [ActivityPage.cs](../src/PimGui.App/ActivityPage.cs) | 保留真实日志模型、级别筛选、错误详情、复制/清空；区分空会话与筛选无记录。原本位于末尾才跟随追加，阅读历史时使用原生可见条目锚定；工具栏按真实内容宽度换行 |
-| 本地化与检查 | [Strings](../src/PimGui.Core/Strings)、[RuntimeWorkspaceChecks.cs](../src/PimGui.App/RuntimeWorkspaceChecks.cs)、[VirtualizedListChecks.cs](../src/PimGui.App/VirtualizedListChecks.cs)、[MaterialInteractionChecks.cs](../src/PimGui.App/MaterialInteractionChecks.cs) | 补充四语言文案、全宽/等宽矩阵、原生状态和合成长列表检查；不把程序化焦点/UIA 调用当作完整人工键盘或读屏验收 |
+| 全宽工作区与滚动 | [MainWindow.xaml](../../src/PimGui.App/MainWindow.xaml)、[MainWindow.xaml.cs](../../src/PimGui.App/MainWindow.xaml.cs)、[RuntimePages.cs](../../src/PimGui.App/RuntimePages.cs) | 移除 `ContentColumn` 整体限宽；`PageHost` 和列表 viewport 铺满内容面，保留 Grid 星号行的有限高度。设置/构建等表单只在 ScrollViewer 内部限宽，滚动条仍位于工作区右侧 |
+| 独立侧栏与页头 | [MaterialPresentation.cs](../../src/PimGui.App/MaterialPresentation.cs)、[FluentPresentation.cs](../../src/PimGui.App/FluentPresentation.cs)、[DesktopPresentation.cs](../../src/PimGui.App/DesktopPresentation.cs) | Material 展开/紧凑侧栏保留全部目的地、设置与可访问名称；当前导航使用 tonal 状态。窄侧栏显式清除原生 `MinWidth` 约束，并检查控件位于分配槽内 |
+| 语义 token 与原生状态 | [DesignTokens.cs](../../src/PimGui.App/DesignTokens.cs)、[DesignComponents.cs](../../src/PimGui.App/DesignComponents.cs)、[MaterialTemplates.cs](../../src/PimGui.App/MaterialTemplates.cs)、[Appearance.cs](../../src/PimGui.App/Appearance.cs) | 统一字号/行高、角色表面与密度；保留 hover、pressed、disabled、focus；运行期间动画偏好变化更新现有模板过渡，不重建当前页面 |
+| 我的 Python 与安装操作 | [RuntimePages.cs](../../src/PimGui.App/RuntimePages.cs)、[Visuals.cs](../../src/PimGui.App/Visuals.cs)、[RuntimeListView.cs](../../src/PimGui.App/RuntimeListView.cs) | 默认 badge 靠近标题，默认容器采用轻量 tonal 区别；保留版本、发行来源、架构、路径与复制入口。安装/已安装共享真实文本测量占位，隐藏测量内容不进入普通 UIA 视图；原有命令及禁用条件保留 |
+| 连续版本分组与回收 | [RuntimeListView.cs](../../src/PimGui.App/RuntimeListView.cs)、[DesignExpanderStyles.cs](../../src/PimGui.App/DesignExpanderStyles.cs) | 将组头与 release 展平为同一原生 `ListView` 数据序列，由 `ItemsStackPanel` 回收；native Expander 负责展开语义。按稳定 key 更新条目、同步搜索展开状态、保留滚动锚点；回收时清除旧内容和标记 |
+| 搜索与筛选 | [RuntimePages.cs](../../src/PimGui.App/RuntimePages.cs) | 搜索保持弹性宽度，筛选按内容需求和文字缩放换行；结果摘要区分全部与筛选数量，无匹配可清除筛选。继续使用原生输入、已有查询/排序/筛选语义 |
+| Activity | [ActivityPage.cs](../../src/PimGui.App/ActivityPage.cs) | 保留真实日志模型、级别筛选、错误详情、复制/清空；区分空会话与筛选无记录。原本位于末尾才跟随追加，阅读历史时使用原生可见条目锚定；工具栏按真实内容宽度换行 |
+| 本地化与检查 | [Strings](../../src/PimGui.Core/Strings)、[RuntimeWorkspaceChecks.cs](../../src/PimGui.App/RuntimeWorkspaceChecks.cs)、[VirtualizedListChecks.cs](../../src/PimGui.App/VirtualizedListChecks.cs)、[MaterialInteractionChecks.cs](../../src/PimGui.App/MaterialInteractionChecks.cs) | 补充四语言文案、全宽/等宽矩阵、原生状态和合成长列表检查；不把程序化焦点/UIA 调用当作完整人工键盘或读屏验收 |
 
 以下均为项目使用的 DIP / XAML 有效像素，不是对截图反推的尺寸，也不宣称为 Google 官方 token：
 
@@ -38,14 +38,14 @@ Fluent 与 Material 保留各自的 presentation 和原生交互，共享现有 
 
 | 证据 | 路径 | 结论与边界 |
 |---|---|---|
-| 最终开发构建 | [PyDeck.Launcher.exe](../artifacts/dev-win-x64-20261003-130033/PyDeck.Launcher.exe)、[发布日志](../artifacts/md3e-final-publish.log) | 编译 0 警告、0 错误；原生 launcher 检查通过。开发构建，未制作安装器或发布 release |
-| 核心检查 | [md3e-final-build.log](../artifacts/md3e-final-build.log) | 118 passed，0 failed |
-| 旧版基线 | [smoke-20261003-122730/result.json](../artifacts/smoke-20261003-122730/result.json)、[来源说明](../artifacts/md3e-baseline-build/baseline-provenance.json) | 归档提交 `0a4311a945796b9ec279ac0d57984ec3c52ebba5`，仅注入独立测量夹具；192 场景通过 |
-| 布局与对比 | [smoke-20261003-124845/workspace-layout.json](../artifacts/smoke-20261003-124845/workspace-layout.json)、[密度比较](../artifacts/md3e-density-comparison.json) | `passed: true`；192 场景、252 个普通 Material 文字对比样本；同 Root 尺寸和缩放下 0 个密度回退 |
-| 设计分项 | [smoke-20261003-124845/result.json](../artifacts/smoke-20261003-124845/result.json) | 整体 `passed: false`，保留真实失败记录。此前搜索、下拉 UIA、组件、192 个六页面组合、192 工作区组合、紧凑导航边界、动画、构建页均完成；失败点为收起组内焦点归位 |
-| 最终专项复验 | [smoke-20261003-130132/result.json](../artifacts/smoke-20261003-130132/result.json) | 最终构建 `passed: true`。两主题千条候选/千条 Activity、组内焦点归位、搜索展开/清空、刷新锚点、四语言构建组件及日志/进度批处理全部通过 |
-| 交互采样 | [结果](../artifacts/smoke-20261003-124823/result.json)、[视频](../artifacts/md3e-interaction-demo.mp4)、[采样范围](../artifacts/md3e-interaction-demo.md) | 64 个实际 Root 帧，6.64 秒、1458 × 1052；覆盖导航、展开/收起、键盘焦点、关闭动画。不是桌面或真人操作录屏 |
-| 交付清单 | [md3e-delivery.json](../artifacts/md3e-delivery.json) | 构建路径、哈希、分轮证据和未覆盖范围 |
+| 最终开发构建 | `artifacts/dev-win-x64-20261003-130033/PyDeck.Launcher.exe`、`artifacts/md3e-final-publish.log` | 编译 0 警告、0 错误；原生 launcher 检查通过。开发构建，未制作安装器或发布 release |
+| 核心检查 | `artifacts/md3e-final-build.log` | 118 passed，0 failed |
+| 旧版基线 | `artifacts/smoke-20261003-122730/result.json`、`artifacts/md3e-baseline-build/baseline-provenance.json` | 归档提交 `0a4311a945796b9ec279ac0d57984ec3c52ebba5`，仅注入独立测量夹具；192 场景通过 |
+| 布局与对比 | `artifacts/smoke-20261003-124845/workspace-layout.json`、`artifacts/md3e-density-comparison.json` | `passed: true`；192 场景、252 个普通 Material 文字对比样本；同 Root 尺寸和缩放下 0 个密度回退 |
+| 设计分项 | `artifacts/smoke-20261003-124845/result.json` | 整体 `passed: false`，保留真实失败记录。此前搜索、下拉 UIA、组件、192 个六页面组合、192 工作区组合、紧凑导航边界、动画、构建页均完成；失败点为收起组内焦点归位 |
+| 最终专项复验 | `artifacts/smoke-20261003-130132/result.json` | 最终构建 `passed: true`。两主题千条候选/千条 Activity、组内焦点归位、搜索展开/清空、刷新锚点、四语言构建组件及日志/进度批处理全部通过 |
+| 交互采样 | `artifacts/smoke-20261003-124823/result.json`、`artifacts/md3e-interaction-demo.mp4`、`artifacts/md3e-interaction-demo.md` | 64 个实际 Root 帧，6.64 秒、1458 × 1052；覆盖导航、展开/收起、键盘焦点、关闭动画。不是桌面或真人操作录屏 |
+| 交付清单 | `artifacts/md3e-delivery.json` | 构建路径、哈希、分轮证据和未覆盖范围 |
 
 最终 `PyDeck.dll` SHA256：`A996771B36E1FC824AED589B26EE9326C33BA73942F2EAB353AAC09DA1C7711B`。
 

@@ -12,7 +12,7 @@
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\01-InspectEnvironment.ps1
 ```
 
-这里的执行策略参数只影响当前进程，不修改系统或用户策略。如果组织策略仍然拦截，回传错误即可，不要修改安全设置
+这里的执行策略参数只影响当前进程，不修改系统或用户策略。如果组织策略仍然拦截，回传错误即可，不要修改安全设置。可用 `-ReferenceRelease <版本>` 标注本次待检查的包，不传时报告版本标签为空。
 
 如果旧脚本在第 8 行提示 `Join-Path ... Path ... empty string`，替换为修正版，或直接在命令末尾指定输出目录
 
@@ -30,7 +30,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\01-InspectEnvironment.
 
 🔎 本步骤检查 Windows、实际生效的 x64 .NET 位置、当前用户的 Windows App Runtime 注册、VC++ 文件、PIM 是否可找到，以及已有 PyDeck 安装登记。不启动 Python 或 PyDeck，不下载或安装软件，不修改虚拟机设置，也不读取应用设置。用户目录路径会脱敏，安装位置和软件包版本仍属于诊断信息，发送前可以自行查看。生成的报告不会进入 Git 源码
 
-⚠️ **0.7.1-fix 要求 Windows 11 x64**。Windows 10 LTSC 出现系统条件不满足是预期结果，其他依赖齐全也不代表已经支持 Windows 10
+⚠️ **PyDeck 要求 Windows 11 x64**。Windows 10 LTSC 出现系统条件不满足是预期结果，其他依赖齐全也不代表已经支持 Windows 10
 
 ## 🔄 后续步骤
 

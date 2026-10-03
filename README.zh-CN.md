@@ -49,7 +49,7 @@ GUI 需要 **.NET Runtime 10 x64**、**Windows App Runtime** 和 **Visual C++ v1
 
 离线安装 Python 时，使用**安装 Python → 在线 → ⋯ → 下载离线包**，复制生成的完整文件夹，再在目标电脑的**安装 Python → 离线**中选择该文件夹。
 
-📖 [安装说明](docs/INSTALL.zh-CN.md) · [Python 管理](docs/MANAGEMENT.zh-CN.md) · [软件包与构建空间](docs/MANAGEMENT_070.md#简体中文) · [构建 Python](docs/BUILD_PYTHON.md#简体中文)
+📖 [安装说明](docs/INSTALL.zh-CN.md) · [Python 管理](docs/MANAGEMENT.zh-CN.md) · [构建 Python](docs/BUILD_PYTHON.md#简体中文)
 
 ## 🧑‍💻 从源码构建
 

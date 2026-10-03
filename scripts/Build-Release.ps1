@@ -41,7 +41,7 @@ function Find-SdkTools {
 
 Push-Location $repoRoot
 try {
-    if (!$CertificateThumbprint -and !$AllowUnsigned) { throw 'Supply -CertificateThumbprint, or explicitly use -AllowUnsigned for local packaging checks.' }
+    if (!$CertificateThumbprint -and !$AllowUnsigned) { throw 'Supply -CertificateThumbprint, or explicitly use -AllowUnsigned for unsigned packages.' }
     $certificate = $null
     if ($CertificateThumbprint) {
         if ($CertificateThumbprint -notmatch '^[A-Fa-f0-9]{40}$') { throw 'Invalid certificate thumbprint.' }
@@ -65,7 +65,10 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'A Git checkout is required.' }
     $sourceDirty = [bool](git status --porcelain --untracked-files=normal)
     Invoke-Checked dotnet @('restore', 'PimGui.slnx', '--locked-mode', '-p:Platform=x64', '--nologo')
-    if (!$SkipChecks) { Invoke-Checked dotnet @('run', '--project', 'tests/PimGui.Checks/PimGui.Checks.csproj', '-c', 'Release', '--no-restore') }
+    if (!$SkipChecks) {
+        & (Join-Path $PSScriptRoot 'Build-Colors.ps1') -Checks
+        Invoke-Checked dotnet @('run', '--project', 'tests/PimGui.Checks/PimGui.Checks.csproj', '-c', 'Release', '--no-restore')
+    }
     Invoke-Checked dotnet @('publish', 'src/PimGui.App/PimGui.App.csproj', '-c', 'Release', '-p:Platform=x64', '--no-restore', '--self-contained', 'false', '-p:DebugType=None', '-p:DebugSymbols=false', '-p:PublishReadyToRun=false', "-p:PathMap=$repoRoot=/_/PyDeck", '-o', $payload, '--nologo')
     & (Join-Path $PSScriptRoot 'Build-Launcher.ps1') -OutputDirectory $payload -Checks:(!$SkipChecks) -InstallerActionsDirectory (Join-Path $work 'native')
     $runtimeConfig = Get-Content -LiteralPath (Join-Path $payload 'PyDeck.runtimeconfig.json') -Raw | ConvertFrom-Json
@@ -197,5 +200,5 @@ try {
     Set-Content -LiteralPath (Join-Path $repoRoot 'artifacts\latest-release.txt') -Value $output -Encoding utf8
     Write-Output "Release packages: $assets"
     if ($sourceDirty) { Write-Warning 'Built from a working tree with changes. Commit and rebuild before public release.' }
-    if (!$certificate) { Write-Warning 'Unsigned local preview packages; sign and validate before public release.' }
+    if (!$certificate) { Write-Warning 'Unsigned packages. Validate with Test-Release.ps1 -AllowUnsigned and disclose signing status when distributing.' }
 } finally { Pop-Location }

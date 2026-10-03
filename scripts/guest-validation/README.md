@@ -12,7 +12,7 @@ Copy `01-InspectEnvironment.ps1` to a writable folder in the VM. Open **64-bit W
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\01-InspectEnvironment.ps1
 ```
 
-The execution-policy option applies only to this process. It does not change the machine or user policy. Managed policy can still block execution; report that error instead of changing security settings.
+The execution-policy option applies only to this process. It does not change the machine or user policy. Managed policy can still block execution; report that error instead of changing security settings. Optionally pass `-ReferenceRelease <version>` to label the report with the package being inspected; omitting it leaves the label empty.
 
 If an older copy fails at line 8 with `Join-Path ... Path ... empty string`, replace the script with the corrected copy or explicitly supply the output directory:
 
@@ -30,7 +30,7 @@ If ZIP creation fails, return these three files from the printed folder. Each ru
 
 🔎 This step checks Windows, the effective x64 .NET runtime location, current-user Windows App Runtime registration, VC++ runtime files, PIM discovery, and existing PyDeck installer registrations. It does not launch Python or PyDeck, download or install anything, change VM settings, or read application preferences. User profile paths are masked. Installation paths and package versions remain diagnostic data; review the report before sharing it. Generated reports are excluded from source control.
 
-⚠️ **0.7.1-fix requires Windows 11 x64**. Windows 10 LTSC reporting an OS failure is expected. An otherwise complete environment does not bypass that requirement or establish Windows 10 support.
+⚠️ **PyDeck requires Windows 11 x64**. Windows 10 LTSC reporting an OS failure is expected. An otherwise complete environment does not bypass that requirement or establish Windows 10 support.
 
 ## 🔄 Following steps
 

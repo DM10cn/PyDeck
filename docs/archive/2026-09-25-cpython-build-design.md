@@ -2,7 +2,7 @@
 
 English · [简体中文](#简体中文)
 
-> 📚 Historical first-slice design. The subsequent implementation expands source selection, Debug/PGO, components and output choices. [Build Python](../../BUILD_PYTHON.md) describes current behavior; the restricted recipe below records the initial milestone only.
+> 📚 Historical first-slice design. The subsequent implementation expands source selection, Debug/PGO, components and output choices. [Build Python](../BUILD_PYTHON.md) describes current behavior; the restricted recipe below records the initial milestone only.
 
 ## Agreed scope
 
@@ -32,7 +32,7 @@ No release, MSI/MSIX build, user Python replacement, system PATH changes, or aut
 
 ## 简体中文
 
-> 📚 这是首阶段的历史方案，后续已扩展源码选择、Debug/PGO、组件和输出设置。当前行为以[构建 Python](../../BUILD_PYTHON.md#简体中文)为准，下文固定版本范围仅记录初始里程碑
+> 📚 这是首阶段的历史方案，后续已扩展源码选择、Debug/PGO、组件和输出设置。当前行为以[构建 Python](../BUILD_PYTHON.md#简体中文)为准，下文固定版本范围仅记录初始里程碑
 
 PyDeck 仅编排本机构建，不发行自己的 Python 分发版。独立的“构建 Python”页面先支持 CPython 3.14.7、x64、Release；可选 Tcl/Tk、测试套件及符号，保留标准库、SSL、SQLite、ctypes、开发头文件、ensurepip、pip 和 venv。
 

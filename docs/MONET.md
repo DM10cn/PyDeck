@@ -6,7 +6,7 @@ PyDeck's Material presentation uses the official Material Color Utilities C++ en
 
 ## 🎨 Choose a color palette
 
-With **Material 3 Expressive** active, open **Settings → Dynamic colors**. Choose **Desktop wallpaper** or **Custom base color**, then select **Balanced**, **Expressive** or **Two colors**. Expand **Custom base color** to edit a manual color and press **Apply custom color**; Two colors provides a second picker and saves both with **Apply custom colors**. **Refresh wallpaper colors** requests a new local extraction. Fluent has its own Windows palette and does not expose these Material controls.
+With **Material 3 Expressive** active, open **Settings → Appearance → Dynamic colors**. Choose **Desktop wallpaper** or **Custom base color**, then select **Balanced**, **Expressive** or **Two colors**. Expand **Custom base color** to edit a manual color and press **Apply custom color**; Two colors provides a second picker and saves both with **Apply custom colors**. **Refresh wallpaper colors** requests a new local extraction. Fluent has its own Windows palette and does not expose these Material controls.
 
 ## 📚 Pinned sources
 
@@ -44,13 +44,13 @@ An automatic wallpaper result does not replace an open settings/build/environmen
 
 The x64 `PyDeck.Colors.dll` is built from pinned sources with the Microsoft C++ toolchain and copied by MSBuild into application/check/publish output. It does not add a JavaScript runtime or bundle .NET / Windows App Runtime. The managed adapter validates pixel bounds and caches at most 64 schemes. A missing or incompatible native engine is reported as an error; no approximated replacement algorithm is silently substituted.
 
-Native checks cover the algorithm and ABI; managed checks cover persistence and contrast; isolated WinUI fixtures cover decoding, manual colors, pending updates and rendered palettes. These fixtures do not change the Windows wallpaper or real Python configuration. The existence of a check is not a claim that it ran for every release: current results and remaining acceptance work are recorded in [Features](FEATURES.md), with developer procedures in [Development](DEVELOPMENT.md).
+Native checks cover the algorithm and ABI; managed checks cover persistence and contrast; isolated WinUI fixtures cover decoding, manual colors, pending updates and rendered palettes. These fixtures do not change the Windows wallpaper or real Python configuration. Procedures are described in [Development](DEVELOPMENT.md); individual run results remain in local artifacts.
 
 ## 简体中文
 
 ### 🎨 使用动态配色
 
-启用 **Material 3 Expressive** 后，在“设置 → 动态配色”选择桌面壁纸或自定义基色，再选择均衡、表现力或双色方案。展开自定义基色，调整后点击“应用自定义颜色”；双色模式提供两个取色器，一次保存两种颜色。“刷新壁纸配色”重新读取本地壁纸，Fluent 继续使用自身的 Windows 配色与材质规则
+启用 **Material 3 Expressive** 后，在“设置 → 外观 → 动态配色”选择桌面壁纸或自定义基色，再选择均衡、表现力或双色方案。展开自定义基色，调整后点击“应用自定义颜色”；双色模式提供两个取色器，一次保存两种颜色。“刷新壁纸配色”重新读取本地壁纸，Fluent 继续使用自身的 Windows 配色与材质规则
 
 “Material 3 Expressive”是界面风格名称，“表现力”是独立的配色选项，两者并不等同。均衡对应官方 `TonalSpot`，表现力对应官方 `Expressive`；明暗主题分别生成，Windows 对比度主题优先
 
@@ -82,4 +82,4 @@ PyDeck 对 WSMeans 最近聚类中心搜索增加了 AVX2 汇编优化，仅在�
 
 `PyDeck.Colors.dll` 随 x64 应用和安装包分发，不引入 JavaScript 运行时，也不内置 .NET 或 Windows App Runtime。托管层验证像素数量，最多缓存 64 套配色，缓存键包含两种基色；新增双基色接口保留原有单色接口。缺失或不兼容的引擎会显示错误，不会静默换成近似算法
 
-原生、托管与隔离 WinUI 检查分别覆盖算法、接口、持久化、对比度、图像解码、手动颜色与延后应用。检查工具的存在不代表每次发行都已运行，具体结果和验收边界见[功能说明](FEATURES.zh-CN.md)，开发流程见[开发指南](DEVELOPMENT.zh-CN.md)
+原生、托管与隔离 WinUI 检查分别覆盖算法、接口、持久化、对比度、图像解码、手动颜色与延后应用，不改变 Windows 壁纸或真实 Python 配置。方法见[开发指南](DEVELOPMENT.zh-CN.md)，逐次结果保留在本地 artifacts 中。

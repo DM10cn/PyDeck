@@ -7,7 +7,7 @@
 - Windows 11 x64
 - PowerShell 7 for repository build and release scripts
 - Visual Studio 2026 with **WinUI application development**
-- **MSVC x64/x86 build tools** (`Microsoft.VisualStudio.Component.VC.Tools.x86.x64`), including C++ headers and desktop libraries, for the native launcher and MSI actions
+- **MSVC x64/x86 build tools** (`Microsoft.VisualStudio.Component.VC.Tools.x86.x64`), including C++ headers and desktop libraries, plus MASM (ml64), for the color engine, launcher, Setup and MSI actions
 - .NET SDK **10.0.400** or a later patch in the same **10.0.4xx** feature band, as specified by `global.json` and `latestPatch`
 - Windows SDK **10.0.26100**
 
@@ -44,6 +44,8 @@ dotnet restore PimGui.slnx --locked-mode -p:Platform=x64
 | --- | --- |
 | `src/PimGui.Core` | PIM discovery and protocol, subprocess execution, offline bundles, settings, catalog, and language resources |
 | `src/PimGui.App` | WinUI pages, semantic design tokens, appearance policy, operation panel, and in-app smoke checks |
+| `src/PyDeck.Colors` | C++ color engine, AVX2 / SSSE3 assembly and upstream algorithm references |
+| `src/PyDeck.Setup` | Native offline installer, runtime preparation and maintenance |
 | `src/PyDeck.Launcher` | Win32 prerequisite dialog, system-only imports, official download links, and guarded GUI startup |
 | `packaging/msi` | WiX install options and native folder-picker / preference actions with a static C++ runtime |
 | `tests/PimGui.E2E` | Destructive Python lifecycle harness, guarded for disposable Windows Sandbox only |
@@ -86,7 +88,7 @@ dotnet run --project tests/PimGui.Checks -- --offline-fixture "C:\TestBundles\Py
 
 These checks require PIM and can create temporary test files; the download check uses the network. They do not install into the normal PIM-managed runtime location. Logs and screenshots can contain local paths and should be reviewed before sharing.
 
-See [feature status](FEATURES.md) for the current validation record and outstanding acceptance work. MSI / MSIX installation checks are covered by the [release workflow](RELEASING.md); they do not validate the complete Python interpreter lifecycle.
+See the [archive index](archive/README.md) for historical development records; individual run results remain in local artifacts. MSI / MSIX installation checks are covered by the [release workflow](RELEASING.md); they do not validate the complete Python interpreter lifecycle.
 
 ## 🐍 Isolated lifecycle acceptance
 
@@ -98,7 +100,7 @@ Use Windows 11 with the Windows Sandbox CLI (`wsb`). The script creates and stop
 
 It tests official PIM 25.2 → 26.3, an actual Python patch update, damage / repair, measured downloads, cancellation, default changes, uninstall, and offline reinstall. `-SeedBundleDirectory` accepts a flat older official offline bundle; `-InstallerDirectory` reuses cached `pim-25.2.msi` / `pim-26.3.msi`, still checking PSF Authenticode signatures. Results are written under `artifacts/pim-e2e-*`. A failed case stops dependent cases; unexecuted cases are not passes.
 
-🕰️ **Historical-version checks (0.6.2):** `Test-PimLifecycle.ps1 -HistoryOnly` creates its own disposable sandbox with PIM 26.3 and selects a latest / previous stable x64 micro pair from the live official history. It checks exact installation, replacement confirmation and stale-state rejection, damaged historical-version repair, interpreter execution, retained source metadata, and uninstall cleanup. This mode skips the old-PIM seed fixture and cannot be combined with `-T3Only`. Defining these cases does not mean they have passed; report the actual per-case JSON results.
+🕰️ **Historical-version checks:** `Test-PimLifecycle.ps1 -HistoryOnly` creates its own disposable sandbox with PIM 26.3 and selects a latest / previous stable x64 micro pair from the live official history. It checks exact installation, replacement confirmation and stale-state rejection, damaged historical-version repair, interpreter execution, retained source metadata, and uninstall cleanup. This mode skips the old-PIM seed fixture and cannot be combined with `-T3Only`. Defining these cases does not mean they have passed; report the actual per-case JSON results.
 
 Do not run the harness by creating its marker on the host. PIM registration cleanup has user-wide effects even with a separate installation directory. The sandbox uses its disposable System account, so this does not replace all interactive-user, Store-package, policy, or clean-machine GUI acceptance. See [Python management](MANAGEMENT.md).
 
@@ -106,11 +108,11 @@ Do not run the harness by creating its marker on the host. PIM registration clea
 
 Use `DesignTokens` and the appearance policy for semantic colors, spacing, and surfaces. Keep style-dependent decisions out of individual page layouts. Fluent can use Mica or Acrylic; Material 3 Expressive is opaque. Unrelated settings changes must preserve the active native backdrop controller.
 
-Page controls in 0.6.2 share a 32 DIP minimum height, 14 DIP label size, 16 DIP glyph size, 12 / 4 DIP horizontal / vertical padding, and 8 DIP icon-to-label spacing. Page titles use 28 DIP and section headings use 18 DIP. These are logical dimensions: Windows display scaling changes physical pixels, and larger text may increase a text button's height. `UiLayoutChecks` measures actual bounds, label clipping, title/action alignment, and compact layouts across both designs and all four languages.
+Use the current semantic tokens and native control states described in [Design systems](DESIGN_SYSTEMS.md); see [Monet](MONET.md) for dynamic color provenance. Historical size measurements are not the current layout specification.
 
 App strings are embedded JSON resources under `src/PimGui.Core/Strings`. Maintain the same keys in `en-US`, `zh-CN`, `zh-TW`, and `ja-JP`. English is the default. Prefer short, natural UI wording; avoid unnecessary sentence-ending punctuation in CJK labels. PIM identifiers and raw process output should not be translated.
 
-The repository's Markdown documentation has only English and Simplified Chinese editions. Update both editions together and keep their sections aligned. Maintain end-user requirements in `INSTALL`, feature / acceptance status in `FEATURES`, build instructions here, and packaging procedures in `RELEASING`. README summarizes those pages and links to them; avoid maintaining another version matrix there.
+The repository's Markdown documentation has only English and Simplified Chinese editions. Update both editions together and keep their sections aligned. Maintain end-user requirements in `INSTALL`, current capabilities in `FEATURES`, historical development records in `archive/`, build instructions here, and packaging procedures in `RELEASING`. README summarizes those pages and links to them; avoid maintaining another version matrix there.
 
 ## 🔐 Local data and contributions
 
@@ -122,10 +124,22 @@ The icon source is in `src/PimGui.App/Assets/AppIcon.Source.png`. Rebuild its PN
 
 ## 🧰 T3 checks
 
-⚡ See [performance and state consistency](PERFORMANCE_070.md) for notification batching, version-sort measurements and registry concurrency checks. The full GUI suite accepts `-TimeoutSeconds` (default 300).
+⚡ See [performance and state consistency](archive/PERFORMANCE_070.md) for notification batching, version-sort measurements and registry concurrency checks. The full GUI suite accepts `-TimeoutSeconds` (default 300).
 
-🧪 For 0.7.0, `dotnet run --project tests/PimGui.Checks -c Release -- --management-live <new-empty-scratch-directory> <trusted-python.exe> -` downloads a private bootstrap Python, checks compiler discovery, creates an isolated venv, prepares pip and installs/removes colorama from PyPI. It checks requirements round-trip, inherited `PIP_TARGET` isolation and pre-cancellation. Use only a new disposable directory; pass a verified local NuGet package instead of `-` to exercise cached bootstrap setup. Normal core checks cover requirement injection, stale cleanup, dependency changes after review and archive traversal. GUI smoke checks cover the new inline panels across four languages, two styles and two widths.
+🧪 `dotnet run --project tests/PimGui.Checks -c Release -- --management-live <new-empty-scratch-directory> <trusted-python.exe> -` downloads a private bootstrap Python, checks compiler discovery, creates an isolated venv, prepares pip and installs/removes colorama from PyPI. It checks requirements round-trip, inherited `PIP_TARGET` isolation and pre-cancellation. Use only a new disposable directory; pass a verified local NuGet package instead of `-` to exercise cached bootstrap setup. Normal core checks cover requirement injection, stale cleanup, dependency changes after review and archive traversal. GUI smoke checks cover the new inline panels across four languages, two styles and two widths.
 
 Core checks cover stable update metadata, source validation and redirect consent, stale source snapshots, Shebang preservation and conflicts, and incomplete environment retention. Set `PYDECK_TEST_VENV_PYTHON` to a trusted local Python executable to include a real temporary venv create / probe / forget check. Test files remain in the ignored artifacts directory.
 
 `Test-PimLifecycle.ps1 -T3Only` runs source, Shebang and venv acceptance in a disposable Windows Sandbox. The HTTPS fixture creates a short-lived localhost test certificate inside that Sandbox, removes its public trust entry on disposal, and never changes host certificate trust. Omit `-T3Only` for the complete lifecycle.
+
+## ⚡ Native color engine
+
+`Directory.Build.targets` builds and copies `PyDeck.Colors.dll` with the app. The repository contains C++ and `.asm` sources; the DLL is generated. RGBA conversion prefers AVX2, then SSSE3, with a managed caller fallback. Quantization uses AVX2 nearest-center search where supported and retains a scalar path.
+
+```powershell
+.\scripts\Build-Colors.ps1 -Checks
+```
+
+Checks compare pixel conversion, quantization and final seed colors, and inspect DLL imports. Release builds invoke this command unless `-SkipChecks` is specified. Native builds cache matching source/DLL hashes and may reuse a previously checked result.
+
+Java / Swift files under `src/PyDeck.Colors/reference` and `vendor/material-color-utilities` are algorithm references and are not compiled. Preserve licenses, `SOURCES.json`, upstream revisions and local patch hashes for provenance and updates.
