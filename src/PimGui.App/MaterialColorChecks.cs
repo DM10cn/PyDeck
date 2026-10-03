@@ -60,7 +60,7 @@ public sealed partial class MainWindow
                 await CaptureAsync(Path.Combine(directory, $"monet-{theme}-{seed:X8}.png"));
             }
 
-            Navigate("settings"); Root.UpdateLayout();
+            OpenSettingsCategoryForSmoke("appearance");
             var picker = Descendants(PageHost).OfType<ColorPicker>().Single();
             picker.Color = Argb(0xFF795548u);
             var apply = Descendants(PageHost).OfType<Button>().Single(button => AutomationProperties.GetName(button) == T("Apply custom color"));
@@ -72,7 +72,7 @@ public sealed partial class MainWindow
             await CaptureAsync(Path.Combine(directory, "monet-custom-settings.png"));
 
             ApplySmokePreferences(preferences with { MaterialColorSource = "Wallpaper", MaterialColorStyle = "DualSource" });
-            expandedSettings.Add("Network"); Navigate("settings"); Root.UpdateLayout();
+            expandedSettings.Add("Network"); OpenSettingsCategoryForSmoke("network");
             var draft = Descendants(settingsSections["Network"].Section).OfType<TextBox>().First();
             draft.Text = "http://unsaved-wallpaper-fixture.invalid:8123";
             var pageBefore = PageHost.Children.Single();
@@ -94,7 +94,7 @@ public sealed partial class MainWindow
             var wallpaperScheme = MonetColors.Create(wallpaperSeed.Value, true, "DualSource", wallpaperSecondSeed);
             if (MaterialColorsPending || palette.Accent != Argb(wallpaperScheme.Primary) || palette.Tokens.SecondaryContainer != Argb(wallpaperScheme.SecondaryContainer))
                 throw new IOException("Explicit navigation failed to consume prepared wallpaper colors");
-            ApplySmokeAppearance("Fluent", "Light"); Navigate("settings"); Root.UpdateLayout();
+            ApplySmokeAppearance("Fluent", "Light"); OpenSettingsCategoryForSmoke("appearance");
             if (Descendants(PageHost).OfType<FrameworkElement>().Any(element => element.Tag as string == "MaterialColorSettings"))
                 throw new IOException("Material-only settings leaked into Fluent");
         }

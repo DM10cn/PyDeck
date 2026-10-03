@@ -21,7 +21,7 @@ public sealed partial class MainWindow
             {
                 ApplySmokePreferences(preferences with { Design = "Material", Theme = theme, Language = "zh-CN",
                     MaterialColorSource = "Custom", MaterialColorStyle = "TonalSpot", MaterialSeed = 0xFF5068C5u, MaterialSecondSeed = null });
-                Navigate("settings"); Root.UpdateLayout();
+                OpenSettingsCategoryForSmoke("appearance");
                 var style = Descendants(PageHost).OfType<ComboBox>().Single(control => AutomationProperties.GetName(control) == T("Color palette"));
                 style.SelectedItem = style.Items.OfType<ComboBoxItem>().Single(item => item.Tag as string == "DualSource");
                 await WaitForSmokeConditionAsync(() => preferences.MaterialColorStyle == "DualSource", "Dual-color selection did not persist");
@@ -59,7 +59,7 @@ public sealed partial class MainWindow
             foreach (var language in Strings.Languages)
             {
                 ApplySmokePreferences(preferences with { Language = language });
-                Navigate("settings"); Root.UpdateLayout(); await Task.Delay(60);
+                OpenSettingsCategoryForSmoke("appearance"); await Task.Delay(60);
                 var section = Descendants(PageHost).OfType<StackPanel>().Single(panel => panel.Tag as string == "MaterialColorSettings");
                 foreach (var picker in Descendants(section).OfType<ColorPicker>())
                     RequireHorizontalBounds(picker, section, "Dual custom picker/" + language);
@@ -73,7 +73,7 @@ public sealed partial class MainWindow
                 }
             }
             ApplySmokePreferences(preferences with { MaterialColorStyle = "TonalSpot" });
-            Navigate("settings"); Root.UpdateLayout();
+            OpenSettingsCategoryForSmoke("appearance");
             if (Descendants(PageHost).OfType<ColorPicker>().Count() != 1)
                 throw new IOException("The second color picker remained visible in single-color mode");
         }

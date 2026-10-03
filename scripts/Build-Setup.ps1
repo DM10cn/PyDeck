@@ -25,6 +25,8 @@ function Read-Property([string]$Name) {
 try {
     if ((Read-Property 'ProductName') -ne 'PyDeck' -or (Read-Property 'UpgradeCode') -ne '{D43AFAF7-DFE0-4AC1-A0A3-8F73AD6F89CA}') { throw 'Unexpected MSI identity.' }
     $version = Read-Property 'ProductVersion'
+    $productCode = Read-Property 'ProductCode'
+    if ($productCode -notmatch '^\{[A-Fa-f0-9-]{36}\}$') { throw 'Invalid embedded MSI product code.' }
 } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($database); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($installer) }
 $msiSignature = Get-AuthenticodeSignature -LiteralPath $msi
 if (!$AllowUnsignedMsi -and (!$msiSignature.SignerCertificate -or $msiSignature.Status -in 'HashMismatch','NotSigned')) { throw 'Sign the MSI first, or explicitly use -AllowUnsignedMsi for local checks.' }
@@ -58,7 +60,7 @@ for ($i = 0; $i -lt $dependencies.Count; $i++) {
 $payloads += [pscustomobject]@{id=304;file='PyDeck.msi';path=$msi;label='PyDeck MSI';sha256=(Get-FileHash -LiteralPath $msi -Algorithm SHA256).Hash.ToLowerInvariant()}
 $work = Join-Path $repoRoot ('artifacts\setup-build-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $work | Out-Null
-$header = @('#pragma once', '#include <array>', 'struct PayloadInfo { int id; const wchar_t* file; const wchar_t* label; const wchar_t* sha256; };', ('constexpr const wchar_t* SetupVersion = L"' + $label + '";'), 'constexpr std::array<PayloadInfo, 4> Payloads{{')
+$header = @('#pragma once', '#include <array>', 'struct PayloadInfo { int id; const wchar_t* file; const wchar_t* label; const wchar_t* sha256; };', ('constexpr const wchar_t* SetupVersion = L"' + $label + '";'), ('constexpr const wchar_t* PayloadProductCode = L"' + $productCode + '";'), ('constexpr const wchar_t* PayloadProductVersion = L"' + $version + '";'), 'constexpr std::array<PayloadInfo, 4> Payloads{{')
 $resources = @('#include <windows.h>', '#pragma code_page(65001)')
 foreach ($payload in $payloads) {
     $header += ('    {{{0}, L"{1}", L"{2}", L"{3}"}},' -f $payload.id, $payload.file, $payload.label, $payload.sha256)
@@ -80,7 +82,7 @@ foreach ($part in @('ucrt','shared','um')) { $includes += '/I' + (Join-Path $sdk
 $libraries = @('/LIBPATH:' + (Join-Path $toolset.FullName 'lib\x64'))
 foreach ($part in @('ucrt','um')) { $libraries += '/LIBPATH:' + (Join-Path $sdkRoot ('Lib\' + $sdk.Name + '\' + $part + '\x64')) }
 $common = @('/nologo','/std:c++20','/MT','/O2','/W4','/WX','/utf-8','/EHsc','/guard:cf','/DUNICODE','/D_UNICODE','/D_WIN32_WINNT=0x0A00') + $includes
-$link = @('/link','/INCREMENTAL:NO','/DYNAMICBASE','/NXCOMPAT','/HIGHENTROPYVA','/guard:cf') + $libraries + @('user32.lib','advapi32.lib','shell32.lib','comctl32.lib','bcrypt.lib','ole32.lib','uuid.lib')
+$link = @('/link','/INCREMENTAL:NO','/DYNAMICBASE','/NXCOMPAT','/HIGHENTROPYVA','/guard:cf') + $libraries + @('user32.lib','advapi32.lib','shell32.lib','comctl32.lib','bcrypt.lib','ole32.lib','uuid.lib','msi.lib','gdi32.lib')
 function Invoke-Native([string]$File, [string[]]$Arguments) {
     & $File @Arguments
     if ($LASTEXITCODE -ne 0) { throw "$File failed: $LASTEXITCODE" }
@@ -98,7 +100,7 @@ try {
     $imports = & $dumpbin /nologo /dependents $exe
     if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect setup imports.' }
     $dlls = @($imports | Where-Object { $_ -match '^\s+([\w.-]+\.dll)\s*$' } | ForEach-Object { $_.Trim().ToLowerInvariant() })
-    $allowed = @('kernel32.dll','user32.dll','advapi32.dll','shell32.dll','comctl32.dll','bcrypt.dll','ole32.dll','gdi32.dll')
+    $allowed = @('kernel32.dll','user32.dll','advapi32.dll','shell32.dll','comctl32.dll','bcrypt.dll','ole32.dll','gdi32.dll','msi.dll')
     if (!$dlls.Count -or @($dlls | Where-Object { $_ -notin $allowed }).Count) { throw ('Unexpected setup DLL dependency: ' + ($dlls -join ', ')) }
     Write-Output ('PASS Setup requires only Windows system DLLs: ' + ($dlls -join ', '))
     if ($Checks) {

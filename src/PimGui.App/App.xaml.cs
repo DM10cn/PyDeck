@@ -32,7 +32,7 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         Main = new MainWindow();
-        if (Main.PerformanceProbe || Main.DesignProbe || Main.RestartProbe)
+        if (Main.PerformanceProbe || Main.DesignProbe || Main.WorkspaceProbe || Main.RestartProbe)
         {
             // Opt-in fixture-only checks run offscreen without taking keyboard focus.
             Main.AppWindow.IsShownInSwitchers = false;

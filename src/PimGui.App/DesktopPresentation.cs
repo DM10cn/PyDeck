@@ -4,6 +4,9 @@ using Microsoft.UI.Xaml.Media;
 
 namespace PimGui.App;
 
+internal sealed record SettingsDestination(string Id, string Label, string Icon, string Group);
+internal sealed record SettingsNavigation(FrameworkElement View, Action<string> Select);
+
 // The business pages supply content and commands. Each presentation owns the visual
 // composition, navigation and layout; no second tree is kept alive in the window.
 internal abstract class DesktopPresentation
@@ -17,13 +20,17 @@ internal abstract class DesktopPresentation
         ("activity", "Activity", "\uE9D9"), ("settings", "Settings", "\uE713")
     ];
 
-    public abstract FrameworkElement CreateShell(Border surface, StackPanel brand, Border connection, Action<string> navigate);
+    public abstract FrameworkElement CreateShell(Border surface, StackPanel brand, Border connection, Button refresh, Action<string> navigate);
     public abstract void Detach();
     public abstract void ApplyShell(Palette palette);
     public abstract void SelectPage(string page, Palette palette);
+    // Reading widths apply only to form bodies inside their scrolling viewport.
+    // The page host and list viewports always use the full workspace width.
     public abstract double ContentWidth(string page);
     public abstract Grid Header(Palette palette, string eyebrow, string title, string description, FrameworkElement? action);
     public abstract Grid SettingRow(Palette palette, string title, string? description, FrameworkElement control);
+    public abstract SettingsNavigation CreateSettingsNavigation(Palette palette, IReadOnlyList<SettingsDestination> destinations,
+        string selected, Action<string> navigate);
 
     protected static TextBlock ShellLabel(string text) => new()
     {

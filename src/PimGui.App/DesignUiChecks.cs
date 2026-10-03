@@ -23,6 +23,9 @@ public sealed partial class MainWindow
 
     private async Task RunDesignProbeAsync(string directory)
     {
+        // Replacing the shell/resources inside the initial Loaded event can leave
+        // native template initialization referring to a detached presentation.
+        await Task.Delay(250);
         Directory.CreateDirectory(directory);
         var checks = new List<string>();
         try
@@ -34,6 +37,15 @@ public sealed partial class MainWindow
             checks.Add("Native selectors retain expansion, selection and scrolling with Material tonal popup rows, rounded corners and checkmarks.");
             await CheckExpandersAsync(directory);
             checks.Add("All settings expanders share native behavior and Material rounded header/content corners, including custom colors and build workspace management.");
+            if (Environment.GetCommandLineArgs().Contains("--components-only"))
+            {
+                await CheckDesignComponentsAsync(directory);
+                await CheckInterfaceRestartAsync(directory);
+                await CheckBuildUiAsync(directory);
+                checks.Add("Component and build controls retain native behavior; Material surfaces are borderless at rest and keyboard focus remains visible.");
+                await File.WriteAllTextAsync(Path.Combine(directory, "result.json"), JsonSerializer.Serialize(new { passed = true, checks }, new JsonSerializerOptions { WriteIndented = true }));
+                return;
+            }
             await CheckProgressColorsAsync(directory);
             checks.Add("Refresh and operation indicators use the current Material primary and tonal track colors in both progress modes; Fluent and contrast roles remain native.");
             await CheckDeferredDesignAsync();
@@ -48,6 +60,8 @@ public sealed partial class MainWindow
             checks.Add("Both component dictionaries, five action roles, compact sizes, native invocation, switches, radio selection, state templates and typography rendered in light/dark and four languages.");
             await CheckPageLayoutsAsync(directory);
             checks.Add("192 page combinations: six pages, four languages, two designs, light/dark and normal/compact windows; bounds, labels, settings rows, runtime identities and action geometry.");
+            await CheckRuntimeWorkspacesAsync(directory, checks);
+            await CheckLiveMaterialInteractionsAsync(checks);
             await CheckBuildUiAsync(directory);
             checks.Add("Build controls retain configuration, draft, scroll, cancellation and source behavior in both presentations.");
             await CheckInteractivePerformanceAsync(checks);
@@ -72,7 +86,7 @@ public sealed partial class MainWindow
             {
                 ApplySmokePreferences(preferences with { Design = design, Theme = "Dark", Transparency = "On" });
                 expandedSettings.Add("Network");
-                Navigate("settings"); Root.UpdateLayout();
+                OpenSettingsCategoryForSmoke("network");
                 var visual = PageHost.Children.Single(); var controller = SystemBackdrop;
                 var draft = Descendants(settingsSections["Network"].Section).OfType<TextBox>().First();
                 draft.Text = "http://unsaved-design-fixture.invalid:8123";
@@ -85,10 +99,12 @@ public sealed partial class MainWindow
                     Root.UpdateLayout();
                     if (ActiveDesign != design || !ReferenceEquals(visual, PageHost.Children.Single()) || !ReferenceEquals(controller, SystemBackdrop) ||
                         !dictionaries.SequenceEqual(Application.Current.Resources.MergedDictionaries) || !workCoordinator.Contains(WorkKind.Build) ||
-                        store.Load().Design != pending || designRestartNotice?.IsOpen != true)
+                        store.Load().Design != pending)
                         throw new IOException("Deferred style selection disturbed the active session");
                     if (draft.Text != "http://unsaved-design-fixture.invalid:8123" || !draft.IsLoaded)
                         throw new IOException("Style selection discarded an unsaved settings draft");
+                    SelectSettingsCategory("appearance"); Root.UpdateLayout();
+                    if (designRestartNotice?.IsOpen != true) throw new IOException("Appearance did not show the pending style notice");
                     using (var locked = new FileStream(store.FilePath, FileMode.Open, FileAccess.Read, FileShare.None))
                     {
                         designChoices[design].IsChecked = true;
@@ -139,8 +155,19 @@ public sealed partial class MainWindow
                     action.ApplyTemplate();
                     if (action.IsEnabled && (!VisualStateManager.GoToState(action, "PointerOver", false) || !VisualStateManager.GoToState(action, "Pressed", false) || !VisualStateManager.GoToState(action, "Normal", false)))
                         throw new IOException("Action template lacks interaction states: " + design);
+                    if (design == "Material" && !palette.Tokens.HighContrast &&
+                        Descendants(action).OfType<Border>().Single(part => part.Name == "ButtonBorder").BorderThickness != new Thickness(0))
+                        throw new IOException("Material action retained a decorative outline");
                 }
                 var toggle = Descendants(PageHost).OfType<ToggleSwitch>().Single(control => AutomationProperties.GetName(control) == T("Switch off"));
+                if (design == "Material" && !palette.Tokens.HighContrast)
+                {
+                    foreach (var input in Descendants(PageHost).OfType<TextBox>())
+                        foreach (var border in Descendants(input).OfType<Border>().Where(part => part.Name == "BorderElement"))
+                            if (border.BorderThickness != new Thickness(0)) throw new IOException("Material text input retained a decorative outline");
+                    foreach (var track in Descendants(PageHost).OfType<Microsoft.UI.Xaml.Shapes.Rectangle>().Where(part => part.Name is "OuterBorder" or "SwitchKnobBounds"))
+                        if (track.StrokeThickness != 0) throw new IOException("Material switch retained a decorative track outline");
+                }
                 var peer = new Microsoft.UI.Xaml.Automation.Peers.ToggleSwitchAutomationPeer(toggle);
                 ((Microsoft.UI.Xaml.Automation.Provider.IToggleProvider)peer.GetPattern(Microsoft.UI.Xaml.Automation.Peers.PatternInterface.Toggle)).Toggle();
                 if (!toggle.IsOn) throw new IOException("Switch lost native automation semantics");

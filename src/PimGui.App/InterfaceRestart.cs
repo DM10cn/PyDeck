@@ -78,6 +78,10 @@ public sealed partial class MainWindow
         RefreshAvailability();
         try
         {
+            var previousSave = store.FlushAsync();
+            if (previousSave.IsFaulted || previousSave.IsCanceled)
+                await store.SaveAsync(preferences);
+            await store.FlushAsync();
             // Set the work gate on the UI thread before yielding. StartWork cannot race
             // a queued callback into creating an operation while the restart is pending.
             var reason = await Task.Run(() => AppInstance.Restart(arguments));

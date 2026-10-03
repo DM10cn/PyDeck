@@ -11,6 +11,11 @@ public sealed record AppSettings
     public string Language { get; init; } = "en-US";
     public string Transparency { get; init; } = "System";
     public string Backdrop { get; init; } = "Mica";
+    public string StartupPage { get; init; } = "runtimes";
+    public string CloseBehavior { get; init; } = "Exit";
+    public bool UseSystemFont { get; init; } = true;
+    public bool OledBlack { get; init; }
+    public bool UseSystemTitleBar { get; init; }
     public string MaterialColorSource { get; init; } = "Wallpaper";
     public uint MaterialSeed { get; init; } = 0xFF1B6EF3;
     public uint? MaterialSecondSeed { get; init; }
@@ -40,6 +45,8 @@ public sealed record AppSettings
             Language = Language is "en-US" or "zh-CN" or "zh-TW" or "ja-JP" ? Language : "en-US",
             Transparency = Transparency is "System" or "On" or "Off" ? Transparency : "System",
             Backdrop = Backdrop is "Mica" or "Acrylic" ? Backdrop : "Mica",
+            StartupPage = StartupPage is "runtimes" or "catalog" or "environments" or "build" or "activity" or "settings" ? StartupPage : "runtimes",
+            CloseBehavior = CloseBehavior is "Exit" or "Minimize" or "Tray" ? CloseBehavior : "Exit",
             MaterialColorSource = MaterialColorSource is "Wallpaper" or "Custom" ? MaterialColorSource : "Wallpaper",
             MaterialSeed = MaterialSeed | 0xFF000000u,
             MaterialSecondSeed = MaterialSecondSeed is { } secondSeed ? secondSeed | 0xFF000000u : null,
@@ -57,6 +64,8 @@ public sealed record AppSettings
 
 public sealed class SettingsStore(string directory)
 {
+    private readonly object saveGate = new();
+    private Task pendingSave = Task.CompletedTask;
     public string DirectoryPath => directory;
     public string FilePath => Path.Combine(directory, "settings.json");
     public string? LoadWarning { get; private set; }
@@ -72,9 +81,30 @@ public sealed class SettingsStore(string directory)
         { LoadWarning = "Your saved preferences could not be read. Defaults are in use. " + ex.Message; return new AppSettings().Normalize(); }
     }
     public void Save(AppSettings settings)
+        => SaveAsync(settings).GetAwaiter().GetResult();
+
+    public Task SaveAsync(AppSettings settings)
+    {
+        // All writers share the same ordered queue. A synchronous save must not be
+        // overwritten later by an earlier toggle's background write.
+        var snapshot = settings.Normalize();
+        lock (saveGate)
+        {
+            pendingSave = pendingSave.ContinueWith(_ => SaveCore(snapshot), CancellationToken.None,
+                TaskContinuationOptions.None, TaskScheduler.Default);
+            return pendingSave;
+        }
+    }
+
+    public Task FlushAsync()
+    {
+        lock (saveGate) return pendingSave;
+    }
+
+    private void SaveCore(AppSettings settings)
     {
         Directory.CreateDirectory(directory);
-        AtomicJson.Write(FilePath, JsonSerializer.Serialize(settings.Normalize(), new JsonSerializerOptions { WriteIndented = true }));
+        AtomicJson.Write(FilePath, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
     }
 }
 

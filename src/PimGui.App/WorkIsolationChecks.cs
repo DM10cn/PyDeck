@@ -17,21 +17,23 @@ public sealed partial class MainWindow
             foreach (var design in new[] { "Material", "Fluent" })
             {
                 ApplySmokePreferences(preferences with { Language = language, Design = design });
-                expandedSettings.Add("Network"); Navigate("settings"); Root.UpdateLayout();
+                expandedSettings.Add("Network"); OpenSettingsCategoryForSmoke("network");
                 var originalPage = PageHost.Children.Single();
                 var draft = Descendants(settingsSections["Network"].Section).OfType<TextBox>().First();
                 draft.Text = "http://draft.invalid:8123";
-                var theme = Descendants(PageHost).OfType<ComboBox>().Single(c => AutomationProperties.GetName(c) == T("App theme"));
-                var languageChoice = Descendants(PageHost).OfType<ComboBox>().Single(c => AutomationProperties.GetName(c) == T("Language"));
                 using var catalogWork = StartWork(WorkKind.Catalog);
                 using var updateWork = StartWork(WorkKind.AppUpdate);
                 Require(catalogWork is not null && updateWork is not null, "Independent query refused");
-                var buildNavigation = Descendants(Root).OfType<Control>().Single(control => control.Tag as string == "build");
-                Require(theme.IsEnabled && languageChoice.IsEnabled && buildNavigation.IsEnabled, "Query disabled unrelated UI");
                 Require(ReferenceEquals(PageHost.Children.Single(), originalPage) && draft.Text == "http://draft.invalid:8123", "Starting work replaced an editor");
                 RefreshWorkPage("catalog"); catalogWork.Dispose();
                 Require(busy && !CanWork(WorkKind.AppUpdate) && CanWork(WorkKind.Catalog), "One query unlocked another query");
                 Require(ReferenceEquals(PageHost.Children.Single(), originalPage) && draft.Text == "http://draft.invalid:8123", "Background result discarded a draft");
+                SelectSettingsCategory("appearance"); Root.UpdateLayout();
+                Require(Descendants(PageHost).OfType<ComboBox>().Single(c => AutomationProperties.GetName(c) == T("App theme")).IsEnabled, "Query disabled appearance");
+                SelectSettingsCategory("interface"); Root.UpdateLayout();
+                Require(Descendants(PageHost).OfType<ComboBox>().Single(c => AutomationProperties.GetName(c) == T("Language")).IsEnabled, "Query disabled language");
+                SelectSettingsCategory("network"); Root.UpdateLayout();
+                Require(Descendants(settingsSections["Network"].Section).Contains(draft) && draft.Text == "http://draft.invalid:8123", "Category navigation discarded a draft");
                 updateWork.Dispose(); Require(!busy, "Query lease leaked");
 
                 Navigate("build"); Root.UpdateLayout();
@@ -50,7 +52,7 @@ public sealed partial class MainWindow
                     Require(packages.IsCancellationRequested && !build.IsCancellationRequested, "Cancel targeted another operation");
                     FinishOperation(packages); packageWork.Dispose();
                     Require(ReferenceEquals(activeOperation, build) && !operationCanCancel && !prepare.IsEnabled, "Completion lost the build or unlocked its controls");
-                    Navigate("settings"); Root.UpdateLayout();
+                    OpenSettingsCategoryForSmoke("appearance");
                     Require(Descendants(PageHost).OfType<ComboBox>().Single(c => AutomationProperties.GetName(c) == T("App theme")).IsEnabled, "Build disabled appearance");
                 }
                 finally { FinishOperation(packages); FinishOperation(build); }

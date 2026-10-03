@@ -73,6 +73,27 @@ internal sealed class Palette(DesignTokens tokens)
     }
     public Border CardBox(UIElement child, double padding = 20) => new()
     { Child = child, Padding = new(padding), Background = Brush(Card), BorderBrush = Brush(Line), BorderThickness = new(tokens.CardBorder), CornerRadius = new(Radius) };
+    public Border RuntimeCardBox(UIElement child, bool isDefault, double? padding = null)
+    {
+        var card = CardBox(child, padding ?? tokens.RowPadding);
+        if (tokens.Design == "Material")
+        {
+            // Default is a model status, not selection: retain the badge and use only a
+            // modest tonal difference, without a permanent accent border or extra height.
+            card.Background = Brush(tokens.HighContrast ? tokens.Card : isDefault
+                ? DesignComponents.Mix(tokens.SurfaceContainer, tokens.PrimaryContainer, .28)
+                : tokens.SurfaceContainer);
+            card.CornerRadius = new(tokens.CardRadius);
+        }
+        return card;
+    }
+    public CornerRadius CatalogSegmentCorner(bool first, bool last) => tokens.Design == "Material"
+        ? new(first ? 16 : 4, first ? 16 : 4, last ? 16 : 4, last ? 16 : 4)
+        : new(tokens.CardRadius);
+    public void ApplyCatalogSegment(Expander header, bool first, bool last, bool expanded)
+        => DesignExpanderStyles.ConfigureCatalogSegment(header, components.Resources, tokens, first, last, expanded);
+    public void UpdateMotion(DependencyObject root, bool enabled) => components.UpdateMotion(root, enabled);
+    public void ApplyMotion(DependencyObject root) => components.ApplyMotion(root);
     public Border Badge(string text, bool accent = false) => new()
     {
         Background = Brush(accent ? AccentContainer : Surface), CornerRadius = new(tokens.ChipRadius), Padding = new(10, 4, 10, 4),
@@ -84,6 +105,8 @@ internal sealed class Palette(DesignTokens tokens)
     public Border Chip(string text, bool accent = false) => Badge(text, accent);
     public Button Action(string label, string? icon = null, bool primary = false, bool compact = false, ActionRole role = ActionRole.Standard)
         => components.Action(T(label), icon, primary ? ActionRole.Primary : role, compact);
+    public Button RuntimeTerminalAction()
+        => components.Action(T("Terminal"), "\uE756", tokens.Design == "Material" ? ActionRole.Secondary : ActionRole.Quiet, true);
     public void ConfigureAction(Button button, ActionRole role = ActionRole.Standard, bool compact = false)
         => components.ConfigureAction(button, role, compact);
     public void ConfigureProgress(ProgressBar progress) => components.ConfigureProgress(progress);

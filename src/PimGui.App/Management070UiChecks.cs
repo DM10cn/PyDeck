@@ -32,7 +32,7 @@ public sealed partial class MainWindow
                 var removePip = Descendants(PageHost).OfType<Button>().Where(b => AutomationProperties.GetName(b) == T("Uninstall")).ToArray();
                 if (removePip.Count(b => !b.IsEnabled) != 1) throw new IOException("pip uninstall must be disabled");
                 if (!compact && design == "Fluent" && language == "zh-CN") await CaptureAsync(Path.Combine(directory, "27-environment-packages.png"));
-                Navigate("settings"); Root.UpdateLayout(); await Task.Delay(100); Root.UpdateLayout();
+                OpenSettingsCategoryForSmoke("storage"); await Task.Delay(100); Root.UpdateLayout();
                 var clean = Descendants(PageHost).OfType<Button>().Single(b => AutomationProperties.GetName(b) == T("Clean files"));
                 if (clean.IsEnabled) throw new IOException("Used runtime cleanup enabled");
                 if (!compact && design == "Fluent" && language == "zh-CN")

@@ -17,13 +17,14 @@ public sealed partial class MainWindow
         {
             foreach (var design in new[] { "Fluent", "Material" })
             foreach (var theme in new[] { "Light", "Dark" })
+            foreach (var category in design == "Material" ? new[] { "appearance", "storage" } : new[] { "storage" })
             {
                 ApplySmokePreferences(preferences with { Design = design, Theme = theme, MaterialColorSource = "Custom", Transparency = "Off" });
-                Navigate("settings"); Root.UpdateLayout();
+                OpenSettingsCategoryForSmoke(category);
                 var expanders = Descendants(PageHost).OfType<Expander>().ToArray();
                 var targets = expanders.Where(expander => expander.Header is string).ToArray();
-                if (targets.Length < (design == "Material" ? 2 : 1))
-                    throw new IOException("Settings lacks its custom-color or storage expander fixture");
+                if (targets.Length == 0)
+                    throw new IOException("Settings category lacks its expander fixture: " + category);
                 foreach (var expander in expanders)
                 {
                     expander.ApplyTemplate();
@@ -35,8 +36,8 @@ public sealed partial class MainWindow
                 }
                 foreach (var (expander, index) in targets.Select((item, index) => (item, index)))
                 {
-                    var context = $"Expander/{design}/{theme}/{expander.Header}";
-                    var peer = new ExpanderAutomationPeer(expander);
+                    var context = $"Expander/{design}/{theme}/{category}/{expander.Header}";
+                    var peer = FrameworkElementAutomationPeer.FromElement(expander) ?? FrameworkElementAutomationPeer.CreatePeerForElement(expander);
                     var provider = (IExpandCollapseProvider)peer.GetPattern(PatternInterface.ExpandCollapse);
                     foreach (var expanded in new[] { false, true })
                     {
@@ -54,10 +55,24 @@ public sealed partial class MainWindow
                         if (design == "Material" && (grid.Background is not SolidColorBrush fill || fill.Color != palette.Card ||
                             content.Background is not SolidColorBrush body || body.Color != palette.Card))
                             throw new IOException(context + ": header/content do not share their Monet container");
+                        if (design == "Material" && !palette.Tokens.HighContrast)
+                        {
+                            var states = expanded ? new[] { "CheckedPointerOver", "CheckedPressed", "CheckedDisabled", "Checked" }
+                                : new[] { "PointerOver", "Pressed", "Disabled", "Normal" };
+                            foreach (var interaction in states)
+                            {
+                                if (!VisualStateManager.GoToState(header, interaction, false))
+                                    throw new IOException(context + ": missing native header state " + interaction);
+                                if (grid.BorderThickness != new Thickness(0) ||
+                                    grid.BorderBrush is not SolidColorBrush { Color.A: 0 } ||
+                                    content.BorderBrush is not SolidColorBrush { Color.A: 0 })
+                                    throw new IOException(context + ": decorative outline remains in " + interaction);
+                            }
+                        }
                         if (theme == "Dark")
                         {
                             expander.StartBringIntoView(new BringIntoViewOptions { VerticalAlignmentRatio = 0 });
-                            await CaptureAsync(Path.Combine(directory, $"expander-{design}-{index}-{(expanded ? "expanded" : "collapsed")}.png"), expander);
+                            await CaptureAsync(Path.Combine(directory, $"expander-{design}-{category}-{index}-{(expanded ? "expanded" : "collapsed")}.png"), expander);
                         }
                     }
                 }

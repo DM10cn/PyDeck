@@ -2,40 +2,41 @@
 
 [English](INSTALL.md) · **简体中文** · [🏠 项目首页](https://github.com/DM10cn/PyDeck)
 
-📦 **0.7.1-fix · Windows 11 x64**
+📦 **0.7.2 本地预览 · Windows 11 x64 · MSI / Setup**
 
-从 [GitHub Releases](https://github.com/DM10cn/PyDeck/releases) 下载文件，选择**一种**安装格式。MSI 与 MSIX 不能相互升级，切换格式前请卸载旧格式。两个安装器都不会移除 Python 安装，也不会主动删除 PyDeck 偏好设置
+新版 **0.7.2** MSI 与 Setup 是**尚未发布的本地未签名构建**。[现有 GitHub 发行页](https://github.com/DM10cn/PyDeck/releases/tag/v0.7.1)提供的是 **0.7.1-fix**，不包含这些新安装器。MSI 与 MSIX 不能相互升级，切换格式前请卸载旧格式；卸载会保留 Python 安装与 PyDeck 偏好设置
 
-## 📥 发行下载
+## 📦 本地 0.7.2 文件
 
 | 文件 | 用途 |
 | --- | --- |
-| `PyDeck-Setup-0.7.1-fix-win-x64.exe` | 离线准备运行依赖，再进入 MSI 安装向导 |
-| `PyDeck-0.7.1-fix-win-x64.msi` | 当前用户独立安装包，可选目录、快捷方式和首次界面风格 |
-| `PyDeck-0.7.1-fix-win-x64.msix` | Windows 管理的安装包，先准备运行依赖和证书信任 |
-| `PyDeck-Dependencies-0.7.1-fix-win-x64.exe` | 独立依赖清单与官方下载入口 |
-| `PyDeck-preview.cer` | 用于 MSIX 信任步骤的公开签名证书 |
-| `INSTALL.md` / `INSTALL.zh-CN.md` | 英语与简体中文安装说明 |
-| `Test-Prerequisites.ps1` | 可选的只读前置依赖清单 |
-| `SHA256SUMS.txt` | 已上传发行附件的 SHA-256 校验值 |
+| `PyDeck-Setup-0.7.2-win-x64.exe` | 离线 MSI 安装与维护，并准备运行依赖 |
+| `PyDeck-0.7.2-win-x64.msi` | 当前用户独立安装包，可选目录、快捷方式和首次界面风格 |
+| `PyDeck-Dependencies-0.7.2-win-x64.exe` | 独立依赖清单与官方下载入口 |
+
+此次使用 `-MsiOnly` 构建，**不生成新版 MSIX 或签名证书**。下方 MSIX / 证书说明仅适用于历史 **0.7.1-fix** 发行包。新文件以本地构建的元数据与哈希为准，旧发行校验值不适用于 0.7.2
 
 ## 🧰 离线 Setup
 
-**`PyDeck-Setup-0.7.1-fix-win-x64.exe`** 内含微软运行时安装程序和同一份独立 MSI。普通用户只需要运行时，**无需 .NET SDK、Windows SDK 或 Visual Studio**
+**`PyDeck-Setup-0.7.2-win-x64.exe` 是主要的 MSI 安装入口**，使用简洁的 Windows 原生窗口，内含微软运行时安装程序和独立 MSI。普通用户只需要运行时，**无需 .NET SDK、Windows SDK 或 Visual Studio**。已发布的 0.7.1-fix 文件保持原样，使用单独的 MSI 向导
 
-1. 正常打开 Setup，不要选择**以管理员身份运行**
-2. 查看检测结果：兼容运行时显示**已满足，将跳过**，缺失或不完整的项目显示**需要安装**
-3. 选择首次启动的 **Material 3 Expressive** 或 **Windows Fluent** 界面；已有应用偏好优先
-4. 点击**继续**，从包内的离线安装程序补装缺少的 .NET、Windows App Runtime，以及 MSI 所需的 VC++ 运行库；Windows 可能请求管理员确认
-5. 每项安装后重新检测，再打开 MSI 向导，保留安装目录、快捷方式与首次界面风格选择
+1. 等待 Python 操作结束并退出 PyDeck，包括托盘中的应用；最小化窗口不等于退出
+2. 正常打开 Setup，不要选择**以管理员身份运行**。它按 Windows 语言选择英语、简体中文、繁体中文（台湾）或日语，也可手动切换
+3. 选择可写的安装目录、桌面 / 开始菜单快捷方式，以及首次使用的 **Material 3 Expressive** 或 **Windows Fluent** 风格；已有应用偏好优先
+4. 查看依赖清单并点击**安装**。兼容运行时会跳过，缺少的运行时从离线包补装，可能请求管理员确认
+5. MSI 在后台静默执行，同一个 Setup 窗口显示当前阶段、进度状态、完成结果或错误码；成功后可点击**打开 PyDeck**
+
+检测到 ProductCode 相同的已安装 MSI 时提供**修复**，并沿用安装目录。较新的安装包可升级旧版本；版本号相同但 MSI 身份不同会提示冲突，不作为修复处理，请使用更新版本或先卸载现有包。已安装版本更高时禁止降级安装
+
+**卸载…**会先确认，再通过 Windows Installer 缓存的 MSI 移除检测到的当前用户产品。卸载执行路径跳过内嵌文件解压与运行时检测、安装，只移除 PyDeck 安装文件和快捷方式，保留 Python、虚拟环境、共享运行时与应用偏好。也可从 **设置 → 应用 → 安装的应用** 卸载
 
 📦 运行时安装程序包含在 Setup 内，不会复制到已安装应用的目录中。GUI 继续使用共享运行时，卸载 PyDeck 会保留这些运行时。Setup 与启动器共用架构、版本、文件及当前用户注册状态检测；这属于就绪检查，不是完整的运行时损坏扫描
 
-⏳ 进度显示当前正在安装的组件，不显示虚构百分比。取消会在当前安装程序返回后停止，不强杀 Windows Installer，也不删除已经装好的运行时。复查失败、取消 UAC 或安装失败时不进入下一步。需要重启时停止后续步骤，由用户重启后重新运行 Setup，不会自动重启电脑。**打开日志**进入本次私有目录 `%LocalAppData%\PyDeck-Setup-{GUID}`，包含 `setup.log`、`result.json` 和可用的运行时 / MSI 日志。解出的安装程序在退出后移除，清理失败会记入日志
+⏳ 进度标明当前安装阶段，不虚构整体百分比。**取消**会请求在当前安装程序返回后停止，已经开始的安装或卸载仍可能完成；Setup 不强杀 Windows Installer。复查失败、取消 UAC 或安装失败会停止后续步骤，处理问题后可重试。需要重启时停止后续步骤，不会自动重启电脑。**打开日志**进入本次私有目录 `%LocalAppData%\PyDeck-Setup-{GUID}`，包含 `setup.log`、`result.json` 和可用的运行时 / MSI 日志。解出的安装程序在退出后移除，清理失败会记入日志
 
 🪟 使用 MSIX 时勾选**仅准备依赖**，或运行 Setup 的 `--dependencies-only` 模式。这会准备 .NET 并为桌面用户注册 Windows App Runtime，不安装 MSI，也不单独安装 VC++ Redistributable。之后按下方证书说明安装 MSIX。MSIX / App Installer 在有可用来源时能解析声明的 MSIX 框架依赖，但**不会运行普通 .NET 10 EXE 安装程序**；离线的 `.msix` 本身并不包含全部前置依赖。Setup 不修改证书信任，也不安装 PIM
 
-🔎 `PyDeck-Setup-0.7.1-fix-win-x64.exe --check` 只报告就绪状态；`--verify-payloads` 会解出并校验内置文件、生成报告，再移除解出的文件，不运行安装程序。这些检查不能替代干净机器上的实际安装验收
+🔎 `--preview` 只打开 Setup 界面，禁用安装、卸载和启动应用，不执行安装程序；`--check` 只报告就绪状态；`--verify-payloads` 解出并校验内置文件、生成报告后移除解出的文件，不执行它们。这些模式不能替代干净机器上的实际安装验收
 
 ## 📋 准备依赖
 
@@ -56,25 +57,25 @@
 | 入口 | 行为 |
 | --- | --- |
 | 已安装的 `PyDeck.Launcher.exe` / PyDeck 快捷方式 | 依赖齐全时启动 GUI，否则显示依赖窗口；手动安装缺失组件后，点击**重新检查**，再**打开 PyDeck** |
-| 独立的 `PyDeck-Dependencies-0.7.1-fix-win-x64.exe` | 始终显示检查结果和下载入口，**打开 PyDeck 保持禁用**；即使放在应用旁边，也不安装或启动应用，请关闭工具后回到安装器或已安装的快捷方式 |
+| 独立的 `PyDeck-Dependencies-0.7.2-win-x64.exe` | 始终显示检查结果和下载入口，**打开 PyDeck 保持禁用**；即使放在应用旁边，也不安装或启动应用，请关闭工具后回到安装器或已安装的快捷方式 |
 
 **下载**按钮打开 Microsoft 官方来源，工具不执行安装程序、自行提权或修改证书信任。独立工具按非打包环境检查，也会提示 VC++；MSIX 自身能否安装，以 Windows 的包依赖检查为准
 
 MSIX 缺少框架时可能在包内启动器运行前就被阻止安装，可先使用独立工具准备依赖；该工具不能绕过 MSIX 的依赖或证书信任要求
 
-🌏 应用和依赖工具提供英语、简体中文、繁体中文（台湾）及日语。应用会保存语言选择，依赖工具每次以英语打开。MSI 向导目前使用英语，原生文件夹窗口使用 Windows 的语言设置
+🌏 应用、依赖工具和 Setup 提供英语、简体中文、繁体中文（台湾）及日语。应用会保存语言，独立依赖工具以英语打开，Setup 首次跟随 Windows。直接打开独立 MSI 时仍使用英语向导；原生文件夹窗口使用 Windows 语言设置
 
 发行附件 `Test-Prerequisites.ps1` 是辅助只读清单，检查常见安装位置及 PATH 中的 PIM。它的提示不等于启动器的精确就绪判断：PATH 之外的管理器可在设置中选择，缺少 PIM 也不阻止 GUI 启动。原生启动器的只读运行时状态可通过 `PyDeck.Launcher.exe --check` 查看
 
 ### 🐍 连接 Python Install Manager
 
-**0.7.1-fix** 修改 Python 安装需要 PIM **26.3 或更高版本**，旧版或无法识别的管理器仅支持兼容的只读查询，升级后请重新连接。详见 [Python 管理](https://github.com/DM10cn/PyDeck/blob/v0.7.1/docs/MANAGEMENT.zh-CN.md)
+PyDeck 修改 Python 安装需要 PIM **26.3 或更高版本**，旧版或无法识别的管理器仅支持兼容的只读查询，升级后请重新连接。详见 [Python 管理](https://github.com/DM10cn/PyDeck/blob/main/docs/MANAGEMENT.zh-CN.md)
 
 GUI 运行时齐全后，可在未安装 PIM 时打开 PyDeck。在未连接页面或设置中选择**下载 Python Install Manager**，从 Python 官方 Windows 页面手动安装，再点击**重新检查**或**自动检测**，也可在设置中选择管理器文件。按钮只打开下载页面或重新连接，不自行安装 PIM；重连无需重启 PyDeck
 
 ## 🛠️ MSI
 
-1. 下载 `PyDeck-0.7.1-fix-win-x64.msi`
+1. 打开本地的 `PyDeck-0.7.2-win-x64.msi`
 2. 输入安装目录，或点击 **Browse…（浏览）** 打开 Windows 文件夹选择窗口
 3. 按需勾选**创建桌面快捷方式**与**添加到开始菜单**，默认仅勾选开始菜单
 4. 选择首次启动的 **Material 3 Expressive**（默认）或 **Windows Fluent** 界面
@@ -89,18 +90,18 @@ MSI 为当前用户安装，默认目录为 `%LocalAppData%\Programs\PyDeck`，�
 🧑‍💻 当前用户的静默安装也可使用相同选项，`0` 表示关闭，`1` 表示开启
 
 ```powershell
-msiexec /i PyDeck-0.7.1-fix-win-x64.msi /qn INSTALLFOLDER="D:\Apps\PyDeck" DESKTOPSHORTCUT=1 STARTMENUSHORTCUT=0 PYDECKSTYLE=Material
+msiexec /i PyDeck-0.7.2-win-x64.msi /qn INSTALLFOLDER="D:\Apps\PyDeck" DESKTOPSHORTCUT=1 STARTMENUSHORTCUT=0 PYDECKSTYLE=Material
 ```
 
 `PYDECKSTYLE` 仅接受 `Material` 或 `Fluent`，不填写时沿用上次安装器选择，全新安装则使用 Material；它不会覆盖已有应用偏好。请选择当前账号有写入权限的目录。原生文件夹选择窗口不依赖 .NET；MSIX 的安装位置由 Windows 管理，不提供这些 MSI 选项
 
-0.7.1-fix 仍使用自签证书，Windows 不会将其识别为公开受信任的发布者。安装 MSI 不要求导入预览证书，遇到 Windows 提示时请先核对下载来源，再决定是否继续
+本地 0.7.2 MSI、Setup 和依赖工具均**未签名**，不使用旧预览证书，也不要求导入它。遇到 Windows 提示时请核对源码来源和构建哈希；这些文件是本地预览产物，不是已签名的公开发行
 
-较新的 MSI 会升级同一用户的安装，旧版本会被阻止。可从 **设置 → 应用 → 安装的应用** 卸载，只移除安装器自身的文件和快捷方式，不卸载 Python 或共享运行时
+较新的 MSI 会升级同一用户的安装，旧版本会被阻止。上文的 Setup 提供维护选项与版本冲突检查；独立 MSI 和 Windows **安装的应用**入口仍可使用。卸载只移除安装器所属的文件和快捷方式，不卸载 Python 或共享运行时
 
-## 🪟 MSIX — 自签安装包
+## 🪟 历史 0.7.1-fix MSIX — 自签安装包
 
-MSIX 要求签名证书受信任，此安装包**没有公开信任的签名**。请仅在核对文件并确实准备使用 PyDeck 时信任该发布者，签名私钥不会分发
+本节仅保留给已发布的 **0.7.1-fix** MSIX；本地 0.7.2 构建不生成 MSIX 或新证书。历史 MSIX 要求签名证书受信任，但**没有公开信任的签名**。请仅在核对文件并确实准备使用该包时信任发布者，签名私钥不会分发
 
 1. 从同一发行页下载 `PyDeck-0.7.1-fix-win-x64.msix`、`PyDeck-preview.cer` 和 `SHA256SUMS.txt`
 2. 使用 `Get-FileHash -Algorithm SHA256`，将文件哈希与 `SHA256SUMS.txt` 对照
@@ -145,4 +146,6 @@ Fluent 与 Material 3 Expressive 使用分离的界面。Material 默认从本�
 
 ## 🧪 验证边界
 
-**0.7.1-fix** 最终安装包没有完整自动回归或安装验收结果。最终 GUI 交互、实际重启、运行时补装、MSI 升级与 MSIX 激活仍待手动验收；静态安装包检查仅确认文件与元数据属性。历史 Python 生命周期结果使用一次性 Sandbox，不代表本版安装包已经通过。各项范围见[发行详情](https://github.com/DM10cn/PyDeck/releases)与[功能状态](https://github.com/DM10cn/PyDeck/blob/main/docs/FEATURES.zh-CN.md)
+本地 **0.7.2** Setup 修改未进行实际安装、修复、升级或卸载验收。卸载优化减少的是不必要的解压和依赖处理，尚无前后耗时对比，不宣称提速比例；编译与静态安装包检查不代表实际安装验收
+
+历史 **0.7.1-fix** 同样缺少完整安装验收，包括运行时补装、MSI 升级与 MSIX 激活。一次性 Sandbox 中的历史 Python 生命周期结果不代表这两个版本已通过安装验收。历史范围见[已发布版本详情](https://github.com/DM10cn/PyDeck/releases/tag/v0.7.1)与[功能状态](https://github.com/DM10cn/PyDeck/blob/main/docs/FEATURES.zh-CN.md)

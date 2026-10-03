@@ -75,12 +75,14 @@ public sealed partial class MainWindow
             releaseSeries[0].IsExpanded = true;
             await CaptureAsync(Path.Combine(directory, "02b-all-distributions.png"));
             checks.Add("Recommended stable release, global package-type filter and single-level minor series verified.");
-            Navigate("settings");
+            OpenSettingsCategoryForSmoke("appearance");
             await CaptureAsync(Path.Combine(directory, "03-material-dark-settings.png"));
+            if (Descendants(PageHost).OfType<Control>().Any(control => Microsoft.UI.Xaml.Automation.AutomationProperties.GetName(control) == T("Transparency effects") ||
+                Microsoft.UI.Xaml.Automation.AutomationProperties.GetName(control) == T("Window material"))) throw new InvalidOperationException("Fluent backdrop controls leaked into Material appearance.");
+            SelectSettingsCategory("python"); Root.UpdateLayout();
             var managerSection = Descendants(PageHost).OfType<StackPanel>().Single(panel => panel.Tag as string == "ManagerLocation");
             if (Descendants(managerSection).OfType<TextBox>().Any(box => !box.IsReadOnly)) throw new InvalidOperationException("Manager settings exposes an editable path.");
-            if (Descendants(PageHost).OfType<RadioButton>().Any(radio => radio.IsEnabled)) throw new InvalidOperationException("Material transparency controls are not disabled.");
-            await ScrollSettingsAsync(bottom: true);
+            SelectSettingsCategory("about"); Root.UpdateLayout();
             await CaptureAsync(Path.Combine(directory, "03b-python-settings-about.png"));
             await ScrollSettingsAsync();
             ApplySmokePreferences(preferences with { ShowPreviewReleases = true, CatalogPackageType = "All", DefaultArchitecture = "ARM64" });
@@ -94,6 +96,7 @@ public sealed partial class MainWindow
             await CheckManagementSettingsAsync(directory);
             checks.Add("Four-language inline management settings, read-only PATH diagnostics, virtual environments, runtime badges, catalog grouping and actual byte progress rendered without saving user settings.");
             await CheckPageLayoutsAsync(directory);
+            await CheckRuntimeWorkspacesAsync(directory, checks);
             await CheckBuildUiAsync(directory);
             await CheckManagement070UiAsync(directory);
             checks.Add("0.7.0: package actions, pip protection, build preparation and used-runtime cleanup guards render in four languages, two designs and two widths.");
@@ -105,7 +108,7 @@ public sealed partial class MainWindow
             if (SystemBackdrop is not null || PopupBrush() is not SolidColorBrush) throw new InvalidOperationException("Off retained a transparent surface.");
             if (palette.Surface.A != 255 || palette.Card.A != 255) throw new InvalidOperationException("Off retained translucent content.");
             await CaptureAsync(Path.Combine(directory, "04b-fluent-off.png"));
-            Navigate("settings");
+            OpenSettingsCategoryForSmoke("appearance");
             await ScrollSettingsAsync();
             await CaptureAsync(Path.Combine(directory, "04c-fluent-settings.png"));
             Navigate("runtimes");
@@ -132,20 +135,21 @@ public sealed partial class MainWindow
             checks.Add("Four-language stage progress persists across navigation; cancel confirmation can be dismissed or accepted; stopping disables repeated cancellation.");
             foreach (var language in new[] { "zh-CN", "zh-TW", "ja-JP" })
             {
-                Navigate("settings"); Root.UpdateLayout();
+                OpenSettingsCategoryForSmoke("interface");
                 await ScrollSettingsAsync();
                 var languageChoice = Descendants(PageHost).OfType<ComboBox>().Single(box => Microsoft.UI.Xaml.Automation.AutomationProperties.GetName(box) == T("Language"));
                 languageChoice.SelectedItem = languageChoice.Items.Cast<ComboBoxItem>().Single(item => (string)item.Tag == language);
                 Root.UpdateLayout();
+                SelectSettingsCategory("appearance"); Root.UpdateLayout();
                 if (!Descendants(PageHost).OfType<TextBlock>().Any(label => label.Text == T("App theme"))) throw new InvalidOperationException("Settings not localized: " + language);
+                await CaptureAsync(Path.Combine(directory, "07-settings-" + language + ".png"));
+                SelectSettingsCategory("about"); Root.UpdateLayout();
+                await CaptureAsync(Path.Combine(directory, "07b-settings-about-" + language + ".png"));
+                Navigate("runtimes");
+                Root.UpdateLayout();
                 var navigationLabels = Descendants(ShellHost).OfType<TextBlock>().Where(label => label.Tag as string == "NavigationLabel").Select(label => label.Text).ToArray();
                 if (navigationLabels.Length != 6 || new[] { "My Python", "Install Python", "Virtual environments", "Build Python", "Activity", "Settings" }.Any(key => !navigationLabels.Contains(T(key))))
                     throw new InvalidOperationException("Active presentation navigation not localized: " + language);
-                await CaptureAsync(Path.Combine(directory, "07-settings-" + language + ".png"));
-                await ScrollSettingsAsync(bottom: true);
-                await CaptureAsync(Path.Combine(directory, "07b-settings-about-" + language + ".png"));
-                await ScrollSettingsAsync();
-                Navigate("runtimes");
                 await CaptureAsync(Path.Combine(directory, "08-runtimes-" + language + ".png"));
                 checks.Add("Live language switch and localized settings / navigation rendered: " + language);
             }
@@ -179,12 +183,12 @@ public sealed partial class MainWindow
             ApplySmokePreferences(preferences with { Language = "en-US", Design = "Fluent", Transparency = "Off" }); Navigate("runtimes");
             AppWindow.Resize(new Windows.Graphics.SizeInt32(2560, 1600));
             await CaptureAsync(Path.Combine(directory, "09-fluent-2560x1600.png"));
-            if (ContentColumn.ActualWidth > palette.Tokens.ContentWidth + 1) throw new InvalidOperationException("Wide window content is not constrained.");
+            RequireWorkspaceGeometry("smoke/fluent/wide/runtimes");
             var scale = Root.XamlRoot.RasterizationScale;
             AppWindow.Resize(new Windows.Graphics.SizeInt32((int)(930 * scale), (int)(620 * scale)));
             await CaptureAsync(Path.Combine(directory, "10-fluent-compact.png"));
-            checks.Add("Wide 2560 × 1600 and compact window layouts rendered; content width remains bounded.");
-            ApplySmokePreferences(preferences with { Language = "ja-JP" }); Navigate("settings");
+            checks.Add("Wide 2560 × 1600 and compact window layouts rendered; runtime workspace fills its available width.");
+            ApplySmokePreferences(preferences with { Language = "ja-JP" }); OpenSettingsCategoryForSmoke("appearance");
             await ScrollSettingsAsync();
             await CaptureAsync(Path.Combine(directory, "11-japanese-compact-settings.png"));
             ApplySmokePreferences(preferences with { Design = "Material", Theme = "Dark" });
@@ -254,8 +258,10 @@ public sealed partial class MainWindow
             ApplySmokePreferences(preferences with { Language = language }); Navigate("settings");
             foreach (var title in new[] { "Network", "PIM configuration", "Installation source", "Shebang rules" })
             {
-                expandedSettings.Clear(); expandedSettings.Add(title); RenderPage(); Root.UpdateLayout();
+                expandedSettings.Clear(); expandedSettings.Add(title);
+                SelectSettingsCategory(title is "Network" or "Installation source" ? "network" : "python"); Root.UpdateLayout();
                 var section = Descendants(PageHost).OfType<Expander>().Single(e => e.Tag as string == "Management:" + title);
+                section.IsExpanded = true; Root.UpdateLayout();
                 if (!section.IsExpanded || section.Content is not StackPanel) throw new IOException("Inline settings not rendered: " + title);
                 if (title == "Network" && !Descendants(section).OfType<PasswordBox>().Any()) throw new IOException("Protected credential UI missing");
                 if (title == "PIM configuration" && Descendants(section).OfType<ComboBox>().Count() < 4) throw new IOException("Configuration choices missing");
@@ -271,7 +277,8 @@ public sealed partial class MainWindow
         }
         ApplySmokePreferences(preferences with { Language = "en-US" });
         lastPathReport = await PathDiagnostics.ProbeKnownAsync(PathDiagnostics.Inspect(installed, client.Executable), installed, client.Executable);
-        expandedSettings.Clear(); expandedSettings.Add("PATH and aliases"); Navigate("settings"); Root.UpdateLayout();
+        expandedSettings.Clear(); expandedSettings.Add("PATH and aliases"); OpenSettingsCategoryForSmoke("python");
+        Descendants(PageHost).OfType<Expander>().Single(e => e.Tag as string == "Management:PATH and aliases").IsExpanded = true; Root.UpdateLayout();
         await CaptureAsync(Path.Combine(directory, "17-path-diagnostics.png"), Descendants(PageHost).OfType<Expander>().Single(e => e.Tag as string == "Management:PATH and aliases"));
         expandedSettings.Clear();
         var sample = installed.First();
@@ -288,8 +295,13 @@ public sealed partial class MainWindow
         var filter = Descendants(PageHost).OfType<ComboBox>().Single(box =>
             Microsoft.UI.Xaml.Automation.AutomationProperties.GetName(box) == T("Package type"));
         filter.SelectedItem = filter.Items.Cast<ComboBoxItem>().Single(i => i.Tag as string == "Embedded");
+        await WaitForSmokeConditionAsync(() => Descendants(PageHost).OfType<Expander>().Any(e => e.IsLoaded && e.Tag is string tag && tag.StartsWith("CatalogSeries:")),
+            "Filtered catalog header was not realized");
         var series = Descendants(PageHost).OfType<Expander>().First(e => e.Tag is string tag && tag.StartsWith("CatalogSeries:")); series.IsExpanded = true; Root.UpdateLayout();
-        if (!Descendants(series).OfType<TextBlock>().Any(t => t.Text.Contains("Embeddable", StringComparison.OrdinalIgnoreCase))) throw new IOException("Distribution filter did not populate versions");
+        await WaitForSmokeConditionAsync(() => RealizedRuntimeRows().Any(row => ((PythonRuntime)row.Tag).IsEmbeddable),
+            "Distribution filter did not realize embeddable release rows");
+        if (runtimeEntries.Where(entry => entry.Runtime is not null).Any(entry => !entry.Runtime!.IsEmbeddable))
+            throw new IOException("Distribution filter retained a different package type");
         await CaptureAsync(Path.Combine(directory, "19-filtered-minor-series.png"));
         ApplySmokePreferences(preferences with { CatalogPackageType = "Standard" });
     }
@@ -326,10 +338,10 @@ public sealed partial class MainWindow
     {
         // Wait for the new ScrollViewer to load before changing its view (ChangeView otherwise returns false).
         Root.UpdateLayout(); await Task.Delay(100);
-        settingsOffset = bottom ? settingsScroll!.ScrollableHeight : 0;
-        settingsScroll!.ChangeView(null, settingsOffset, null, true);
+        var targetOffset = bottom ? settingsScroll!.ScrollableHeight : 0;
+        settingsScroll!.ChangeView(null, targetOffset, null, true);
         await Task.Delay(200);
-        if (Math.Abs(settingsScroll.VerticalOffset - settingsOffset) > 2)
+        if (Math.Abs(settingsScroll.VerticalOffset - targetOffset) > 2)
             throw new InvalidOperationException("Settings scroll view did not reach the requested position.");
     }
 
@@ -337,7 +349,7 @@ public sealed partial class MainWindow
     {
         if (SystemBackdrop is null) throw new InvalidOperationException(material + " is unavailable on this smoke-test host.");
         var controller = SystemBackdrop;
-        Navigate("settings"); Root.UpdateLayout();
+        OpenSettingsCategoryForSmoke("interface");
         var language = Descendants(PageHost).OfType<ComboBox>().Single(box => Microsoft.UI.Xaml.Automation.AutomationProperties.GetName(box) == T("Language"));
         language.SelectedItem = language.Items.Cast<ComboBoxItem>().Single(item => (string)item.Tag == "zh-CN");
         Root.UpdateLayout();
@@ -351,7 +363,7 @@ public sealed partial class MainWindow
         if (((SolidColorBrush)PageSurface.Background).Color.A == 255 || ((SolidColorBrush)ConnectionCard.Background).Color.A == 255 || palette.Card.A == 255)
             throw new InvalidOperationException(material + " covered by an opaque content layer.");
         ApplySmokePreferences(preferences with { Language = "en-US", Theme = "Dark", DefaultArchitecture = "x64", ShowPreviewReleases = false, CatalogPackageType = "Standard", ConfirmBeforeUninstall = true });
-        Navigate("settings");
+        OpenSettingsCategoryForSmoke("appearance");
         await ScrollSettingsAsync();
         await CaptureAsync(Path.Combine(directory, "04-effects-" + material + ".png"));
         if (!ReferenceEquals(controller, SystemBackdrop)) throw new InvalidOperationException(material + " controller replaced after restoring settings.");

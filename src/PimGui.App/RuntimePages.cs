@@ -11,6 +11,14 @@ public sealed partial class MainWindow
     private readonly HashSet<string> expandedSeries = [];
     private IReadOnlyList<PythonRuntime>? runtimeSnapshotSource;
     private RuntimeCatalogSnapshot? runtimeSnapshot;
+    private sealed record RuntimeFilterKey(RuntimeCatalogSnapshot Snapshot, string Architecture, bool Previews,
+        string Search, string Distribution, bool Online, bool Connected);
+    private RuntimeFilterKey? runtimeFilterKey;
+    private PythonRuntime[] runtimeFilterResults = [];
+    private IReadOnlyList<PythonRuntime>? catalogProjectionSource;
+    private string catalogProjectionArchitecture = "";
+    private PythonRuntime? catalogRecommended;
+    private (string Key, PythonRuntime[] Releases)[] catalogSeries = [];
     private Grid PageGrid(params GridLength[] rows)
     {
         var grid = new Grid { RowSpacing = palette.Tokens.SectionSpacing, Tag = "PageShell" };
@@ -18,14 +26,23 @@ public sealed partial class MainWindow
         return grid;
     }
     private static void At(Grid grid, UIElement element, int row) { Grid.SetRow((FrameworkElement)element, row); grid.Children.Add(element); }
-    private static ScrollViewer PageScroll(UIElement content) => new()
+    private ScrollViewer PageScroll(UIElement content)
     {
+        var limit = page is "settings" or "build" or "components"
+            ? Math.Min(palette.Tokens.ContentWidth, presentation.ContentWidth(page)) : double.PositiveInfinity;
+        var body = new Border { Child = content, HorizontalAlignment = HorizontalAlignment.Left, MaxWidth = limit };
+        var scroll = new ScrollViewer
+        {
         // WinUI scrollbars overlay their viewport. Reserve a full gutter even while the thumb is hidden.
-        Content = new Border { Child = content, Padding = new(0, 8, 28, 20), Tag = "ScrollContentGutter" },
+        Content = new Border { Child = body, Padding = new(0, 8, 28, 20), Tag = "ScrollContentGutter" },
         VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
         HorizontalScrollMode = ScrollMode.Disabled, IsHorizontalRailEnabled = false, IsVerticalRailEnabled = true,
+        HorizontalContentAlignment = HorizontalAlignment.Stretch,
         VerticalContentAlignment = VerticalAlignment.Top, Tag = "PageScroll"
-    };
+        };
+        scroll.SizeChanged += (_, args) => body.Width = Math.Max(0, Math.Min(limit, args.NewSize.Width - 28));
+        return scroll;
+    }
     private Grid Header(string eyebrow, string title, string description, FrameworkElement? action = null)
         => presentation.Header(palette, eyebrow, title, description, action);
     private StackPanel Toolbar(params UIElement[] children)
@@ -54,8 +71,8 @@ public sealed partial class MainWindow
             return layout;
         }
         At(layout, FilterBar(false), 1);
-        runtimeRows = new StackPanel { Spacing = 6 };
-        At(layout, PageScroll(runtimeRows), 2);
+        runtimeRows = CreateRuntimeList();
+        At(layout, runtimeRows, 2);
         PopulateRuntimes();
         return layout;
     }
@@ -66,8 +83,8 @@ public sealed partial class MainWindow
         At(layout, Header("FIND YOUR NEXT VERSION", "Install Python", "Python releases, installed by Python Install Manager"), 0);
         At(layout, CatalogSourceBar(), 1);
         At(layout, FilterBar(true), 2);
-        runtimeRows = new StackPanel { Spacing = 10 };
-        At(layout, PageScroll(runtimeRows), 3);
+        runtimeRows = CreateRuntimeList();
+        At(layout, runtimeRows, 3);
         At(layout, palette.Label(OfflineSource ? "Use bundles from a source you trust. A checksum verifies the files, not the publisher." : "Replacing an installed micro version requires confirmation", 11, muted: true), 4);
         PopulateRuntimes();
         return layout;
@@ -75,9 +92,12 @@ public sealed partial class MainWindow
 
     private UIElement FilterBar(bool online)
     {
-        var outer = new StackPanel { Spacing = 12 };
+        var outer = new StackPanel { Spacing = 8 };
         var filters = new Grid { ColumnSpacing = palette.Tokens.ToolbarSpacing, Tag = "PageToolbar" };
         filters.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); filters.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); filters.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
+        filters.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        filters.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        filters.RowSpacing = 8;
         var find = palette.Search(online ? "Search versions or distributions" : "Search your Python versions", search);
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(find, T("Search Python versions"));
         find.TextChanged += (sender, _) => { search = sender.Text; ScheduleSearchRefresh(PopulateRuntimes); };
@@ -103,7 +123,28 @@ public sealed partial class MainWindow
             var refresh = palette.IconAction("Refresh", "\uE72C"); BindAvailability(refresh, () => CanWork(WorkKind.Runtimes));
             refresh.Click += async (_, _) => await RefreshInstalledAsync(); Grid.SetColumn(refresh, 2); filters.Children.Add(refresh);
         }
+        void AdaptFilters()
+        {
+            if (filters.ActualWidth <= 0) return;
+            var last = (FrameworkElement)filters.Children[^1];
+            var fixedWidth = Math.Max(architectureFilter.MinWidth, architectureFilter.DesiredSize.Width) +
+                Math.Max(last.MinWidth, last.DesiredSize.Width) + filters.ColumnSpacing * 2;
+            var narrow = filters.ActualWidth < Math.Max(620, fixedWidth + 180 * systemUi.TextScaleFactor);
+            Grid.SetColumnSpan(find, narrow ? 3 : 1);
+            foreach (var control in filters.Children.OfType<FrameworkElement>().Skip(1))
+                Grid.SetRow(control, narrow ? 1 : 0);
+            Grid.SetColumn(architectureFilter, narrow ? 0 : 1);
+            architectureFilter.HorizontalAlignment = narrow ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
+            Grid.SetColumn(last, narrow ? 1 : 2);
+            Grid.SetColumnSpan(last, narrow ? 2 : 1);
+            last.HorizontalAlignment = online && narrow ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
+        }
+        filters.SizeChanged += (_, _) => AdaptFilters();
+        filters.Loaded += (_, _) => AdaptFilters();
+        architectureFilter.SizeChanged += (_, _) => AdaptFilters();
+        ((FrameworkElement)filters.Children[^1]).SizeChanged += (_, _) => AdaptFilters();
         outer.Children.Add(filters);
+        resultLabel = palette.Label("", palette.Tokens.CaptionFontSize, muted: true);
         if (online)
         {
             var label = palette.Label("Show preview releases", palette.Tokens.ControlFontSize);
@@ -113,15 +154,46 @@ public sealed partial class MainWindow
             previews.FontSize = palette.Tokens.ControlFontSize;
             previews.MinHeight = palette.Tokens.ControlHeight;
             previews.IsEnabled = true;
-            outer.Children.Add(Toolbar(label, previews));
+            var previewControls = Toolbar(label, previews);
+            var summary = resultLabel;
+            summary.VerticalAlignment = VerticalAlignment.Center;
+            var status = new Grid { ColumnSpacing = 12, RowSpacing = 4 };
+            status.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
+            status.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
+            status.RowDefinitions.Add(new() { Height = GridLength.Auto });
+            status.RowDefinitions.Add(new() { Height = GridLength.Auto });
+            status.Children.Add(previewControls); Grid.SetColumn(summary, 1); status.Children.Add(summary);
+            void AdaptSummary()
+            {
+                if (status.ActualWidth <= 0) return;
+                var narrow = status.ActualWidth < previewControls.DesiredSize.Width + summary.DesiredSize.Width + 12;
+                Grid.SetRow(summary, narrow ? 1 : 0); Grid.SetColumn(summary, narrow ? 0 : 1);
+                Grid.SetColumnSpan(summary, narrow ? 2 : 1); Grid.SetColumnSpan(previewControls, narrow ? 2 : 1);
+                summary.HorizontalAlignment = narrow ? HorizontalAlignment.Left : HorizontalAlignment.Right;
+            }
+            status.SizeChanged += (_, _) => AdaptSummary();
+            summary.SizeChanged += (_, _) => AdaptSummary();
+            previewControls.SizeChanged += (_, _) => AdaptSummary();
+            outer.Children.Add(status);
         }
-        resultLabel = online ? null : palette.Label("", palette.Tokens.CaptionFontSize, muted: true);
-        if (resultLabel is not null) outer.Children.Add(resultLabel);
+        else outer.Children.Add(resultLabel);
         return outer;
     }
 
     private void SaveCatalogPreferences(AppSettings changed)
     {
+        if (savingFromToggle)
+        {
+            _ = SaveTogglePreferencesAsync(changed);
+            architecture = preferences.DefaultArchitecture;
+            distributionFilter = preferences.CatalogPackageType!;
+            // Let the switch present its native on/off feedback before measuring new rows.
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                if (page == "catalog") PopulateRuntimes();
+            });
+            return;
+        }
         try
         {
             changed = changed.Normalize();
@@ -143,7 +215,8 @@ public sealed partial class MainWindow
     {
         CancelSearchRefresh();
         if (runtimeRows is null) return;
-        runtimeRows.Children.Clear();
+        if (runtimeListSearch != search) { searchCollapsedSeries.Clear(); runtimeListSearch = search; }
+        var entries = new List<RuntimeListEntry>();
         var online = page == "catalog";
         IReadOnlyList<PythonRuntime> source = online ? (OfflineSource ? offlineBundle?.Runtimes : catalog) ?? [] : installed;
         if (!ReferenceEquals(source, runtimeSnapshotSource))
@@ -151,20 +224,47 @@ public sealed partial class MainWindow
             runtimeSnapshot = new(source);
             runtimeSnapshotSource = source;
         }
-        var filtered = runtimeSnapshot!.Filter(architecture, !online || preferences.ShowPreviewReleases, search, online ? distributionFilter : "All")
-            .Where(r => online || connected || r.IsLocalBuild).ToArray();
+        var filterKey = new RuntimeFilterKey(runtimeSnapshot!, architecture, !online || preferences.ShowPreviewReleases,
+            search, online ? distributionFilter : "All", online, connected);
+        // Expansion alone does not change filtering. A replaced source creates a new
+        // snapshot; every filter input is part of this key, including connection state.
+        if (runtimeFilterKey != filterKey)
+        {
+            runtimeFilterResults = runtimeSnapshot!.Filter(filterKey.Architecture, filterKey.Previews, filterKey.Search, filterKey.Distribution)
+                .Where(r => online || connected || r.IsLocalBuild).ToArray();
+            runtimeFilterKey = filterKey;
+        }
+        var filtered = runtimeFilterResults;
         VisibleRuntimeCount = filtered.Length;
-        if (resultLabel is not null) resultLabel.Text = online ? T(OfflineSource ? "Offline packages" : "RELEASE CATALOG") : T("INSTALLED VERSIONS  /  {0}", filtered.Length);
+        if (resultLabel is not null) resultLabel.Text = filtered.Length == source.Count
+            ? T(online ? "Available versions · {0}" : "Installed · {0}", filtered.Length)
+            : T("Showing {0} of {1}", filtered.Length, source.Count);
         if (online && OfflineSource && offlineBundle is null)
-            runtimeRows.Children.Add(Empty("\uE8B7", "Install from an offline bundle", "Choose a folder containing index.json and the Python packages.", "Choose folder…", () => _ = PickOfflineFolderAsync()));
+            entries.Add(new("empty", Content: Empty("\uE8B7", "Install from an offline bundle", "Choose a folder containing index.json and the Python packages.", "Choose folder…", () => _ = PickOfflineFolderAsync())));
         else if (online && !connected)
-            runtimeRows.Children.Add(ManagerSetup());
+            entries.Add(new("empty", Content: ManagerSetup()));
         else if (online && !OfflineSource && catalog is null)
-            runtimeRows.Children.Add(Empty("\uE896", workCoordinator.Contains(WorkKind.Catalog) ? "Checking the release catalog…" : "Your next Python starts here", "Available versions are loaded from the selected catalog", workCoordinator.Contains(WorkKind.Catalog) ? null : "Load releases", () => _ = LoadCatalogAsync()));
+            entries.Add(new("empty", Content: Empty("\uE896", workCoordinator.Contains(WorkKind.Catalog) ? "Checking the release catalog…" : "Your next Python starts here", "Available versions are loaded from the selected catalog", workCoordinator.Contains(WorkKind.Catalog) ? null : "Load releases", () => _ = LoadCatalogAsync())));
         else if (filtered.Length == 0)
-            runtimeRows.Children.Add(Empty("\uE721", source.Any() ? "No matching versions" : "No Python versions yet", source.Any() ? "Try another search or filter" : "Install your first Python version to get started.", source.Any() || online ? null : "Install Python", () => Navigate("catalog")));
-        else if (online) PopulateCatalog(filtered);
-        else foreach (var runtime in filtered) runtimeRows.Children.Add(RuntimeCard(runtime, false));
+            entries.Add(new("empty", Content: Empty("\uE721", source.Any() ? "No matching versions" : "No Python versions yet", source.Any() ? "Try another search or filter" : "Install your first Python version to get started.", source.Any() ? "Clear filters" : online ? null : "Install Python", source.Any() ? ClearRuntimeFilters : () => Navigate("catalog"))));
+        else if (online) PopulateCatalog(filtered, entries);
+        else foreach (var runtime in filtered) entries.Add(new(RuntimeEntryKey(runtime), Runtime: runtime));
+        UpdateRuntimeEntries(entries);
+    }
+
+    private void ClearRuntimeFilters()
+    {
+        search = "";
+        var find = Descendants(PageHost).OfType<AutoSuggestBox>().FirstOrDefault();
+        if (find is not null) find.Text = "";
+        foreach (var choice in Descendants(PageHost).OfType<ComboBox>().ToArray())
+        {
+            var name = Microsoft.UI.Xaml.Automation.AutomationProperties.GetName(choice);
+            var value = name == T("Architecture") ? "All architectures" : name == T("Package type") ? "All" : null;
+            if (value is not null) choice.SelectedItem = choice.Items.OfType<ComboBoxItem>().First(item => item.Tag as string == value);
+        }
+        PopulateRuntimes();
+        find?.Focus(FocusState.Keyboard);
     }
 
     private UIElement ManagerSetup()
@@ -188,7 +288,7 @@ public sealed partial class MainWindow
 
     private void OpenManagerDownload() => OpenUrl("https://www.python.org/downloads/windows/");
 
-    private void PopulateCatalog(IReadOnlyList<PythonRuntime> filtered)
+    private void PopulateCatalog(IReadOnlyList<PythonRuntime> filtered, List<RuntimeListEntry> entries)
     {
         if (runtimeRows is null) return;
         var recommendedArchitecture = architecture == "All architectures"
@@ -198,51 +298,67 @@ public sealed partial class MainWindow
                 System.Runtime.InteropServices.Architecture.X86 => "x86",
                 _ => "x64"
             } : architecture;
-        var recommended = RuntimeCatalog.Recommended(filtered, recommendedArchitecture);
+        if (!ReferenceEquals(catalogProjectionSource, filtered) || catalogProjectionArchitecture != recommendedArchitecture)
+        {
+            catalogRecommended = RuntimeCatalog.Recommended(filtered, recommendedArchitecture);
+            catalogSeries = filtered.GroupBy(RuntimeCatalog.MinorSeries).OrderByDescending(g => RuntimeCatalog.VersionKey(g.Key))
+                .Select(group => (group.Key, group.ToArray())).ToArray();
+            catalogProjectionSource = filtered;
+            catalogProjectionArchitecture = recommendedArchitecture;
+        }
+        // Installation state can change while the catalog/filter projection is retained.
+        // Rebuild this lookup once per populate, with the same ID/version comparison rules.
+        var installedVersions = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var runtime in installed)
+        {
+            if (!installedVersions.TryGetValue(runtime.Id, out var versions))
+                installedVersions.Add(runtime.Id, versions = new(StringComparer.Ordinal));
+            versions.Add(runtime.Version);
+        }
+        bool IsInstalled(PythonRuntime runtime) => installedVersions.TryGetValue(runtime.Id, out var versions) && versions.Contains(runtime.Version);
+        var recommended = catalogRecommended;
         if (recommended is not null)
         {
-            runtimeRows.Children.Add(palette.Label("Recommended", palette.Tokens.SectionTitleSize, true));
-            var card = RuntimeCard(recommended, true, recommended: true); card.Tag = "RecommendedRuntime";
-            runtimeRows.Children.Add(card);
+            entries.Add(new("recommended-heading", Heading: "Recommended"));
+            entries.Add(new("recommended:" + RuntimeEntryKey(recommended), Runtime: recommended, Online: true, Recommended: true,
+                Installed: IsInstalled(recommended)));
         }
-        runtimeRows.Children.Add(palette.Label("All versions", palette.Tokens.SectionTitleSize, true));
-        foreach (var series in filtered.GroupBy(RuntimeCatalog.MinorSeries).OrderByDescending(g => RuntimeCatalog.VersionKey(g.Key)))
+        entries.Add(new("all-heading", Heading: "All versions"));
+        var groups = catalogSeries;
+        for (var groupIndex = 0; groupIndex < groups.Length; groupIndex++)
         {
-            var items = new StackPanel { Spacing = 0 };
-            var section = palette.Expander("Python " + series.Key, items, expandedSeries.Contains(series.Key) || search.Length > 0);
-            section.Tag = "CatalogSeries:" + series.Key;
-            section.Padding = new(0);
-            // One expandable level per minor. Release rows use dividers, not nested cards.
-            section.Resources["ExpanderContentBackground"] = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
-            void PopulateItems()
-            {
-                if (items.Children.Count != 0) return;
-                foreach (var release in series) items.Children.Add(RuntimeCard(release, true, inGroup: true));
-                // Material separates adjacent releases without outlining the group's foot.
-                palette.FinishReleaseGroup(section, items);
-            }
-            if (section.IsExpanded) PopulateItems();
-            section.Expanding += (_, _) => { expandedSeries.Add(series.Key); PopulateItems(); };
-            section.Collapsed += (_, _) => expandedSeries.Remove(series.Key);
-            runtimeRows.Children.Add(section);
+            var series = groups[groupIndex];
+            var open = expandedSeries.Contains(series.Key) || search.Length > 0 && !searchCollapsedSeries.Contains(series.Key);
+            entries.Add(new("series:" + series.Key, Series: series.Key, First: groupIndex == 0,
+                Last: groupIndex == groups.Length - 1 && !open, Expanded: open));
+            if (!open) continue;
+            var releases = series.Releases;
+            for (var index = 0; index < releases.Length; index++)
+                entries.Add(new(RuntimeEntryKey(releases[index]), Runtime: releases[index], Series: series.Key, Online: true, InGroup: true,
+                    Last: groupIndex == groups.Length - 1 && index == releases.Length - 1, Installed: IsInstalled(releases[index])));
         }
     }
-    private Border RuntimeCard(PythonRuntime runtime, bool online, bool inGroup = false, bool recommended = false)
+
+    private Border RuntimeCard(PythonRuntime runtime, bool online, bool inGroup = false, bool recommended = false, bool installedRuntime = false)
     {
         var grid = new Grid { ColumnSpacing = 16 };
         grid.ColumnDefinitions.Add(new() { Width = new(inGroup ? 44 : 52) }); grid.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); grid.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
         var monogram = RuntimeIcon(runtime, compact: inGroup);
         grid.Children.Add(monogram);
-        var details = new StackPanel { Spacing = 5, VerticalAlignment = VerticalAlignment.Center };
+        var details = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
         var title = palette.Label(RuntimeTitle(runtime), inGroup ? 14 : 16, true); title.TextWrapping = TextWrapping.NoWrap; title.TextTrimming = TextTrimming.CharacterEllipsis;
         var titleLine = new Grid { ColumnSpacing = 8 };
-        titleLine.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); titleLine.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
+        titleLine.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); titleLine.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
+        titleLine.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
         titleLine.Children.Add(title);
         var badges = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
         if (runtime.IsDefault && !online) badges.Children.Add(palette.Badge("Default", true));
         if (runtime.IsPrerelease) badges.Children.Add(palette.Badge("Preview"));
         if (!online && !runtime.IsManaged) badges.Children.Add(palette.Badge(runtime.IsLocalBuild ? "Local build" : "External"));
         Grid.SetColumn(badges, 1); titleLine.Children.Add(badges); details.Children.Add(titleLine);
+        void FitTitle() => title.MaxWidth = Math.Max(0, titleLine.ActualWidth - badges.ActualWidth - (badges.Children.Count > 0 ? 8 : 0));
+        titleLine.SizeChanged += (_, _) => FitTitle();
+        badges.SizeChanged += (_, _) => FitTitle();
         details.Children.Add(palette.Label($"{runtime.Company}  ·  {runtime.Architecture}", 12, muted: true));
         if (!online)
         {
@@ -256,9 +372,9 @@ public sealed partial class MainWindow
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
         if (online)
         {
-            var existing = installed.FirstOrDefault(r => r.Id.Equals(runtime.Id, StringComparison.OrdinalIgnoreCase) && r.Version == runtime.Version);
-            var install = palette.Action(existing is null ? "Install" : "Installed", existing is null ? "\uE896" : "\uE73E", compact: !recommended, role: existing is null ? (recommended ? ActionRole.Primary : ActionRole.Secondary) : ActionRole.Quiet);
-            BindAvailability(install, () => existing is null && CanWork(WorkKind.RuntimeMutation) && connected && client.SupportsMutations);
+            var install = palette.Action(installedRuntime ? "Installed" : "Install", installedRuntime ? "\uE73E" : "\uE896", compact: !recommended, role: installedRuntime ? ActionRole.Quiet : ActionRole.Secondary);
+            SizeInstallAction(install, recommended);
+            BindAvailability(install, () => !installedRuntime && CanWork(WorkKind.RuntimeMutation) && connected && client.SupportsMutations);
             install.Click += async (_, _) => { if (OfflineSource) await InstallOfflineRuntimeAsync(runtime); else await ChangeRuntimeAsync(RuntimeAction.Install, runtime); };
             actions.Children.Add(install);
             if (!OfflineSource)
@@ -274,7 +390,8 @@ public sealed partial class MainWindow
         }
         else
         {
-            var terminal = palette.Action("Terminal", "\uE756", compact: true, role: ActionRole.Quiet); BindAvailability(terminal, () => !workCoordinator.Contains(WorkKind.RuntimeMutation) && !workCoordinator.Contains(WorkKind.Storage)); terminal.Click += (_, _) => OpenTerminal(runtime); actions.Children.Add(terminal);
+            var terminal = palette.RuntimeTerminalAction(); BindAvailability(terminal, () => !workCoordinator.Contains(WorkKind.RuntimeMutation) && !workCoordinator.Contains(WorkKind.Storage)); terminal.Click += (_, _) => OpenTerminal(runtime); actions.Children.Add(terminal);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(terminal, T("Open terminal for {0}", RuntimeTitle(runtime)));
             var more = palette.IconAction(T("More options for {0}", RuntimeTitle(runtime)), "\uE712");
             var menu = RuntimeMenu();
             MenuFlyoutItem Item(string text, string glyph, Action action, bool enabled = true)
@@ -296,7 +413,7 @@ public sealed partial class MainWindow
             more.Flyout = menu; actions.Children.Add(more);
         }
         Grid.SetColumn(actions, 2); grid.Children.Add(actions);
-        var row = palette.CardBox(grid, inGroup ? 8 : palette.Tokens.RowPadding); row.Tag = runtime;
+        var row = palette.RuntimeCardBox(grid, runtime.IsDefault && !online, inGroup ? 8 : palette.Tokens.RowPadding); row.Tag = runtime;
         if (inGroup)
         {
             row.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);

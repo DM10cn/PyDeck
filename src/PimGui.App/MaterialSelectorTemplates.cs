@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Markup;
 using Microsoft.UI.Xaml.Media;
 using System.Runtime.CompilerServices;
@@ -9,8 +10,9 @@ using Windows.UI;
 namespace PimGui.App;
 
 // The SDK ComboBox owns popup positioning, editing, scrolling, keyboard and UIA.
-// Only the item visuals are replaced. Its native Popup/PopupBorder/ScrollViewer/
-// ItemsPresenter parts remain intact; no page or item click handlers emulate selection.
+// The collapsed surface, disclosure glyph and item visuals use Material styling.
+// Native Popup/PopupBorder/ScrollViewer/ItemsPresenter parts remain intact; no
+// page or item click handlers emulate selection.
 internal static class MaterialSelectorTemplates
 {
     internal const double PopupRadius = 16;
@@ -27,16 +29,28 @@ internal static class MaterialSelectorTemplates
         Brush("ComboBoxDropDownForeground", tokens.Text);
         Brush("ComboBoxDropDownBorderBrush", tokens.HighContrast ? tokens.Outline : tokens.OutlineVariant);
         Brush("ComboBoxItemPillFillBrush", Microsoft.UI.Colors.Transparent);
-        Brush("ComboBoxBackgroundFocused", tokens.ControlFill);
-        Brush("ComboBoxBackgroundBorderBrushFocused", tokens.Accent);
+        // The native template also paints its own focus halo. Let the system focus
+        // visual own that boundary so two rounded outlines never overlap.
+        Brush("ComboBoxBackgroundFocused", Microsoft.UI.Colors.Transparent);
+        Brush("ComboBoxBackgroundBorderBrushFocused", Microsoft.UI.Colors.Transparent);
         Brush("ComboBoxForegroundFocused", tokens.Text);
         Brush("ComboBoxForegroundFocusedPressed", tokens.Text);
+        Brush("ComboBoxEditableDropDownGlyphForeground", tokens.Muted);
         foreach (var suffix in new[] { "", "PointerOver", "Pressed", "Focused", "FocusedPressed", "Disabled" })
         {
-            Brush("ComboBoxDropDownGlyphForeground" + suffix, suffix == "Disabled" ? disabled : tokens.Muted);
-            Brush("ComboBoxPlaceHolderForeground" + suffix, suffix == "Disabled" ? disabled : tokens.Muted);
-            Brush("ComboBoxHeaderForeground" + suffix, suffix == "Disabled" ? disabled : tokens.Text);
+            var isDisabled = suffix == "Disabled";
+            var opacity = suffix == "PointerOver" ? tokens.HoverStateOpacity
+                : suffix.EndsWith("Pressed", StringComparison.Ordinal) ? tokens.PressedStateOpacity : 0;
+            var fill = isDisabled ? DesignComponents.Mix(tokens.Surface, tokens.Text, tokens.DisabledContainerOpacity)
+                : opacity > 0 ? DesignComponents.Mix(tokens.ControlFill, tokens.Text, opacity) : tokens.ControlFill;
+            Brush("ComboBoxBackground" + suffix, tokens.HighContrast ? tokens.Card : fill);
+            Brush("ComboBoxBorderBrush" + suffix, tokens.HighContrast ? (isDisabled ? tokens.Muted : tokens.Outline) : Microsoft.UI.Colors.Transparent);
+            Brush("ComboBoxForeground" + suffix, isDisabled ? disabled : tokens.Text);
+            Brush("ComboBoxDropDownGlyphForeground" + suffix, isDisabled ? disabled : tokens.Muted);
+            Brush("ComboBoxPlaceHolderForeground" + suffix, isDisabled ? disabled : tokens.Muted);
+            Brush("ComboBoxHeaderForeground" + suffix, isDisabled ? disabled : tokens.Text);
         }
+        resources["ComboBoxBorderThemeThickness"] = new Thickness(tokens.HighContrast ? 1 : 0);
         InstallPaletteResources(resources, tokens);
         resources["PyDeckSelectorPopupCornerRadius"] = new CornerRadius(PopupRadius);
         resources["ComboBoxDropdownBorderPadding"] = new Thickness(4);
@@ -58,11 +72,14 @@ internal static class MaterialSelectorTemplates
         selector.Setters.Add(new Setter(ItemsControl.ItemContainerStyleProperty, item));
         selector.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(14, 9, 12, 9)));
         selector.Setters.Add(new Setter(Control.ForegroundProperty, Palette.Brush(tokens.Text)));
-        selector.Setters.Add(new Setter(Control.BorderBrushProperty, Palette.Brush(tokens.Outline)));
-        selector.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
+        selector.Setters.Add(new Setter(Control.BackgroundProperty, Palette.Brush(tokens.HighContrast ? tokens.Card : tokens.ControlFill)));
+        selector.Setters.Add(new Setter(Control.BorderBrushProperty, Palette.Brush(tokens.HighContrast ? tokens.Outline : Microsoft.UI.Colors.Transparent)));
+        selector.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(tokens.HighContrast ? 1 : 0)));
         selector.Setters.Add(new Setter(Control.UseSystemFocusVisualsProperty, true));
         selector.Setters.Add(new Setter(Control.FocusVisualPrimaryBrushProperty, Palette.Brush(tokens.Accent)));
         selector.Setters.Add(new Setter(Control.FocusVisualSecondaryBrushProperty, Palette.Brush(surface)));
+        selector.Setters.Add(new Setter(Control.FocusVisualPrimaryThicknessProperty, new Thickness(2)));
+        selector.Setters.Add(new Setter(Control.FocusVisualSecondaryThicknessProperty, new Thickness(0)));
         selector.Setters.Add(new Setter(ComboBoxHelper.KeepInteriorCornersSquareProperty, false));
         resources[typeof(ComboBox)] = selector;
     }
@@ -100,11 +117,14 @@ internal static class MaterialSelectorTemplates
         selector.ItemContainerStyle = (Style)resources["PyDeckMaterialSelectorItemStyle"];
         selector.CornerRadius = new(tokens.InputRadius);
         selector.Foreground = Palette.Brush(tokens.Text);
-        selector.BorderBrush = Palette.Brush(tokens.Outline);
-        selector.BorderThickness = new(1);
+        selector.Background = Palette.Brush(tokens.HighContrast ? tokens.Card : tokens.ControlFill);
+        selector.BorderBrush = Palette.Brush(tokens.HighContrast ? tokens.Outline : Microsoft.UI.Colors.Transparent);
+        selector.BorderThickness = new(tokens.HighContrast ? 1 : 0);
         selector.UseSystemFocusVisuals = true;
         selector.FocusVisualPrimaryBrush = Palette.Brush(tokens.Accent);
         selector.FocusVisualSecondaryBrush = Palette.Brush(tokens.Surface);
+        selector.FocusVisualPrimaryThickness = new(2);
+        selector.FocusVisualSecondaryThickness = new(0);
         ComboBoxHelper.SetKeepInteriorCornersSquare(selector, false);
         if (configured.TryGetValue(selector, out var state)) state.Tokens = tokens;
         else
@@ -122,10 +142,40 @@ internal static class MaterialSelectorTemplates
         if (!configured.TryGetValue(selector, out var state)) return;
         selector.ApplyTemplate();
         var parts = Descendants(selector).OfType<FrameworkElement>().ToArray();
-        // The SDK focus halo has a fixed seven-dip corner, independent of CornerRadius.
-        // Shape it at component level without replacing the SDK template or input behavior.
+        // Keep the SDK state target alive, but only the system focus visual paints
+        // the ring. The original halo's separate radius caused a doubled edge.
         if (parts.OfType<Border>().FirstOrDefault(part => part.Name == "HighlightBackground") is { } focus)
-        { focus.CornerRadius = new(state.Tokens.InputRadius); focus.Margin = new(0); }
+        {
+            focus.Background = Palette.Brush(Microsoft.UI.Colors.Transparent);
+            focus.BorderBrush = Palette.Brush(Microsoft.UI.Colors.Transparent);
+            focus.BorderThickness = new(0);
+        }
+        if (parts.OfType<AnimatedIcon>().FirstOrDefault(part => part.Name == "DropDownGlyph") is { } glyph &&
+            VisualTreeHelper.GetParent(glyph) is Grid glyphParent &&
+            !glyphParent.Children.OfType<PathIcon>().Any(icon => icon.Name == "MaterialSelectorArrow"))
+        {
+            // Keep the SDK AnimatedIcon, visual source and state targets alive.
+            // Replacing its Source while its native template/state initialization
+            // is active can invalidate the animated visual. A non-interactive path
+            // shares its grid slot and foreground, while only its pixels are hidden.
+            var figure = new PathFigure { StartPoint = new(0, 0), IsClosed = true };
+            figure.Segments.Add(new LineSegment { Point = new(5, 5) });
+            figure.Segments.Add(new LineSegment { Point = new(10, 0) });
+            var geometry = new PathGeometry(); geometry.Figures.Add(figure);
+            var arrow = new PathIcon
+            {
+                Name = "MaterialSelectorArrow", Data = geometry, Width = 10, Height = 6,
+                HorizontalAlignment = glyph.HorizontalAlignment, VerticalAlignment = VerticalAlignment.Center,
+                Margin = glyph.Margin, IsHitTestVisible = false
+            };
+            arrow.SetBinding(IconElement.ForegroundProperty, new Binding { Source = glyph, Path = new PropertyPath("Foreground"), Mode = BindingMode.OneWay });
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAccessibilityView(arrow,
+                Microsoft.UI.Xaml.Automation.Peers.AccessibilityView.Raw);
+            Grid.SetRow(arrow, Grid.GetRow(glyph)); Grid.SetColumn(arrow, Grid.GetColumn(glyph));
+            Grid.SetRowSpan(arrow, Grid.GetRowSpan(glyph)); Grid.SetColumnSpan(arrow, Grid.GetColumnSpan(glyph));
+            glyphParent.Children.Add(arrow);
+            glyph.Opacity = 0;
+        }
         var popup = parts.OfType<Popup>().FirstOrDefault(part => part.Name == "Popup");
         if (popup is null && selector.IsDropDownOpen && selector.XamlRoot is not null)
             popup = VisualTreeHelper.GetOpenPopupsForXamlRoot(selector.XamlRoot).FirstOrDefault(candidate => candidate.Child is not null &&

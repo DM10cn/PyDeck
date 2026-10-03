@@ -25,7 +25,7 @@ public sealed partial class MainWindow
             foreach (var (name, color) in new[] { ("First base color", MaterialSeedForRender), ("Second base color", MaterialSecondSeedForRender) })
             {
                 var swatch = new Border { Width = 28, Height = 28, CornerRadius = new(14), Background = Palette.Brush(SeedColor(color)),
-                    BorderBrush = Palette.Brush(palette.Line), BorderThickness = new(1) };
+                    BorderBrush = Palette.Brush(palette.Line), BorderThickness = new(palette.Tokens.HighContrast ? 1 : 0) };
                 AutomationProperties.SetName(swatch, T(name) + $" #{color & 0xFFFFFFu:X6}");
                 var item = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
                 item.Children.Add(swatch); item.Children.Add(palette.Label(T(name) + $" · #{color & 0xFFFFFFu:X6}", palette.Tokens.CaptionFontSize, muted: true));

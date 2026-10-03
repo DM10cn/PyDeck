@@ -39,13 +39,14 @@ public sealed partial class MainWindow : Window
     private bool connected;
     private bool closeDialogOpen;
     private bool confirmationOpen;
-    private StackPanel? runtimeRows;
+    private ListView? runtimeRows;
     private TextBlock? resultLabel;
     private ScrollViewer? settingsScroll;
     private double settingsOffset;
     private readonly string? smokeDirectory;
     internal bool PerformanceProbe { get; }
     internal bool DesignProbe { get; }
+    internal bool WorkspaceProbe { get; }
     internal bool RestartProbe { get; }
     internal int VisibleRuntimeCount { get; private set; }
 
@@ -59,6 +60,7 @@ public sealed partial class MainWindow : Window
         if (smokeIndex >= 0 && smokeIndex + 1 < args.Length) smokeDirectory = Path.GetFullPath(args[smokeIndex + 1]);
         PerformanceProbe = smokeDirectory is not null && args.Contains("--performance-only");
         DesignProbe = smokeDirectory is not null && args.Contains("--design-only");
+        WorkspaceProbe = smokeDirectory is not null && args.Contains("--workspace-only");
         RestartProbe = smokeDirectory is not null && args.Contains("--restart-only");
         store = new(smokeDirectory is null
             ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PyDeck")
@@ -80,9 +82,8 @@ public sealed partial class MainWindow : Window
         palette = new(DesignTokens.For(ActiveDesign, preferences.Theme == "Light", MaterialSeedForRender, preferences.MaterialColorStyle, MaterialSecondSeedForRender));
         client = CreateClient();
         InitializeSystemAppearance();
-        ExtendsContentIntoTitleBar = true;
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
-        SetTitleBar(TitleBar);
+        InitializeWindowPreferences();
         AppWindow.Resize(new SizeInt32(1200, 820));
         AppWindow.Closing += OnClosing;
         Closed += (_, _) => CancelSearchRefresh();
@@ -92,14 +93,16 @@ public sealed partial class MainWindow : Window
             initialized = true;
             CollectShellLabels(Root);
             ApplyLanguage();
-            if (!PerformanceProbe && !DesignProbe && !RestartProbe) SizeForDisplay();
+            if (!PerformanceProbe && !DesignProbe && !WorkspaceProbe && !RestartProbe) SizeForDisplay();
             ApplyAppearance();
             RefreshMaterialColors();
             if (RestartProbe) { await RunRestartProbeAsync(smokeDirectory!); return; }
+            if (WorkspaceProbe) { await RunWorkspaceProbeAsync(smokeDirectory!); return; }
             if (DesignProbe) { await RunDesignProbeAsync(smokeDirectory!); return; }
             if (PerformanceProbe) { await RunPerformanceProbeAsync(smokeDirectory!); return; }
             try { Builds.RecoverInterrupted(); ReloadLocalRuntimes(); } catch (Exception ex) { ShowError(ex); }
             await ConnectAsync();
+            if (smokeDirectory is null && page == "runtimes" && preferences.StartupPage != "runtimes") Navigate(preferences.StartupPage);
             if (store.LoadWarning is { } warning) Notify(warning, InfoBarSeverity.Warning);
             if (smokeDirectory is not null) await RunSmokeTestAsync(smokeDirectory);
         };
@@ -116,8 +119,16 @@ public sealed partial class MainWindow : Window
         // Production calls this once. Isolated visual fixtures may explicitly create another presentation.
         presentation?.Detach();
         ShellHost.Children.Clear();
+        // Before the initial visual tree is loaded, Parent can still be null even
+        // though the footer owns this button. Detach through its known collection
+        // before the Material drawer takes ownership.
+        FooterActions.Children.Remove(RefreshDatabaseButton);
         presentation = design == "Fluent" ? new FluentPresentation() : new MaterialPresentation();
-        ShellHost.Children.Add(presentation.CreateShell(PageSurface, BrandPanel, ConnectionCard, Navigate));
+        var material = presentation.Design == "Material";
+        if (!material) FooterActions.Children.Add(RefreshDatabaseButton);
+        FooterBar.Visibility = material ? Visibility.Collapsed : Visibility.Visible;
+        Root.RowDefinitions[2].Height = new GridLength(material ? 0 : 36);
+        ShellHost.Children.Add(presentation.CreateShell(PageSurface, BrandPanel, ConnectionCard, RefreshDatabaseButton, Navigate));
         if (initialized)
         {
             // Shared chrome keeps its original translation keys. Navigation labels belong
@@ -151,27 +162,22 @@ public sealed partial class MainWindow : Window
     private void ApplyColors()
     {
         if (closed) return;
-        palette = new(AccessibleTokens(DesignTokens.For(ActiveDesign, Root.ActualTheme == ElementTheme.Light, MaterialSeedForRender, preferences.MaterialColorStyle, MaterialSecondSeedForRender).WithBackdrop(SystemBackdrop is not null)));
+        palette = new(AccessibleTokens(ApplyWindowPreferenceTokens(DesignTokens.For(ActiveDesign, Root.ActualTheme == ElementTheme.Light, MaterialSeedForRender, preferences.MaterialColorStyle, MaterialSecondSeedForRender).WithBackdrop(SystemBackdrop is not null))));
+        ApplyWindowPreferenceFonts();
         palette.InstallResources(Root.Resources);
         palette.ConfigureProgress(BusyProgress);
         palette.ConfigureProgress(OperationProgressBar);
-        palette.ConfigureAction(RefreshDatabaseButton, ActionRole.Quiet, compact: true);
+        palette.ConfigureAction(RefreshDatabaseButton, ActionRole.Quiet, compact: ActiveDesign != "Material");
         palette.ConfigureAction(CancelOperationButton, ActionRole.Secondary, compact: true);
         ApplyPopupResources();
         Root.Background = SystemBackdrop is null ? Palette.Brush(palette.Shell) : new SolidColorBrush(Colors.Transparent);
         TitleBar.RequestedTheme = Root.RequestedTheme;
         presentation.ApplyShell(palette);
-        ContentColumn.MaxWidth = Math.Min(palette.Tokens.ContentWidth, presentation.ContentWidth(page));
         BrandMark.Background = new SolidColorBrush(Colors.Transparent);
         BrandMark.CornerRadius = new(palette.Tokens.IconRadius);
-        ConnectionCard.Background = new SolidColorBrush(Colors.Transparent);
-        ConnectionCard.CornerRadius = new(palette.Tokens.IconRadius);
         ConnectionDot.Fill = Palette.Brush(connected ? palette.Green : palette.Muted);
         StyleStatus.Text = palette.Tokens.Name + "  ·  PyDeck " + AppVersionLabel;
-        AppWindow.TitleBar.ButtonBackgroundColor = Colors.Transparent;
-        AppWindow.TitleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
-        AppWindow.TitleBar.ButtonForegroundColor = palette.Text;
-        AppWindow.TitleBar.ButtonInactiveForegroundColor = palette.Muted;
+        ApplyWindowCaptionColors();
         UpdateOperationPanel();
         RenderPage();
         MarkMaterialColorsApplied();
@@ -194,6 +200,11 @@ public sealed partial class MainWindow : Window
 
     private void Navigate(string destination)
     {
+        if (destination == "settings" && page is not ("settings" or "components"))
+        {
+            settingsReturnPage = page;
+            settingsDetailSelected = false;
+        }
         page = destination;
         search = "";
         architecture = destination == "catalog" ? preferences.DefaultArchitecture : "All architectures";
@@ -204,6 +215,7 @@ public sealed partial class MainWindow : Window
     }
     private void RenderPage()
     {
+        RememberSettingsScroll();
         CancelSearchRefresh();
         availability.Clear();
         settingsSections.Clear();
@@ -215,7 +227,6 @@ public sealed partial class MainWindow : Window
         activityList = null; activityEmpty = null;
         runtimeRows = null;
         resultLabel = null;
-        ContentColumn.MaxWidth = Math.Min(palette.Tokens.ContentWidth, presentation.ContentWidth(page));
         presentation.SelectPage(page, palette);
         PageHost.Children.Clear();
         PageHost.Children.Add(page switch
@@ -405,8 +416,23 @@ public sealed partial class MainWindow : Window
     }
     private async void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
-        if (restartInProgress) { args.Cancel = true; return; }
-        if (!RestartBlockedByWork) return;
+        if (restartInProgress) { explicitWindowExit = false; exitAfterSettingsFlush = false; args.Cancel = true; return; }
+        // Minimizing keeps the process and its operations alive. Only a real exit
+        // must wait for active Python/build work to finish.
+        if (!exitAfterSettingsFlush && TryApplyClosePreference()) { args.Cancel = true; return; }
+        if (!RestartBlockedByWork)
+        {
+            if (exitAfterSettingsFlush) { exitAfterSettingsFlush = false; return; }
+            args.Cancel = false;
+            if (!args.Cancel && smokeDirectory is null && !store.FlushAsync().IsCompletedSuccessfully)
+            {
+                args.Cancel = true;
+                await CloseAfterSettingsSavedAsync();
+            }
+            return;
+        }
+        explicitWindowExit = false;
+        exitAfterSettingsFlush = false;
         args.Cancel = true;
         if (closeDialogOpen || confirmationOpen || cancelDialogOpen) return;
         closeDialogOpen = true;
@@ -425,7 +451,9 @@ public sealed partial class MainWindow : Window
         {
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps ||
                 !(new[] { "www.python.org", "docs.python.org", "learn.microsoft.com", "visualstudio.microsoft.com" }.Contains(uri.Host) ||
-                  (uri.Host == "github.com" && uri.AbsolutePath.StartsWith("/DM10cn/PyDeck/releases", StringComparison.Ordinal) && uri.UserInfo.Length == 0 && uri.IsDefaultPort)))
+                  (uri.Host == "github.com" &&
+                   (uri.AbsolutePath is "/DM10cn/PyDeck" or "/DM10cn/PyDeck/issues" or "/DM10cn/PyDeck/blob/main/LICENSE" or "/DM10cn/PyDeck/blob/main/THIRD-PARTY-NOTICES.md" ||
+                    uri.AbsolutePath == "/DM10cn/PyDeck/releases" || uri.AbsolutePath.StartsWith("/DM10cn/PyDeck/releases/", StringComparison.Ordinal)) && uri.UserInfo.Length == 0 && uri.IsDefaultPort)))
                 throw new ArgumentException("This link is not a supported documentation address.");
             Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
         }

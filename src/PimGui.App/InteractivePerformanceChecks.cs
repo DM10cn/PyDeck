@@ -62,6 +62,7 @@ public sealed partial class MainWindow
             PopulateRuntimes();
             if (VisibleRuntimeCount != 0 || ReferenceEquals(projection, runtimeSnapshot)) throw new IOException("Catalog replacement reused stale results");
             checks.Add("Catalog search preserves controls/index; replaced catalog invalidates the index");
+            await CheckVirtualizedRuntimeListsAsync(checks);
 
             var environment = new VirtualEnvironment(Path.Combine(store.DirectoryPath, "performance-fixture"));
             Environments.Remember(environment); packageEnvironment = environment.Path;
@@ -82,6 +83,9 @@ public sealed partial class MainWindow
             {
                 ApplySmokePreferences(preferences with { Design = design, Language = language });
                 buildOptions = new(); buildPreset = "Standard"; Navigate("build"); Root.UpdateLayout();
+                await WaitForSmokeConditionAsync(() => buildScroll?.IsLoaded == true &&
+                    Descendants(PageHost).OfType<ToggleSwitch>().Any(toggle => toggle.IsLoaded && AutomationProperties.GetName(toggle) == T("Debug symbols")),
+                    "Build component fixture did not finish loading");
                 var originalPage = PageHost.Children.Single(); var scroll = buildScroll;
                 ComboBox Choice(string title) => Descendants(PageHost).OfType<ComboBox>().Single(box => AutomationProperties.GetName(box) == T(title));
                 ToggleSwitch Component(string title) => Descendants(PageHost).OfType<ToggleSwitch>().Single(toggle => AutomationProperties.GetName(toggle) == T(title));

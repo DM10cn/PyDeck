@@ -3,6 +3,7 @@ param(
     [string]$CertificateThumbprint,
     [switch]$AllowUnsigned,
     [switch]$SkipChecks,
+    [switch]$MsiOnly,
     [string]$WixCommand = 'wix'
 )
 $ErrorActionPreference = 'Stop'
@@ -148,6 +149,7 @@ try {
     $msi = Join-Path $assets "PyDeck-$releaseLabel-win-x64.msi"
     Invoke-Checked $WixCommand @('build', 'packaging/msi/Package.wxs', 'packaging/msi/InstallOptions.wxs', $fragmentPath, '-arch', 'x64', '-ext', 'WixToolset.UI.wixext/7.0.0', '-d', "ProductVersion=$version", '-d', "PayloadDir=$payload", '-d', "LicenseRtf=$licenseRtf", '-d', ('InstallerActions=' + (Join-Path $work 'native\PyDeck.InstallerActions.dll')), '-pdbtype', 'none', '-intermediatefolder', (Join-Path $work 'wix'), '-o', $msi)
 
+    if (!$MsiOnly) {
     $msixStage = Join-Path $work 'msix'
     New-Item -ItemType Directory -Path $msixStage | Out-Null
     Get-ChildItem -LiteralPath $payload | Copy-Item -Destination $msixStage -Recurse
@@ -171,12 +173,15 @@ try {
     $manifest.Save((Join-Path $msixStage 'AppxManifest.xml'))
     $msix = Join-Path $assets "PyDeck-$releaseLabel-win-x64.msix"
     Invoke-Checked (Join-Path $sdkTools 'makeappx.exe') @('pack', '/d', $msixStage, '/p', $msix, '/h', 'SHA256', '/o')
+    }
     if ($certificate) {
-        foreach ($package in @($msi, $msix)) {
+        $packagesToSign = @($msi)
+        if (!$MsiOnly) { $packagesToSign += $msix }
+        foreach ($package in $packagesToSign) {
             Invoke-Checked (Join-Path $sdkTools 'signtool.exe') @('sign', '/fd', 'SHA256', '/sha1', $CertificateThumbprint, '/s', 'My', $package)
         }
     }
-    # Chain the shared runtime installers outside the MSI transaction, preserving its full UI.
+    # Prepare runtimes before the MSI transaction; Setup owns the UI, standalone MSI keeps its wizard.
     & (Join-Path $PSScriptRoot 'Build-Setup.ps1') -MsiPath $msi -OutputDirectory $assets -AllowUnsignedMsi:(!$certificate) -Checks:(!$SkipChecks)
     $setup = Join-Path $assets "PyDeck-Setup-$releaseLabel-win-x64.exe"
     if ($certificate) {
@@ -185,11 +190,12 @@ try {
     $metadata = [ordered]@{ version = $version; sourceCommit = $sourceCommit; sourceDirty = $sourceDirty; signed = [bool]$certificate; certificateThumbprint = $CertificateThumbprint; certificateExpires = $(if ($certificate) { $certificate.NotAfter.ToUniversalTime().ToString('o') } else { $null }); assets = $assets; payload = $payload }
     $metadata.releaseLabel = $releaseLabel
     $metadata.automatedChecksRun = !$SkipChecks
+    $metadata.msiOnly = [bool]$MsiOnly
     $metadata.setup = $setup
     $metadata.setupPrerequisites = @(Get-Content -LiteralPath 'packaging/setup/prerequisites.json' -Raw | ConvertFrom-Json)
     $metadata | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $output 'build.json') -Encoding utf8
     Set-Content -LiteralPath (Join-Path $repoRoot 'artifacts\latest-release.txt') -Value $output -Encoding utf8
     Write-Output "Release packages: $assets"
     if ($sourceDirty) { Write-Warning 'Built from a working tree with changes. Commit and rebuild before public release.' }
-    if (!$certificate) { Write-Warning 'Unsigned validation packages only; do not publish as installable MSIX.' }
+    if (!$certificate) { Write-Warning 'Unsigned local preview packages; sign and validate before public release.' }
 } finally { Pop-Location }

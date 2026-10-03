@@ -12,11 +12,9 @@ public sealed partial class MainWindow
     private TextBlock? managerPathLabel;
     private InfoBar? designRestartNotice;
     private readonly Dictionary<string, Microsoft.UI.Xaml.Controls.Primitives.ToggleButton> designChoices = [];
-    private UIElement BuildSettingsPage()
+    private StackPanel BuildAppearanceSettings()
     {
-        var layout = PageGrid(GridLength.Auto, new(1, GridUnitType.Star));
-        At(layout, Header("MAKE IT YOURS", "Settings", "Appearance, language, and Python preferences."), 0);
-        var body = new StackPanel { Spacing = palette.Tokens.SectionSpacing };
+        var body = new StackPanel { Spacing = 24 };
         var appearance = palette.Section("Appearance");
         designChoices.Clear();
         var choices = new Grid { ColumnSpacing = 8, MinWidth = 300, MaxWidth = 380 };
@@ -42,7 +40,7 @@ public sealed partial class MainWindow
             Grid.SetColumn(button, column); choices.Children.Add(button);
         }
         appearance.Children.Add(SettingRow("Interface style", "Changes to interface style apply the next time PyDeck starts.", choices));
-        designRestartNotice = new InfoBar { Severity = InfoBarSeverity.Informational, IsClosable = false,
+        designRestartNotice = new InfoBar { Severity = InfoBarSeverity.Informational, IsClosable = false, Visibility = Visibility.Collapsed,
             Title = T("Restart to apply interface style"), Message = T("Your selection is saved. Current tasks and the active interface will continue until you close PyDeck.") };
         var restart = palette.Action("Restart now", compact: true, role: ActionRole.Quiet);
         restart.Click += async (_, _) => await PromptDesignRestartAsync();
@@ -51,37 +49,59 @@ public sealed partial class MainWindow
         UpdateDesignSelection();
         appearance.Children.Add(SettingRow("App theme", null, Choice([("System", "System"), ("Light", "Light"), ("Dark", "Dark")], preferences.Theme,
             value => SaveAppearance(preferences.Design, value), "App theme")));
-        appearance.Children.Add(SettingRow("Language", "Changes apply immediately.", Choice([("en-US", "English (US)"), ("zh-CN", "简体中文"), ("zh-TW", "繁體中文（台灣）"), ("ja-JP", "日本語")], preferences.Language,
-            value => SavePreferences(preferences with { Language = value }), "Language")));
-
-        var radios = new StackPanel { Spacing = 2 };
-        foreach (var (id, label) in new[] { ("System", "Use Windows setting"), ("On", "On"), ("Off", "Off") })
+        appearance.Children.Add(SettingRow("Use system font", "Turn off to use PyDeck's Segoe UI Variable font.",
+            Toggle(preferences.UseSystemFont, value => SavePreferences(preferences with { UseSystemFont = value }), "Use system font")));
+        body.Children.Add(appearance);
+        if (palette.Tokens.SupportsEffects)
         {
-            var radio = new RadioButton { Content = T(label), GroupName = "Transparency", FontSize = palette.Tokens.ControlFontSize,
-                MinHeight = palette.Tokens.ControlHeight, IsChecked = preferences.Transparency == id, IsEnabled = palette.Tokens.SupportsEffects };
-            palette.ApplyAccentResources(radio);
-            radio.Checked += (_, _) => SavePreferences(preferences with { Transparency = id });
-            radios.Children.Add(radio);
+            var effects = palette.Section("Window");
+            effects.Children.Add(SettingRow("Transparency effects", null, Choice([("System", "Use Windows setting"), ("On", "On"), ("Off", "Off")], preferences.Transparency,
+                value => SavePreferences(preferences with { Transparency = value }), "Transparency effects")));
+            var material = Choice([("Mica", "Mica"), ("Acrylic", "Acrylic")], preferences.Backdrop,
+                value => SavePreferences(preferences with { Backdrop = value }), "Window material");
+            material.IsEnabled = preferences.Transparency != "Off" && !OledBlackActive;
+            effects.Children.Add(SettingRow("Window material", "Mica uses your wallpaper colors. Acrylic blurs what is behind the window.", material));
+            effects.Children.Add(palette.Label(BackdropDescription(), palette.Tokens.CaptionFontSize, muted: true));
+            body.Children.Add(effects);
         }
-        appearance.Children.Add(SettingRow("Transparency effects", null, radios));
-        var material = Choice([("Mica", "Mica"), ("Acrylic", "Acrylic")], preferences.Backdrop,
-            value => SavePreferences(preferences with { Backdrop = value }), "Window material");
-        material.IsEnabled = palette.Tokens.SupportsEffects && preferences.Transparency != "Off";
-        appearance.Children.Add(SettingRow("Window material", "Mica uses your wallpaper colors. Acrylic blurs what is behind the window.", material));
-        appearance.Children.Add(palette.Label(BackdropDescription(), palette.Tokens.CaptionFontSize, muted: true));
+        if (palette.Tokens.SupportsDynamicColor) body.Children.Add(MaterialColorSettings());
+        body.Children.Add(palette.Section("Display", SettingRow("OLED optimization", "Use a pure black background in dark mode.",
+            Toggle(preferences.OledBlack, value => SavePreferences(preferences with { OledBlack = value }), "OLED optimization"))));
+        return body;
+    }
+
+    private StackPanel BuildInterfaceSettings()
+    {
+        var body = new StackPanel { Spacing = 24 };
+        body.Children.Add(palette.Section("Language", SettingRow("Language", "Changes apply immediately.", Choice([("en-US", "English (US)"), ("zh-CN", "简体中文"), ("zh-TW", "繁體中文（台灣）"), ("ja-JP", "日本語")], preferences.Language,
+            value => SavePreferences(preferences with { Language = value }), "Language"))));
+        body.Children.Add(palette.Section("Startup", SettingRow("Startup page", "Choose the page shown when PyDeck starts.",
+            Choice([("runtimes", "My Python"), ("catalog", "Install Python"), ("environments", "Virtual environments"), ("build", "Build Python"), ("activity", "Activity"), ("settings", "Settings")], preferences.StartupPage,
+                value => SavePreferences(preferences with { StartupPage = value }), "Startup page"))));
+        body.Children.Add(palette.Section("Window behavior",
+            SettingRow("When closing the window", "Choose what the window's close button does. Active tasks must finish before exiting.",
+                Choice([("Exit", "Exit PyDeck"), ("Minimize", "Minimize to taskbar"), ("Tray", "Minimize to system tray")], preferences.CloseBehavior,
+                    value => SavePreferences(preferences with { CloseBehavior = value }), "When closing the window")),
+            SettingRow("Use system title bar", "Turn off to hide the title bar and all window buttons. Restart PyDeck to apply.", Toggle(preferences.UseSystemTitleBar,
+                value => SavePreferences(preferences with { UseSystemTitleBar = value }), "Use system title bar"))));
         var gallery = palette.Action("Component gallery", "\uE8A9", compact: true, role: ActionRole.Quiet);
         gallery.Click += (_, _) => Navigate("components");
-        appearance.Children.Add(gallery);
-        body.Children.Add(appearance);
-        if (palette.Tokens.SupportsDynamicColor) body.Children.Add(MaterialColorSettings());
+        body.Children.Add(palette.Section("Components", gallery));
+        return body;
+    }
 
-        var python = palette.Section("Python");
-        python.Children.Add(SettingRow("Confirm before uninstall", null, Toggle(preferences.ConfirmBeforeUninstall,
-            value => SavePreferences(preferences with { ConfirmBeforeUninstall = value }), "Confirm before uninstall")));
-        body.Children.Add(python);
-        body.Children.Add(ManagementSettings());
-        body.Children.Add(StorageSettings());
+    private StackPanel BuildPythonSettings()
+    {
+        var body = new StackPanel { Spacing = 24 };
+        body.Children.Add(palette.Section("Python", SettingRow("Confirm before uninstall", null, Toggle(preferences.ConfirmBeforeUninstall,
+            value => SavePreferences(preferences with { ConfirmBeforeUninstall = value }), "Confirm before uninstall"))));
+        body.Children.Add(ManagementSettings(false));
+        body.Children.Add(BuildManagerSettings());
+        return body;
+    }
 
+    private StackPanel BuildManagerSettings()
+    {
         var manager = palette.Section("Python Install Manager location");
         manager.Tag = "ManagerLocation";
         managerStateLabel = palette.Label(connected ? "Connected on this computer" : "Not connected", 12, muted: true);
@@ -111,26 +131,10 @@ public sealed partial class MainWindow
         detect.Click += async (_, _) => await ChangeManagerAsync("");
         var download = palette.Action("Download Python Install Manager", "\uE8A7", compact: true); download.HorizontalAlignment = HorizontalAlignment.Left; download.Click += (_, _) => OpenManagerDownload();
         manager.Children.Add(Toolbar(browse, detect));
-        manager.Children.Add(download); body.Children.Add(manager);
+        manager.Children.Add(download);
         manager.Children.Add(palette.Label("After installing the manager, choose Auto-detect to connect without restarting PyDeck.", 12, muted: true));
 
-        var about = palette.Section("About");
-        about.Children.Add(palette.Label("PyDeck", 16, true));
-        about.Children.Add(palette.Label(T("Version {0}", AppVersionLabel), 12, muted: true));
-        about.Children.Add(palette.Label("A desktop companion for managing Python installations with Python Install Manager.", 13));
-        about.Children.Add(palette.Label("Independent project. Not affiliated with the Python Software Foundation.", 12, muted: true));
-        about.Children.Add(palette.Label("Built with WinUI 3. .NET and Windows App Runtime are installed separately.", 12, muted: true));
-        about.Children.Add(palette.Label("No analytics. Preferences stay on this computer; activity logs stay in this session.", 12, muted: true));
-        var update = palette.Action("Check PyDeck updates", "\uE895", compact: true); BindAvailability(update, () => CanWork(WorkKind.AppUpdate));
-        update.Click += async (_, _) => await CheckAppUpdateAsync();
-        var releases = palette.Action("GitHub releases", "\uE8A7", compact: true); releases.Click += (_, _) => OpenUrl(AppUpdates.ReleasesPage);
-        var docs = palette.Action("Python documentation", "\uE8A7", compact: true); docs.HorizontalAlignment = HorizontalAlignment.Left; docs.Click += (_, _) => OpenUrl("https://docs.python.org/3/using/windows.html");
-        about.Children.Add(Toolbar(update, releases));
-        about.Children.Add(docs); body.Children.Add(about);
-        settingsScroll = PageScroll(body);
-        settingsScroll.Loaded += (sender, _) => ((ScrollViewer)sender).ChangeView(null, settingsOffset, null, true);
-        At(layout, settingsScroll, 1);
-        return layout;
+        return manager;
     }
 
     private Grid SettingRow(string title, string? description, FrameworkElement control)
@@ -148,19 +152,71 @@ public sealed partial class MainWindow
     }
     private ToggleSwitch Toggle(bool value, Action<bool> changed, string name)
     {
-        var toggle = new ToggleSwitch { IsOn = value, OnContent = T("On"), OffContent = T("Off"), IsEnabled = true, MinWidth = 112 };
+        var material = ActiveDesign == "Material";
+        var toggle = new ToggleSwitch { IsOn = value, OnContent = material ? "" : T("On"), OffContent = material ? "" : T("Off"), IsEnabled = true, MinWidth = material ? 52 : 112 };
         palette.ApplyAccentResources(toggle);
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(toggle, T(name));
-        toggle.Toggled += (_, _) => changed(toggle.IsOn);
+        toggle.Toggled += (_, _) =>
+        {
+            savingFromToggle = true;
+            try { changed(toggle.IsOn); }
+            finally { savingFromToggle = false; }
+        };
         return toggle;
+    }
+    private bool savingFromToggle;
+    private bool pendingWindowPreferenceAppearance;
+    private int pendingToggleSaves;
+    private AppSettings? confirmedTogglePreferences;
+    private long togglePreferenceVersion;
+    private long confirmedToggleVersion;
+    private async Task SaveTogglePreferencesAsync(AppSettings changed)
+    {
+        changed = changed.Normalize();
+        var previous = preferences;
+        if (pendingToggleSaves++ == 0) confirmedTogglePreferences = previous;
+        var version = ++togglePreferenceVersion;
+        preferences = changed;
+        pendingWindowPreferenceAppearance |= previous.OledBlack != changed.OledBlack || previous.UseSystemFont != changed.UseSystemFont;
+        try
+        {
+            await store.SaveAsync(changed);
+            if (version >= confirmedToggleVersion)
+            {
+                confirmedToggleVersion = version;
+                confirmedTogglePreferences = changed;
+            }
+            if (ReferenceEquals(preferences, changed) && pendingWindowPreferenceAppearance)
+            {
+                pendingWindowPreferenceAppearance = false;
+                ApplyAppearance();
+            }
+        }
+        catch (Exception ex)
+        {
+            if (ReferenceEquals(preferences, changed))
+            {
+                preferences = confirmedTogglePreferences ?? previous;
+                if (pendingWindowPreferenceAppearance) { pendingWindowPreferenceAppearance = false; ApplyAppearance(); }
+                else RenderPage();
+            }
+            ShowError(ex);
+        }
+        finally { if (--pendingToggleSaves == 0) confirmedTogglePreferences = null; }
     }
     private void SavePreferences(AppSettings changed)
     {
+        if (savingFromToggle) { _ = SaveTogglePreferencesAsync(changed); return; }
         try
         {
             changed = changed.Normalize();
             var previous = preferences;
             store.Save(changed); preferences = changed;
+            if (pendingToggleSaves > 0)
+            {
+                confirmedToggleVersion = ++togglePreferenceVersion;
+                confirmedTogglePreferences = changed;
+            }
             if (page == "catalog")
             {
                 architecture = changed.DefaultArchitecture;
@@ -170,10 +226,14 @@ public sealed partial class MainWindow
             var materialColorsChanged = previous.MaterialColorSource != changed.MaterialColorSource ||
                 previous.MaterialSeed != changed.MaterialSeed || previous.MaterialSecondSeed != changed.MaterialSecondSeed || previous.MaterialColorStyle != changed.MaterialColorStyle;
             if (materialColorsChanged) RefreshMaterialColors();
-            if (materialColorsChanged || previous.Theme != changed.Theme ||
-                previous.Transparency != changed.Transparency || previous.Backdrop != changed.Backdrop) ApplyAppearance();
+            if (pendingWindowPreferenceAppearance || materialColorsChanged || previous.Theme != changed.Theme ||
+                previous.Transparency != changed.Transparency || previous.Backdrop != changed.Backdrop || previous.OledBlack != changed.OledBlack || previous.UseSystemFont != changed.UseSystemFont)
+            {
+                pendingWindowPreferenceAppearance = false;
+                ApplyAppearance();
+            }
             else if ((previous with { Design = changed.Design }) == changed) UpdateDesignSelection();
-            else RenderPage();
+            else if (previous.Language != changed.Language) RenderPage();
         }
         catch (Exception ex) { UpdateDesignSelection(); ShowError(ex); }
     }
@@ -187,7 +247,15 @@ public sealed partial class MainWindow
             if (button.Content is StackPanel preview && preview.Children.LastOrDefault() is TextBlock label)
                 label.Text = T(id == "Fluent" ? "Windows Fluent" : "Material 3 Expressive") + (preferences.Design == id ? "  ✓" : "");
         }
-        if (designRestartNotice is not null) designRestartNotice.IsOpen = preferences.Design != ActiveDesign;
+        if (designRestartNotice is not null)
+        {
+            var pending = preferences.Design != ActiveDesign;
+            designRestartNotice.IsOpen = pending;
+            // A closed InfoBar still participates in StackPanel.Spacing unless
+            // the control itself is collapsed, leaving a doubled row gap.
+            designRestartNotice.Visibility = pending ? Visibility.Visible : Visibility.Collapsed;
+            if (designRestartNotice.Parent is StackPanel section) FinishSettingsGroups(section);
+        }
     }
 
     private async Task ChangeManagerAsync(string path)

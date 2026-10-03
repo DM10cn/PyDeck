@@ -6,6 +6,10 @@
     <!-- Full-package replacement upgrades: stable UpgradeCode, transactional removal
          of obsolete components, rollback of the old version, and external user state. -->
     <MajorUpgrade DowngradeErrorMessage="A newer version of PyDeck is already installed." Schedule="afterInstallInitialize" />
+    <Upgrade Id="D43AFAF7-DFE0-4AC1-A0A3-8F73AD6F89CA">
+      <UpgradeVersion Minimum="$(var.ProductVersion)" Maximum="$(var.ProductVersion)" IncludeMinimum="yes" IncludeMaximum="yes" OnlyDetect="yes" Property="PYDECK_SAME_VERSION_FOUND" />
+    </Upgrade>
+    <Launch Condition="Installed OR NOT PYDECK_SAME_VERSION_FOUND" Message="Another PyDeck package with this version is installed. Use a newer version to upgrade, or uninstall the existing package first." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
     <Icon Id="PyDeckIcon" SourceFile="$(var.PayloadDir)\Assets\AppIcon.ico" />
     <Property Id="ARPPRODUCTICON" Value="PyDeckIcon" />
@@ -35,6 +39,7 @@
     <CustomAction Id="PyDeckBrowseInstallFolder" BinaryRef="PyDeckInstallerActions" DllEntry="BrowseInstallFolder" Execute="immediate" Return="check" />
     <InstallUISequence><Custom Action="PyDeckInitializeOptions" After="AppSearch" /></InstallUISequence>
     <InstallExecuteSequence><Custom Action="PyDeckInitializeOptions" After="AppSearch" /></InstallExecuteSequence>
+    <SetProperty Id="ARPINSTALLLOCATION" Value="[INSTALLFOLDER]" After="CostFinalize" Sequence="execute" Condition="NOT REMOVE~=&quot;ALL&quot;" />
     <SetProperty Id="SAVED_DESKTOP_SHORTCUT" Value="1" Before="InstallInitialize" Sequence="execute" Condition="DESKTOPSHORTCUT = &quot;1&quot;" />
     <SetProperty Id="SAVED_START_MENU_SHORTCUT" Value="1" Before="InstallInitialize" Sequence="execute" Condition="STARTMENUSHORTCUT = &quot;1&quot;" />
     <Property Id="WINDOWSBUILD">

@@ -16,8 +16,8 @@
     </Grid>
    </DataTemplate>
   </Grid.Resources>
-  <Grid.RowDefinitions><RowDefinition Height="44"/><RowDefinition Height="*"/><RowDefinition Height="36"/></Grid.RowDefinitions>
-  <Grid x:Name="TitleBar" Padding="20,0,150,0">
+  <Grid.RowDefinitions><RowDefinition Height="0"/><RowDefinition Height="*"/><RowDefinition Height="36"/></Grid.RowDefinitions>
+  <Grid x:Name="TitleBar" Visibility="Collapsed" Padding="20,0,150,0">
    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
     <TextBlock Tag="ShellLabel" Text="PyDeck" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
    </StackPanel>
@@ -37,7 +37,7 @@
       </StackPanel>
      </Border>
    <Border x:Name="PageSurface" CornerRadius="24" Padding="24">
-    <Grid x:Name="ContentColumn" MaxWidth="1160">
+    <Grid x:Name="ContentColumn" HorizontalAlignment="Stretch">
      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
      <InfoBar x:Name="MessageBar" Grid.Row="0" IsOpen="False" IsClosable="True" Margin="0,0,0,14"/>
      <StackPanel Grid.Row="1" Spacing="10">
@@ -56,12 +56,12 @@
        </Grid>
       </Border>
      </StackPanel>
-     <Grid Grid.Row="2" x:Name="PageHost"/>
+     <Grid Grid.Row="2" x:Name="PageHost" HorizontalAlignment="Stretch"/>
     </Grid>
    </Border>
   </Grid>
-  <Grid Grid.Row="2" Padding="26,0">
-   <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+  <Grid x:Name="FooterBar" Grid.Row="2" Padding="26,0">
+   <StackPanel x:Name="FooterActions" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
     <TextBlock x:Name="StatusText" Text="Connecting to Python Install Manager…" FontSize="11" Opacity="0.65" VerticalAlignment="Center" MaxWidth="360" TextTrimming="CharacterEllipsis"/>
     <Button x:Name="RefreshDatabaseButton" Click="RefreshDatabase_Click" Padding="8,2" Background="Transparent" BorderThickness="0"><StackPanel Orientation="Horizontal" Spacing="5"><FontIcon Glyph="&#xE72C;" FontSize="12"/><TextBlock Tag="ShellLabel" Text="Refresh database" FontSize="11"/></StackPanel></Button>
    </StackPanel>

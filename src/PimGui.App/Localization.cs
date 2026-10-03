@@ -24,6 +24,8 @@ public sealed partial class MainWindow
         CultureInfo.CurrentCulture = culture; CultureInfo.CurrentUICulture = culture;
         Root.Language = preferences.Language;
         foreach (var (element, key) in shellLabels) element.Text = T(key);
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(RefreshDatabaseButton, T("Refresh database"));
+        ToolTipService.SetToolTip(RefreshDatabaseButton, T("Refresh database"));
         UpdateConnection();
         if (!busy) StatusText.Text = T(connected ? "Connected on this computer" : "Not connected");
         if (MessageBar.IsOpen) MessageBar.IsOpen = false;

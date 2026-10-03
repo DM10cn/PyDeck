@@ -22,10 +22,11 @@ public sealed partial class MainWindow
         grid.Children.Add(variants);
         if (runtime.IsPrerelease)
         {
-            var badge = new Border { Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 207, 64)),
+            var badge = new Border { Background = Palette.Brush(palette.Tokens.HighContrast ? palette.Surface : Windows.UI.Color.FromArgb(255, 255, 207, 64)),
+                BorderBrush = Palette.Brush(palette.Tokens.Outline), BorderThickness = new(palette.Tokens.HighContrast ? 1 : 0),
                 CornerRadius = new(3), Padding = new(4, 1, 4, 1), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom,
                 Child = new TextBlock { Text = "EAP", FontSize = 9, FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-                    Foreground = new SolidColorBrush(Colors.Black) }, Tag = "EapBadge" };
+                    Foreground = Palette.Brush(palette.Tokens.HighContrast ? palette.Text : Colors.Black) }, Tag = "EapBadge" };
             ToolTipService.SetToolTip(badge, T("Preview")); grid.Children.Add(badge);
         }
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(grid, runtime.IsPrerelease ? "Python · " + T("Preview") : "Python");

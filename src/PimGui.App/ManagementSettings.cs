@@ -21,14 +21,15 @@ public sealed partial class MainWindow
         if (target.Section.IsExpanded) target.Section.Content = target.Build();
     }
     private PathReport? lastPathReport;
-    private UIElement ManagementSettings()
+    private UIElement ManagementSettings(bool? networkOnly = null)
     {
-        var panel = palette.Section("Python management");
-        panel.Children.Add(palette.Label(T("PIM version: {0}", client.ManagerVersion), 12, muted: true));
+        var panel = palette.Section(networkOnly == true ? "Network and sources" : "Python management");
+        if (networkOnly != true) panel.Children.Add(palette.Label(T("PIM version: {0}", client.ManagerVersion), 12, muted: true));
         foreach (var (title, build) in new (string, Func<UIElement>)[] {
             ("PIM configuration", BuildPimEditor), ("PATH and aliases", BuildPathEditor), ("Refresh aliases", BuildAliasEditor),
             ("Network", BuildNetworkEditor), ("Installation source", BuildSourceEditor), ("Shebang rules", BuildShebangEditor) })
         {
+            if (networkOnly is not null && (title is "Network" or "Installation source") != networkOnly.Value) continue;
             var section = palette.Expander(palette.Label(title, palette.Tokens.BodyFontSize, true), expanded: expandedSettings.Contains(title));
             section.Tag = "Management:" + title;
             section.IsEnabled = (connected || title is "Network" or "Installation source") && (title != "Shebang rules" || client.SupportsMutations);

@@ -190,6 +190,51 @@ Check("Legacy and invalid preferences normalize without enabling risky options",
     var chosen = defaults with { Language = "zh-TW", ShowPreviewReleases = true, ShowSpecializedPackages = true, CatalogPackageType = "All", ConfirmBeforeUninstall = false, DefaultArchitecture = "ARM64", Transparency = "Off", Backdrop = "Acrylic" };
     store.Save(chosen); Require(store.Load() == chosen, "Python, language, and transparency preferences not persisted");
 });
+Check("Window preferences migrate safely and persist across both presentations", () =>
+{
+    var directory = Path.Combine(scratch, "window-preferences"); Directory.CreateDirectory(directory);
+    var store = new SettingsStore(directory);
+    File.WriteAllText(store.FilePath, "{\"Design\":\"Fluent\",\"Theme\":\"System\"}");
+    var legacy = store.Load();
+    Require(store.LoadWarning is null && legacy.StartupPage == "runtimes" && legacy.CloseBehavior == "Exit" &&
+        legacy.UseSystemFont && !legacy.OledBlack && !legacy.UseSystemTitleBar, "Legacy appearance preference defaults changed");
+    foreach (var design in new[] { "Fluent", "Material" })
+    foreach (var startup in new[] { "runtimes", "catalog", "environments", "build", "activity", "settings" })
+    foreach (var close in new[] { "Exit", "Minimize", "Tray" })
+    {
+        var chosen = legacy with { Design = design, StartupPage = startup, CloseBehavior = close,
+            UseSystemFont = false, OledBlack = true, UseSystemTitleBar = true };
+        store.Save(chosen);
+        Require(store.Load() == chosen, "Window preference round-trip lost a value");
+    }
+    File.WriteAllText(store.FilePath, "{\"StartupPage\":\"unknown\",\"CloseBehavior\":\"unknown\"}");
+    var invalid = store.Load();
+    Require(store.LoadWarning is null && invalid.StartupPage == "runtimes" && invalid.CloseBehavior == "Exit",
+        "Invalid window preferences did not fall back to a visible, normally closable window");
+});
+await CheckAsync("Queued preference writes cannot overwrite later synchronous saves, and recover after a failed write", async () =>
+{
+    var store = new SettingsStore(Path.Combine(scratch, "queued-preferences"));
+    var baseline = new AppSettings().Normalize();
+    store.Save(baseline);
+    var writes = Enumerable.Range(0, 20).Select(index => store.SaveAsync(baseline with
+        { OledBlack = index % 2 == 0, CloseBehavior = index % 2 == 0 ? "Tray" : "Minimize" })).ToArray();
+    var final = baseline with { StartupPage = "settings", CloseBehavior = "Exit", UseSystemTitleBar = true };
+    store.Save(final);
+    await Task.WhenAll(writes); await store.FlushAsync();
+    Require(store.Load() == final, "An earlier asynchronous save replaced the final synchronous choice");
+
+    using (var lease = new FileStream(store.FilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+    {
+        var blocked = store.SaveAsync(final with { OledBlack = true });
+        try { await blocked; throw new Exception("Expected a locked-file save to fail"); }
+        catch (IOException) { }
+        Require(store.Load() == final, "Failed atomic save damaged existing preferences");
+    }
+    var recovered = final with { UseSystemFont = false };
+    await store.SaveAsync(recovered); await store.FlushAsync();
+    Require(store.Load() == recovered, "One failed save permanently blocked later preference writes");
+});
 Check("Legacy catalog preferences migrate the old specialized switch without losing preview or architecture", () =>
 {
     var directory = Path.Combine(scratch, "catalog-migration"); Directory.CreateDirectory(directory);

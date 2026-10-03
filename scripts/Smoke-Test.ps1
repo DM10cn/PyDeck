@@ -1,4 +1,4 @@
-param([string]$BuildDirectory, [string]$OfflineFixture, [ValidateRange(30, 1800)][int]$TimeoutSeconds = 300, [switch]$PerformanceOnly, [switch]$DesignOnly)
+param([string]$BuildDirectory, [string]$OfflineFixture, [ValidateRange(30, 1800)][int]$TimeoutSeconds = 300, [switch]$PerformanceOnly, [switch]$DesignOnly, [switch]$WorkspaceOnly, [switch]$RecordingOnly, [switch]$ExpansionOnly, [switch]$RippleOnly, [switch]$SettingsOnly, [switch]$WindowChromeOnly, [switch]$ComponentsOnly)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 if (!$BuildDirectory) { $BuildDirectory = (Get-Content -LiteralPath (Join-Path $projectRoot 'artifacts\latest-build.txt') -Raw).Trim() }
@@ -8,7 +8,14 @@ $outputDirectory = Join-Path $projectRoot ('artifacts\smoke-' + (Get-Date -Forma
 $appArguments = @('--smoke-test', ('"' + $outputDirectory + '"'))
 if ($OfflineFixture) { $appArguments += @('--offline-fixture', ('"' + $OfflineFixture + '"')) }
 if ($PerformanceOnly) { $appArguments += '--performance-only' }
-if ($DesignOnly) { $appArguments += '--design-only' }
+if ($DesignOnly -or $ComponentsOnly) { $appArguments += '--design-only' }
+if ($ComponentsOnly) { $appArguments += '--components-only' }
+if ($WorkspaceOnly -or $RecordingOnly -or $ExpansionOnly -or $RippleOnly -or $SettingsOnly -or $WindowChromeOnly) { $appArguments += '--workspace-only' }
+if ($RecordingOnly) { $appArguments += '--recording-only' }
+if ($ExpansionOnly) { $appArguments += '--expansion-only' }
+if ($RippleOnly) { $appArguments += '--ripple-only' }
+if ($SettingsOnly) { $appArguments += '--settings-only' }
+if ($WindowChromeOnly) { $appArguments += '--window-chrome-only' }
 $appProcess = Start-Process -FilePath $appPath -ArgumentList $appArguments -WorkingDirectory $BuildDirectory -WindowStyle Hidden -PassThru
 if (!$appProcess.WaitForExit($TimeoutSeconds * 1000)) { throw "Smoke test is still running as process $($appProcess.Id). Output: $outputDirectory" }
 if ($appProcess.ExitCode -ne 0) { throw "GUI exited with code $($appProcess.ExitCode)." }

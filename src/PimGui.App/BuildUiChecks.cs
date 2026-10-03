@@ -26,7 +26,7 @@ public sealed partial class MainWindow
             foreach (var title in new[] { "Set as default", "Check for updates", "Reinstall to repair" })
                 if (menu.Items.OfType<MenuFlyoutItem>().Single(i => i.Text == T(title)).IsEnabled) throw new IOException("PIM action enabled for a local build");
             if (!menu.Items.OfType<MenuFlyoutItem>().Single(i => i.Text == T("Remove from list")).IsEnabled ||
-                !Descendants(card).OfType<Button>().Single(b => AutomationProperties.GetName(b) == T("Terminal")).IsEnabled)
+                !Descendants(card).OfType<Button>().Single(b => AutomationProperties.GetName(b) == T("Open terminal for {0}", RuntimeTitle((PythonRuntime)card.Tag))).IsEnabled)
                 throw new IOException("Local runtime actions unavailable without PIM");
             await CaptureAsync(Path.Combine(directory, "23-local-build-without-pim.png"));
             foreach (var design in new[] { "Fluent", "Material" })
@@ -69,7 +69,7 @@ public sealed partial class MainWindow
             await CaptureAsync(Path.Combine(directory, "24-build-python.png"));
             buildScroll!.ChangeView(null, 280, null, true); await Task.Delay(150);
             await CaptureAsync(Path.Combine(directory, "25-build-scroll.png"));
-            Navigate("settings"); Root.UpdateLayout(); await Task.Delay(100);
+            OpenSettingsCategoryForSmoke("appearance"); await Task.Delay(100);
             CheckScrollbarClearance(settingsScroll!);
             settingsScroll!.ChangeView(null, 210, null, true); await Task.Delay(150);
             await CaptureAsync(Path.Combine(directory, "26-settings-scroll.png"));

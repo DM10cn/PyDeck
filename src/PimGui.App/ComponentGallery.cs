@@ -21,7 +21,7 @@ public sealed partial class MainWindow
         var enabledSamples = new List<Button>();
         var clicks = 0;
         foreach (var (role, label) in new[] { (ActionRole.Primary, "Primary action"), (ActionRole.Secondary, "Secondary action"),
-            (ActionRole.Standard, "Outlined action"), (ActionRole.Quiet, "Quiet action"), (ActionRole.Destructive, "Destructive action") })
+            (ActionRole.Standard, ActiveDesign == "Material" ? "Standard" : "Outlined action"), (ActionRole.Quiet, "Quiet action"), (ActionRole.Destructive, "Destructive action") })
         {
             var samples = new StackPanel { Spacing = 8 };
             var action = palette.Action(label, "\uE710", role: role);

@@ -42,10 +42,14 @@ public sealed partial class MainWindow
                 PageHost.Children.Clear(); PageHost.Children.Add(fixture);
                 Root.UpdateLayout(); await Task.Delay(80);
                 selector.ApplyTemplate(); Root.UpdateLayout();
+                await WaitForSmokeConditionAsync(() => selector.IsLoaded && selector.XamlRoot == Root.XamlRoot && selector.ActualWidth > 0 && selector.ActualHeight > 0,
+                    context + ": Selector fixture is not attached to the live XAML root");
                 void Require(bool condition, string detail) { if (!condition) throw new IOException(context + ": " + detail); }
                 void RequireColor(Brush brush, Color expected, string detail) => Require(brush is SolidColorBrush solid && solid.Color == expected,
                     detail + $"; expected {expected}, actual {(brush is SolidColorBrush actual ? actual.Color.ToString() : brush?.GetType().Name)}");
-                var peer = new ComboBoxAutomationPeer(selector);
+                // Use the peer owned by the live element. An unattached manually constructed
+                // peer can become unavailable across an awaited screenshot/layout turn.
+                var peer = (ComboBoxAutomationPeer)(FrameworkElementAutomationPeer.FromElement(selector) ?? FrameworkElementAutomationPeer.CreatePeerForElement(selector));
                 var expand = (IExpandCollapseProvider)peer.GetPattern(PatternInterface.ExpandCollapse);
                 Require(expand is not null && peer.IsKeyboardFocusable(), "Native expansion/keyboard automation was lost");
                 Require(selector.Focus(FocusState.Keyboard), "Selector rejected keyboard focus");
@@ -53,9 +57,43 @@ public sealed partial class MainWindow
                 Require(VisualStateManager.GoToState(selector, "PointerOver", false) && VisualStateManager.GoToState(selector, "Pressed", false) &&
                     VisualStateManager.GoToState(selector, "Normal", false), "Native outer selector interaction states missing");
                 Require(!new ComboBoxAutomationPeer(disabledSelector).IsEnabled(), "Disabled selector remains enabled in UIA");
+                if (design == "Material")
+                {
+                    var face = Descendants(selector).OfType<Border>().Single(part => part.Name == "Background");
+                    Require(face.BorderThickness == new Thickness(palette.Tokens.HighContrast ? 1 : 0),
+                        "Collapsed Material selector retained a decorative outline");
+                    RequireColor(face.Background, palette.Tokens.HighContrast ? palette.Card : palette.Tokens.ControlFill,
+                        "Collapsed selector lost its independent tonal surface");
+                    var nativeGlyph = Descendants(selector).OfType<AnimatedIcon>().Single(part => part.Name == "DropDownGlyph");
+                    var arrow = Descendants(selector).OfType<PathIcon>().Single(part => part.Name == "MaterialSelectorArrow");
+                    Require(nativeGlyph.Source is not null && nativeGlyph.Opacity == 0 && !arrow.IsHitTestVisible &&
+                        arrow.Data is PathGeometry triangle &&
+                        triangle.Figures.Count == 1 && triangle.Figures[0].IsClosed && triangle.Figures[0].Segments.Count == 2,
+                        "Collapsed selector did not preserve its native animated source and separate filled triangle");
+                    foreach (var state in new[] { "PointerOver", "Pressed", "Disabled", "Normal" })
+                    {
+                        Require(VisualStateManager.GoToState(selector, state, false), "Collapsed selector state missing: " + state);
+                        RequireColor(face.Background, ((SolidColorBrush)selector.Resources["ComboBoxBackground" + (state == "Normal" ? "" : state)]).Color,
+                            "Collapsed selector lost tonal state feedback: " + state);
+                        Require(face.BorderThickness == new Thickness(palette.Tokens.HighContrast ? 1 : 0),
+                            "Collapsed selector regained a decorative outline in " + state);
+                    }
+                    var focusHalo = Descendants(selector).OfType<Border>().Single(part => part.Name == "HighlightBackground");
+                    Require(selector.UseSystemFocusVisuals && selector.FocusVisualPrimaryThickness == new Thickness(2) &&
+                        selector.FocusVisualSecondaryThickness == new Thickness(0),
+                        "Removing decorative outline also removed the single keyboard focus boundary");
+                    Require(focusHalo.BorderThickness == new Thickness(0) &&
+                        focusHalo.Background is SolidColorBrush { Color.A: 0 } &&
+                        focusHalo.BorderBrush is SolidColorBrush { Color.A: 0 },
+                        "Native selector halo paints an additional outline behind system focus");
+                }
                 await CaptureAsync(Path.Combine(directory, $"selector-{design}-{theme}-closed.png"));
 
-                expand!.Expand();
+                try { expand!.Expand(); }
+                catch (Exception error)
+                {
+                    throw new IOException(context + $": Native UIA expansion failed (loaded={selector.IsLoaded}, enabled={selector.IsEnabled}, root={selector.XamlRoot == Root.XamlRoot}, popup={selector.IsDropDownOpen}, size={selector.ActualWidth:F1}x{selector.ActualHeight:F1})", error);
+                }
                 Popup? popup = null;
                 await WaitForSmokeConditionAsync(() =>
                 {

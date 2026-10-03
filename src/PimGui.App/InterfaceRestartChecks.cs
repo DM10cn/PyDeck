@@ -24,7 +24,7 @@ public sealed partial class MainWindow
             {
                 ApplySmokePreferences(preferences with { Design = design, Language = language, Theme = "Dark" });
                 expandedSettings.Add("Network");
-                Navigate("settings"); Root.UpdateLayout();
+                OpenSettingsCategoryForSmoke("network");
                 var pageVisual = PageHost.Children.Single();
                 var draft = Descendants(settingsSections["Network"].Section).OfType<TextBox>().First();
                 const string unsaved = "http://unsaved-restart-fixture.invalid:8123";
@@ -66,7 +66,7 @@ public sealed partial class MainWindow
             }
 
             ApplySmokePreferences(preferences with { Design = "Material", Language = "en-US" });
-            Navigate("settings"); Root.UpdateLayout();
+            OpenSettingsCategoryForSmoke("appearance");
             using (var locked = new FileStream(store.FilePath, FileMode.Open, FileAccess.Read, FileShare.None))
             {
                 selection = SelectDesignAsync("Fluent");

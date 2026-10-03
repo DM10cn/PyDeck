@@ -68,6 +68,16 @@ void ChooseFolder(FolderChoice& choice) {
 
 extern "C" __declspec(dllexport) UINT __stdcall InitializeOptions(MSIHANDLE install) {
     try {
+        const bool optionsInitialized = Property(install, L"PYDECK_OPTIONS_INITIALIZED") == L"1";
+        // Restore the registered directory before explicit removal, while preserving
+        // a folder already chosen in the UI or supplied on the command line.
+        if (!optionsInitialized && Property(install, L"INSTALLFOLDER").empty()) {
+            const auto previous = Property(install, L"PREVIOUS_INSTALL_FOLDER");
+            if (!previous.empty() && Set(install, L"INSTALLFOLDER", previous) != ERROR_SUCCESS) return ERROR_INSTALL_FAILURE;
+        }
+        // /x and explicit REMOVE=ALL do not need first-run appearance or shortcut
+        // options. Invalid saved/passed options must not block those uninstall paths.
+        if (!Property(install, L"Installed").empty() && Property(install, L"REMOVE") == L"ALL") return ERROR_SUCCESS;
         auto style = Property(install, L"PYDECKSTYLE");
         if (style.empty()) {
             style = Property(install, L"PREVIOUS_INTERFACE_STYLE");
@@ -79,11 +89,7 @@ extern "C" __declspec(dllexport) UINT __stdcall InitializeOptions(MSIHANDLE inst
         }
         if (Set(install, L"PYDECKSTYLE", style) != ERROR_SUCCESS) return ERROR_INSTALL_FAILURE;
         // UI selections must survive the subsequent execute-sequence AppSearch.
-        if (Property(install, L"PYDECK_OPTIONS_INITIALIZED") == L"1") return ERROR_SUCCESS;
-        if (Property(install, L"INSTALLFOLDER").empty()) {
-            const auto previous = Property(install, L"PREVIOUS_INSTALL_FOLDER");
-            if (!previous.empty() && Set(install, L"INSTALLFOLDER", previous) != ERROR_SUCCESS) return ERROR_INSTALL_FAILURE;
-        }
+        if (optionsInitialized) return ERROR_SUCCESS;
         struct Option { const wchar_t *name, *previous, *fallback; };
         for (const auto& option : {Option{L"DESKTOPSHORTCUT", L"PREVIOUS_DESKTOP_SHORTCUT", L"0"},
                                   Option{L"STARTMENUSHORTCUT", L"PREVIOUS_START_MENU_SHORTCUT", L"1"}}) {

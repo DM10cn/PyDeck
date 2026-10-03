@@ -2,40 +2,41 @@
 
 **English** · [简体中文](INSTALL.zh-CN.md) · [🏠 Project](https://github.com/DM10cn/PyDeck)
 
-📦 **0.7.1-fix · Windows 11 x64**
+📦 **0.7.2 local preview · Windows 11 x64 · MSI / Setup**
 
-Download assets from [GitHub Releases](https://github.com/DM10cn/PyDeck/releases). Choose **one** installation format. MSI and MSIX do not upgrade each other; uninstall the previous format before switching. Neither installer removes your Python installations or intentionally deletes your PyDeck preferences.
+The new **0.7.2** MSI and Setup are local, unsigned builds and have **not been published**. The existing [GitHub release](https://github.com/DM10cn/PyDeck/releases/tag/v0.7.1) contains **0.7.1-fix** assets, not these new installers. MSI and MSIX do not upgrade each other; uninstall the previous format before switching. Removal keeps Python installations and PyDeck preferences.
 
-## 📥 Release downloads
+## 📦 Local 0.7.2 deliverables
 
 | File | Purpose |
 | --- | --- |
-| `PyDeck-Setup-0.7.1-fix-win-x64.exe` | Offline runtime preparation and the MSI installation wizard |
-| `PyDeck-0.7.1-fix-win-x64.msi` | Standalone current-user installation, with folder, shortcut, and initial interface options |
-| `PyDeck-0.7.1-fix-win-x64.msix` | Windows-managed package; prepare its runtimes and certificate trust first |
-| `PyDeck-Dependencies-0.7.1-fix-win-x64.exe` | Standalone dependency checklist and official download links |
-| `PyDeck-preview.cer` | Public signing certificate for the MSIX trust step |
-| `INSTALL.md` / `INSTALL.zh-CN.md` | English and Simplified Chinese installation instructions |
-| `Test-Prerequisites.ps1` | Optional read-only prerequisite checklist |
-| `SHA256SUMS.txt` | SHA-256 checksums for the uploaded release files |
+| `PyDeck-Setup-0.7.2-win-x64.exe` | Offline MSI installation and maintenance, with runtime preparation |
+| `PyDeck-0.7.2-win-x64.msi` | Standalone current-user installation, with folder, shortcut, and initial interface options |
+| `PyDeck-Dependencies-0.7.2-win-x64.exe` | Standalone dependency checklist and official download links |
+
+This build uses `-MsiOnly`: it produces no new MSIX or signing certificate. The MSIX/certificate instructions below apply only to the historical **0.7.1-fix** release. Refer to the local build's metadata and hashes for the new files; historical release checksums do not cover 0.7.2.
 
 ## 🧰 Offline Setup
 
-**`PyDeck-Setup-0.7.1-fix-win-x64.exe`** embeds the Microsoft runtime installers and the same standalone MSI. Ordinary users need runtimes, **not the .NET SDK, Windows SDK, or Visual Studio**.
+**`PyDeck-Setup-0.7.2-win-x64.exe` is the primary MSI installation entry.** It uses a simple native Windows window and embeds the Microsoft runtime installers plus the standalone MSI. Ordinary users need runtimes, **not the .NET SDK, Windows SDK, or Visual Studio**. Previously published 0.7.1-fix files remain unchanged and use the separate MSI wizard.
 
-1. Open Setup normally, without **Run as administrator**
-2. Review the plan: compatible runtimes show **Ready - skip**, missing or incomplete runtimes show **install**
-3. Choose the initial **Material 3 Expressive** or **Windows Fluent** interface; existing app preferences take precedence
-4. Choose **Continue** to install missing .NET Runtime, Windows App Runtime, and (for MSI) VC++ runtime from the embedded offline installers; Windows may request administrator approval
-5. Setup rechecks each dependency, then opens the MSI wizard with its folder, shortcut, and initial interface choices
+1. Let Python operations finish and exit PyDeck, including its tray icon; minimizing the window is not an exit
+2. Open Setup normally, without **Run as administrator**. It selects English, Simplified Chinese, Traditional Chinese (Taiwan), or Japanese from Windows; you can change the language
+3. Choose a writable installation folder, desktop/Start menu shortcuts, and the initial **Material 3 Expressive** or **Windows Fluent** style. Existing app preferences take precedence
+4. Review the runtime checklist and choose **Install**. Compatible runtimes are skipped; missing ones are prepared offline and may request administrator approval
+5. MSI runs silently while the same Setup window displays the current stage, progress activity, completion or error code. After successful installation, choose **Open PyDeck**
+
+For an installed MSI with the same ProductCode, Setup offers **Repair** and retains its installation directory. A newer package can upgrade an older installation. A different MSI with the same version is a conflict, not a repair: use a newer version or remove the existing package first. Installing over a newer installed version is blocked.
+
+**Uninstall…** asks for confirmation, then removes the detected current-user product through Windows Installer's cached MSI. The uninstall execution path skips embedded-payload extraction and runtime checks/installation. It removes PyDeck's installed files and shortcuts while keeping Python, virtual environments, shared runtimes, and app preferences. You can also uninstall from **Settings → Apps → Installed apps**.
 
 📦 Runtime EXEs are embedded in Setup, not copied into the installed app folder. The GUI remains framework-dependent. Shared runtimes remain after PyDeck is removed. Setup and the launcher share architecture, version, file, and current-user registration checks. Detection is a readiness check, not a full runtime integrity scan.
 
-⏳ Progress shows the current installer, without invented percentages. Cancel stops after the current installer returns; it does not kill Windows Installer or remove runtimes already installed. Failed rechecks, UAC cancellation, and installer failures prevent the next step. A restart-required result stops before the next installer; Setup never restarts the PC automatically. **Open logs** opens this run's private `%LocalAppData%\PyDeck-Setup-{GUID}` folder, containing `setup.log`, `result.json`, and available vendor/MSI logs. Extracted installers are removed after exit; cleanup failures are logged.
+⏳ Progress identifies the current installer rather than inventing an overall percentage. **Cancel** requests a stop after the active installer returns; an install or uninstall already in progress may finish. Setup never kills Windows Installer. Failed rechecks, UAC cancellation, and installer failures stop the chain; fix the issue and retry. A restart-required result stops later steps and does not restart the PC automatically. **Open logs** opens this run's private `%LocalAppData%\PyDeck-Setup-{GUID}` folder with `setup.log`, `result.json`, and available vendor/MSI logs. Extracted installers are removed after exit; cleanup failures are logged.
 
 🪟 For MSIX, select **Prepare dependencies only** (or run Setup with `--dependencies-only`). This prepares .NET and registers Windows App Runtime for the desktop user; it does not install the MSI or a separate VC++ redistributable. Install MSIX afterward using the certificate instructions below. MSIX/App Installer can resolve declared MSIX framework dependencies when their source is available; it does **not** run the ordinary .NET 10 EXE installer. An offline `.msix` alone is not a complete prerequisite bundle. Setup does not change certificate trust or install PIM.
 
-🔎 `PyDeck-Setup-0.7.1-fix-win-x64.exe --check` reports readiness without installing anything. `--verify-payloads` extracts and checks embedded payloads, writes a report, then removes the extracted files; it never runs an installer. These checks do not replace clean-machine installation acceptance.
+🔎 `--preview` opens the Setup UI with installation, uninstallation, and app launch disabled; it does not run an installer. `--check` reports readiness. `--verify-payloads` extracts and checks embedded files, writes a report, then removes the extracted files without running them. These modes do not replace clean-machine installation acceptance.
 
 ## 📋 Prepare the prerequisites
 
@@ -56,25 +57,25 @@ This page is the reference for end-user dependencies. Build tools belong in the 
 | Entry | Behavior |
 | --- | --- |
 | Installed `PyDeck.Launcher.exe` / PyDeck shortcut | Starts the GUI when dependencies are ready; otherwise shows the dependency window. Install missing packages yourself, choose **Check again**, then **Open PyDeck** |
-| Standalone `PyDeck-Dependencies-0.7.1-fix-win-x64.exe` | Always opens the checklist and download links. **Open PyDeck stays disabled**: this tool does not install or launch the app, even beside an app executable. Close it and return to the installer or installed shortcut |
+| Standalone `PyDeck-Dependencies-0.7.2-win-x64.exe` | Always opens the checklist and download links. **Open PyDeck stays disabled**: this tool does not install or launch the app, even beside an app executable. Close it and return to the installer or installed shortcut |
 
 The **Download** buttons open official Microsoft sources. The tools do not execute installers, elevate themselves, or change certificate trust. The standalone checklist checks the unpackaged prerequisites, including VC++; MSIX installation itself is governed by Windows package-dependency checks.
 
 For MSIX, use the standalone helper before installation if needed: a missing framework can block the package before its bundled launcher can run. The helper cannot bypass MSIX dependencies or certificate trust.
 
-🌏 The app and helper offer English, Simplified Chinese, Traditional Chinese (Taiwan), and Japanese. The app saves its language; the helper starts in English each time. The MSI wizard currently uses English, and the native folder picker uses Windows language settings.
+🌏 The app, helper, and Setup offer English, Simplified Chinese, Traditional Chinese (Taiwan), and Japanese. The app saves its language; the standalone helper starts in English, while Setup initially follows Windows. Opening the standalone MSI directly still uses its English wizard; the native folder picker uses Windows language settings.
 
 The optional `Test-Prerequisites.ps1` asset is a supplementary read-only checklist of common install locations and PIM on PATH. Its warnings are not the launcher's exact readiness decision: a manager outside PATH can be selected in Settings, and missing PIM does not block GUI startup. Use `PyDeck.Launcher.exe --check` for the native launcher's read-only runtime status.
 
 ### 🐍 Connect Python Install Manager
 
-Version **0.7.1-fix** requires PIM **26.3 or later** for installation changes. Older or unrecognized managers are limited to compatible read-only queries; reconnect after upgrading. See [Python management](https://github.com/DM10cn/PyDeck/blob/v0.7.1/docs/MANAGEMENT.md).
+PyDeck requires PIM **26.3 or later** for installation changes. Older or unrecognized managers are limited to compatible read-only queries; reconnect after upgrading. See [Python management](https://github.com/DM10cn/PyDeck/blob/main/docs/MANAGEMENT.md).
 
 Once the GUI runtimes are ready, you can open PyDeck without PIM. Choose **Download Python Install Manager** in the empty state or Settings, install it from Python's official Windows page, then choose **Check again** or **Auto-detect**. You can also select its executable in Settings. These buttons open the download page or reconnect; they do not install PIM themselves, and reconnect does not require restarting PyDeck.
 
 ## 🛠️ MSI
 
-1. Download `PyDeck-0.7.1-fix-win-x64.msi`
+1. Open the local `PyDeck-0.7.2-win-x64.msi`
 2. Choose the installation folder, or use **Browse…** to open the Windows folder picker
 3. Choose **Create a desktop shortcut** and **Add PyDeck to the Start menu** as needed; only Start menu is selected by default
 4. Choose the initial **Material 3 Expressive** (default) or **Windows Fluent** interface
@@ -89,18 +90,18 @@ It checks Windows 11 before installation, but allows GUI runtime dependencies to
 🧑‍💻 For an unattended current-user installation, the same options are available as MSI properties (`0` = off, `1` = on):
 
 ```powershell
-msiexec /i PyDeck-0.7.1-fix-win-x64.msi /qn INSTALLFOLDER="D:\Apps\PyDeck" DESKTOPSHORTCUT=1 STARTMENUSHORTCUT=0 PYDECKSTYLE=Material
+msiexec /i PyDeck-0.7.2-win-x64.msi /qn INSTALLFOLDER="D:\Apps\PyDeck" DESKTOPSHORTCUT=1 STARTMENUSHORTCUT=0 PYDECKSTYLE=Material
 ```
 
 `PYDECKSTYLE` accepts exactly `Material` or `Fluent`; omitting it uses the previous installer choice, or Material for a new installation. It does not overwrite saved app preferences. Use a folder your account can write to. The native folder picker does not require .NET. MSIX uses Windows-managed placement and does not expose these MSI options.
 
-Version 0.7.1-fix still uses a self-signed certificate, so Windows will not recognize it as a publicly trusted publisher. MSI does not require importing the preview certificate to install. Review the download source before choosing to proceed with any Windows prompt.
+The local 0.7.2 MSI, Setup, and dependency helper are **unsigned**. They do not use the old preview certificate and do not require importing it. Review the source and build hashes before proceeding with a Windows prompt; these are local preview artifacts, not a signed public release.
 
-Newer MSI versions upgrade the same per-user installation and older versions are blocked. Uninstall from **Settings → Apps → Installed apps**. The installer removes its own files and selected shortcuts; it does not uninstall Python or shared runtimes.
+Newer MSI versions upgrade the same per-user installation and older versions are blocked. For the maintenance choices and version-conflict checks, use Setup as described above. The standalone MSI and Windows **Installed apps** remain available; removal affects installer-owned files and shortcuts, not Python or shared runtimes.
 
-## 🪟 MSIX — self-signed package
+## 🪟 Historical 0.7.1-fix MSIX — self-signed package
 
-MSIX requires a trusted signing certificate. This package is **not publicly trusted**. Only trust the publisher if you have verified the files and intend to use PyDeck. The private signing key is never distributed.
+This section is retained for the published **0.7.1-fix** MSIX only. The 0.7.2 local build does not produce an MSIX or a new certificate. The historical MSIX requires a trusted signing certificate and is **not publicly trusted**. Only trust the publisher if you have verified the files and intend to use that package. The private signing key is never distributed.
 
 1. Download `PyDeck-0.7.1-fix-win-x64.msix`, `PyDeck-preview.cer`, and `SHA256SUMS.txt` from the same release
 2. Compare file hashes with `SHA256SUMS.txt`, using `Get-FileHash -Algorithm SHA256`
@@ -145,4 +146,6 @@ Use **Source code (zip)** or **Source code (tar.gz)** under the release's Assets
 
 ## 🧪 Validation limits
 
-The final **0.7.1-fix** packages do not have a complete automated regression or installation acceptance result. Final GUI interaction, real restarts, runtime installation, MSI upgrades, and MSIX activation still require manual acceptance. Static package checks establish file/metadata properties only. Historical Python lifecycle results used a disposable Sandbox and do not certify these packages. See the [release details](https://github.com/DM10cn/PyDeck/releases) and [feature status](https://github.com/DM10cn/PyDeck/blob/main/docs/FEATURES.md) for the stated scope.
+The local **0.7.2** Setup changes have not been accepted through an actual install, repair, upgrade, or uninstall run. The uninstall optimization removes unnecessary extraction and dependency work; no before/after timing or percentage improvement is claimed. Compilation and static package checks do not establish installation acceptance.
+
+The historical **0.7.1-fix** packages also lack complete installation acceptance, including runtime preparation, MSI upgrades, and MSIX activation. Historical Python lifecycle results from a disposable Sandbox do not certify either release. See the [published release details](https://github.com/DM10cn/PyDeck/releases/tag/v0.7.1) and [feature status](https://github.com/DM10cn/PyDeck/blob/main/docs/FEATURES.md) for their stated scope.

@@ -88,7 +88,8 @@ public sealed partial class MainWindow
                     Require(border.CornerRadius == new CornerRadius(12), "Material search corners are not 12 dip");
                     RequireColor(restingFill, palette.Tokens.ControlFill, "Material resting fill is not the paired Monet container");
                     RequireColor(editor.Foreground, palette.Tokens.Text, "Material text does not use Monet on-surface");
-                    RequireColor(border.BorderBrush, palette.Tokens.Outline, "Material outline does not use the Monet outline role");
+                    Require(border.BorderThickness == new Thickness(palette.Tokens.HighContrast ? 1 : 0),
+                        "Material search retained a decorative resting outline");
                 }
                 await CaptureAsync(Path.Combine(directory, $"search-{design}-{theme}-normal.png"));
 
@@ -110,6 +111,15 @@ public sealed partial class MainWindow
                     RequireColor(border.Background, palette.Tokens.SurfaceHighest, "Material focused fill is incorrect");
                     RequireColor(border.BorderBrush, palette.Tokens.Accent, "Material focus border is not the primary role");
                     Require(border.BorderThickness == new Thickness(2), "Material focus outline is not 2 dip");
+                    var renderedFill = (SolidColorBrush)border.Background;
+                    var renderedFocus = (SolidColorBrush)border.BorderBrush;
+                    var fillColor = CompositeColor(renderedFill.Color, renderedFill.Opacity, palette.Surface);
+                    var focusColor = CompositeColor(renderedFocus.Color, renderedFocus.Opacity, fillColor);
+                    Require(ColorContrast(focusColor, fillColor) >= 3 && ColorContrast(focusColor, palette.Surface) >= 3,
+                        "Rendered Material keyboard focus does not reach 3:1 against both adjacent surfaces");
+                    var renderedText = (SolidColorBrush)editor.Foreground;
+                    Require(ColorContrast(CompositeColor(renderedText.Color, renderedText.Opacity, fillColor), fillColor) >= 4.5,
+                        "Rendered focused search text does not reach 4.5:1 against its actual fill");
                 }
                 else if (!palette.Tokens.HighContrast)
                     Require(border.BorderBrush is LinearGradientBrush, "Fluent native focused elevation/underline brush is missing");
@@ -139,6 +149,22 @@ public sealed partial class MainWindow
                 await WaitForSmokeConditionAsync(() => editor.Text.Length == 0 && control.Text.Length == 0 && VisibleRuntimeCount == 30,
                     context + ": Native clear button did not restore unfiltered results");
                 RequireStableEditor();
+                if (design == "Material")
+                {
+                    Navigate("runtimes"); Root.UpdateLayout(); await Task.Delay(60); Root.UpdateLayout();
+                    var environmentSearchControl = Descendants(PageHost).OfType<AutoSuggestBox>().Single();
+                    var environmentEditor = Descendants(environmentSearchControl).OfType<TextBox>().Single(box => box.Name == "TextBox");
+                    var environmentBorder = Descendants(environmentEditor).OfType<Border>().Single(part => part.Name == "BorderElement");
+                    Require(VisualStateManager.GoToState(environmentEditor, "Normal", false), "Installed-runtime search lacks normal state");
+                    Require(environmentBorder.BorderThickness == new Thickness(palette.Tokens.HighContrast ? 1 : 0),
+                        "Installed-runtime search retained a decorative resting outline");
+                    await CaptureAsync(Path.Combine(directory, $"search-runtimes-{design}-{theme}-normal.png"));
+                    Require(environmentEditor.Focus(FocusState.Keyboard), "Installed-runtime search cannot receive keyboard focus");
+                    await Task.Delay(35); Root.UpdateLayout();
+                    RequireColor(environmentBorder.BorderBrush, palette.Tokens.Accent, "Installed-runtime search lost keyboard focus indication");
+                    Require(environmentBorder.BorderThickness == new Thickness(2), "Installed-runtime search focus outline is not 2 dip");
+                    await CaptureAsync(Path.Combine(directory, $"search-runtimes-{design}-{theme}-focused.png"));
+                }
             }
         }
         finally

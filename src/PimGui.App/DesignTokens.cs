@@ -118,7 +118,7 @@ internal sealed record DesignTokens
     public TypographyToken Typography(TextRole role) => role switch
     {
         TextRole.Display => new(HeroTitleSize, HeroTitleSize == 32 ? 40 : 36, true),
-        TextRole.Headline or TextRole.Title => new(PageTitleSize, 36, true),
+        TextRole.Headline or TextRole.Title => new(PageTitleSize, Design == "Fluent" ? 36 : 38, true),
         TextRole.Section => new(SectionTitleSize, Design == "Fluent" ? 28 : 24, true),
         TextRole.BodyLarge => new(16, 24),
         TextRole.Body => new(BodyFontSize, 20),
@@ -186,11 +186,11 @@ internal sealed record DesignTokens
             PrimaryFixed = Argb(scheme.PrimaryFixed), PrimaryFixedDim = Argb(scheme.PrimaryFixedDim), OnPrimaryFixed = Argb(scheme.OnPrimaryFixed), OnPrimaryFixedVariant = Argb(scheme.OnPrimaryFixedVariant),
             SecondaryFixed = Argb(scheme.SecondaryFixed), SecondaryFixedDim = Argb(scheme.SecondaryFixedDim), OnSecondaryFixed = Argb(scheme.OnSecondaryFixed), OnSecondaryFixedVariant = Argb(scheme.OnSecondaryFixedVariant),
             TertiaryFixed = Argb(scheme.TertiaryFixed), TertiaryFixedDim = Argb(scheme.TertiaryFixedDim), OnTertiaryFixed = Argb(scheme.OnTertiaryFixed), OnTertiaryFixedVariant = Argb(scheme.OnTertiaryFixedVariant),
-            CardRadius = 20, SurfaceRadius = 28, ActionRadius = 20, InputRadius = 12, ChipRadius = 8, IconRadius = 16, NavigationRadius = 24,
-            CardBorder = 0, NavigationIndicator = 0, PageTitleSize = 28, HeroTitleSize = 32, SectionSpacing = 24,
-            ControlHeight = 40, ControlFontSize = 14, ControlIconSize = 20, ControlHorizontalPadding = 16, ControlVerticalPadding = 10,
-            CompactControlHeight = 32, CompactHorizontalPadding = 12, CompactVerticalPadding = 6, CompactIconSize = 20,
-            ControlSpacing = 8, RowPadding = 16, ToolbarSpacing = 16, SectionTitleSize = 16, PressedActionRadius = 12
+            CardRadius = 16, SurfaceRadius = 24, ActionRadius = 20, InputRadius = 12, ChipRadius = 8, IconRadius = 16, NavigationRadius = 22,
+            CardBorder = 0, NavigationIndicator = 0, PageTitleSize = 30, HeroTitleSize = 32, SectionSpacing = 20,
+            ControlHeight = 40, ControlFontSize = 14, ControlIconSize = 20, ControlHorizontalPadding = 16, ControlVerticalPadding = 8,
+            CompactControlHeight = 32, CompactHorizontalPadding = 12, CompactVerticalPadding = 4, CompactIconSize = 18,
+            ControlSpacing = 8, RowPadding = 12, ToolbarSpacing = 12, SectionTitleSize = 18, PressedActionRadius = 12
         };
     }
 }

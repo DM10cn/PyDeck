@@ -1,4 +1,7 @@
-using System.Globalization;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
+using System.Runtime.CompilerServices;
 
 namespace PimGui.App;
 
@@ -6,20 +9,68 @@ namespace PimGui.App;
 // semantics. These templates replace their visuals; they do not emulate controls with click handlers.
 internal static class MaterialTemplates
 {
-    private static string Duration(double milliseconds) => TimeSpan.FromMilliseconds(milliseconds).ToString("c", CultureInfo.InvariantCulture);
+    private static readonly ConditionalWeakTable<ToggleSwitch, object> switchContentTracking = new();
 
-    public static string Button(double duration) => """
+    private static void UpdateSwitchContentSpacing(DependencyObject sender, DependencyProperty? property = null)
+    {
+        if (sender is not ToggleSwitch toggle || VisualTreeHelper.GetChildrenCount(toggle) == 0 ||
+            VisualTreeHelper.GetChild(toggle, 0) is not Panel templateRoot ||
+            templateRoot.Children.OfType<Grid>().FirstOrDefault(child => child.Name == "SwitchLayout") is not { } layout) return;
+        static bool HasContent(object? content) => content is not null && (content is not string text || text.Length > 0);
+        // Empty on/off content is common for labeled settings rows. Its native
+        // content presenters stay in the template, but reserve no trailing gap.
+        layout.ColumnDefinitions[1].Width = new(HasContent(toggle.OnContent) || HasContent(toggle.OffContent) ? 12 : 0);
+    }
+
+    public static void UpdateMotion(DependencyObject root, Duration duration)
+    {
+        if (root is FrameworkElement { Tag: "MaterialMotionRoot" } templateRoot)
+        {
+            if (VisualTreeHelper.GetParent(templateRoot) is ToggleSwitch toggle)
+            {
+                if (!switchContentTracking.TryGetValue(toggle, out _))
+                {
+                    switchContentTracking.Add(toggle, new());
+                    toggle.RegisterPropertyChangedCallback(Microsoft.UI.Xaml.Controls.ToggleSwitch.OnContentProperty, UpdateSwitchContentSpacing);
+                    toggle.RegisterPropertyChangedCallback(Microsoft.UI.Xaml.Controls.ToggleSwitch.OffContentProperty, UpdateSwitchContentSpacing);
+                }
+                UpdateSwitchContentSpacing(toggle);
+            }
+            if (templateRoot is Panel panel && panel.Children.OfType<Grid>().Any(child => child.Name == "RippleHost"))
+            {
+                DependencyObject? owner = VisualTreeHelper.GetParent(templateRoot);
+                while (owner is not null && owner is not Control) owner = VisualTreeHelper.GetParent(owner);
+                if (owner is Control control) MaterialRipple.Configure(control, duration.TimeSpan > TimeSpan.Zero);
+            }
+            foreach (var group in VisualStateManager.GetVisualStateGroups(templateRoot))
+            {
+                foreach (var transition in group.Transitions) transition.GeneratedDuration = duration;
+                // Keep the live template and its focused control. Settling the current
+                // state does not dispatch any command or rebuild the business page.
+                if (duration.TimeSpan == TimeSpan.Zero && group.CurrentState is { } current)
+                {
+                    DependencyObject? parent = VisualTreeHelper.GetParent(templateRoot);
+                    while (parent is not null && parent is not Control) parent = VisualTreeHelper.GetParent(parent);
+                    if (parent is Control control) VisualStateManager.GoToState(control, current.Name, false);
+                }
+            }
+        }
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
+            UpdateMotion(VisualTreeHelper.GetChild(root, index), duration);
+    }
+
+    public static string Button() => """
         <Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" TargetType="Button">
           <Setter Property="UseSystemFocusVisuals" Value="True" />
           <Setter Property="Template">
             <Setter.Value>
               <ControlTemplate TargetType="Button">
-                <Grid x:Name="Root" Background="Transparent">
+                <Grid x:Name="Root" Background="Transparent" Tag="MaterialMotionRoot">
                   <VisualStateManager.VisualStateGroups>
                     <VisualStateGroup x:Name="CommonStates">
                       <VisualStateGroup.Transitions>
-                        <VisualTransition GeneratedDuration="__DURATION__" />
+                        <VisualTransition GeneratedDuration="0:0:0" />
                       </VisualStateGroup.Transitions>
                       <VisualState x:Name="Normal" />
                       <VisualState x:Name="PointerOver">
@@ -48,11 +99,12 @@ internal static class MaterialTemplates
                       <VisualState x:Name="Unfocused" />
                     </VisualStateGroup>
                   </VisualStateManager.VisualStateGroups>
-                  <Border x:Name="ButtonBorder" Background="{TemplateBinding Background}"
+                  <Border x:Name="ButtonBorder" Background="{TemplateBinding Background}" BackgroundSizing="OuterBorderEdge"
                           BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
                           CornerRadius="{TemplateBinding CornerRadius}" />
                   <Border x:Name="StateLayer" Background="{ThemeResource PyDeckActionStateLayer}" Opacity="0"
                           CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+                  <Grid x:Name="RippleHost" IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw" />
                   <ContentPresenter x:Name="ContentPresenter" Content="{TemplateBinding Content}"
                           ContentTemplate="{TemplateBinding ContentTemplate}" ContentTransitions="{TemplateBinding ContentTransitions}"
                           Padding="{TemplateBinding Padding}" Foreground="{TemplateBinding Foreground}"
@@ -64,9 +116,9 @@ internal static class MaterialTemplates
             </Setter.Value>
           </Setter>
         </Style>
-        """.Replace("__DURATION__", Duration(duration), StringComparison.Ordinal);
+        """;
 
-    public static string ToggleSwitch(double duration) => """
+    public static string ToggleSwitch() => """
         <Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" TargetType="ToggleSwitch">
           <Setter Property="HorizontalAlignment" Value="Left" />
@@ -75,15 +127,16 @@ internal static class MaterialTemplates
           <Setter Property="VerticalContentAlignment" Value="Center" />
           <Setter Property="ManipulationMode" Value="System,TranslateX" />
           <Setter Property="UseSystemFocusVisuals" Value="True" />
-          <Setter Property="MinHeight" Value="40" />
+          <Setter Property="MinHeight" Value="44" />
           <Setter Property="FocusVisualMargin" Value="-4,-2,-4,-2" />
           <Setter Property="Template">
             <Setter.Value>
               <ControlTemplate TargetType="ToggleSwitch">
-                <Grid Background="{TemplateBinding Background}">
+                <Grid Background="{TemplateBinding Background}" Tag="MaterialMotionRoot">
                   <VisualStateManager.VisualStateGroups>
                     <VisualStateGroup x:Name="CommonStates">
-                      <VisualStateGroup.Transitions><VisualTransition GeneratedDuration="__DURATION__" /></VisualStateGroup.Transitions>
+                      <!-- Press/hover feedback is immediate; only the native knob
+                           movement in ToggleStates interpolates between values. -->
                       <VisualState x:Name="Normal" />
                       <VisualState x:Name="PointerOver">
                         <VisualState.Setters>
@@ -123,10 +176,10 @@ internal static class MaterialTemplates
                     </VisualStateGroup>
                     <VisualStateGroup x:Name="ToggleStates">
                       <VisualStateGroup.Transitions>
-                        <VisualTransition From="Off" To="On" GeneratedDuration="__DURATION__" />
-                        <VisualTransition From="On" To="Off" GeneratedDuration="__DURATION__" />
-                        <VisualTransition From="Dragging" To="On" GeneratedDuration="__DURATION__" />
-                        <VisualTransition From="Dragging" To="Off" GeneratedDuration="__DURATION__" />
+                        <VisualTransition From="Off" To="On" GeneratedDuration="0:0:0" />
+                        <VisualTransition From="On" To="Off" GeneratedDuration="0:0:0" />
+                        <VisualTransition From="Dragging" To="On" GeneratedDuration="0:0:0" />
+                        <VisualTransition From="Dragging" To="Off" GeneratedDuration="0:0:0" />
                       </VisualStateGroup.Transitions>
                       <VisualState x:Name="Dragging" />
                       <VisualState x:Name="Off" />
@@ -150,8 +203,8 @@ internal static class MaterialTemplates
                          ContentTemplate="{TemplateBinding HeaderTemplate}" Foreground="{TemplateBinding Foreground}"
                          Margin="0,0,0,8" TextWrapping="Wrap" Visibility="Collapsed"
                          IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw" />
-                  <Grid Grid.Row="1" MinHeight="40" HorizontalAlignment="Left">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="52" /><ColumnDefinition Width="12" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                  <Grid x:Name="SwitchLayout" Grid.Row="1" MinHeight="44" HorizontalAlignment="Left">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="52" /><ColumnDefinition Width="0" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                     <Grid x:Name="SwitchAreaGrid" Grid.ColumnSpan="3" Background="Transparent" CornerRadius="16" Control.IsTemplateFocusTarget="True" />
                     <ContentPresenter x:Name="OffContentPresenter" Grid.Column="2" Opacity="0" Content="{TemplateBinding OffContent}"
                         ContentTemplate="{TemplateBinding OffContentTemplate}" Foreground="{TemplateBinding Foreground}"
@@ -159,9 +212,9 @@ internal static class MaterialTemplates
                     <ContentPresenter x:Name="OnContentPresenter" Grid.Column="2" Opacity="0" Content="{TemplateBinding OnContent}"
                         ContentTemplate="{TemplateBinding OnContentTemplate}" Foreground="{TemplateBinding Foreground}"
                         VerticalAlignment="Center" IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw" />
-                    <Rectangle x:Name="OuterBorder" Width="52" Height="32" RadiusX="16" RadiusY="16" StrokeThickness="2"
+                    <Rectangle x:Name="OuterBorder" Width="52" Height="32" RadiusX="16" RadiusY="16" StrokeThickness="{ThemeResource PyDeckSwitchBorderThickness}"
                         Fill="{ThemeResource ToggleSwitchFillOff}" Stroke="{ThemeResource ToggleSwitchStrokeOff}" />
-                    <Rectangle x:Name="SwitchKnobBounds" Width="52" Height="32" RadiusX="16" RadiusY="16" StrokeThickness="2" Opacity="0"
+                    <Rectangle x:Name="SwitchKnobBounds" Width="52" Height="32" RadiusX="16" RadiusY="16" StrokeThickness="{ThemeResource PyDeckSwitchBorderThickness}" Opacity="0"
                         Fill="{ThemeResource ToggleSwitchFillOn}" Stroke="{ThemeResource ToggleSwitchStrokeOn}" />
                     <Grid x:Name="SwitchKnob" Width="32" Height="32" HorizontalAlignment="Left">
                       <Ellipse x:Name="StateLayer" Width="40" Height="40" Margin="-4" Fill="{ThemeResource PyDeckSwitchStateLayer}" Opacity="0" />
@@ -178,5 +231,5 @@ internal static class MaterialTemplates
             </Setter.Value>
           </Setter>
         </Style>
-        """.Replace("__DURATION__", Duration(duration), StringComparison.Ordinal);
+        """;
 }

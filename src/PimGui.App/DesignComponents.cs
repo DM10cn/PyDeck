@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Markup;
 using Microsoft.UI.Xaml.Media;
+using System.Runtime.CompilerServices;
 using Windows.UI;
 using Windows.UI.ViewManagement;
 
@@ -13,9 +14,11 @@ internal enum ActionRole { Standard, Primary, Secondary, Quiet, Destructive }
 // Each implementation owns its templates. Pages request a semantic component, not a design flag.
 internal abstract class DesignComponents
 {
+    private sealed class MotionOwner { public required DesignComponents Components; }
+    private static readonly ConditionalWeakTable<Control, MotionOwner> motionOwners = new();
     protected DesignTokens Tokens { get; }
     public ResourceDictionary Resources { get; } = new();
-    protected bool AnimationsEnabled { get; }
+    protected bool AnimationsEnabled { get; private set; }
 
     protected DesignComponents(DesignTokens tokens)
     {
@@ -34,6 +37,7 @@ internal abstract class DesignComponents
         AddBrush("PyDeckActionDisabledForeground", DisabledText());
         AddBrush("PyDeckActionDisabledOutline", DisabledText());
         Resources["PyDeckActionPressedCornerRadius"] = new CornerRadius(tokens.PressedActionRadius);
+        Resources["PyDeckSwitchBorderThickness"] = tokens.Design == "Material" && !tokens.HighContrast ? 0.0 : 2.0;
         Resources["PyDeckFontFamily"] = new FontFamily(tokens.FontFamily);
         InstallNativeResources();
         DesignExpanderStyles.Install(Resources, tokens);
@@ -44,6 +48,57 @@ internal abstract class DesignComponents
         ? new FluentComponents(tokens) : new MaterialExpressiveComponents(tokens);
 
     protected void AddBrush(string name, Color color) => Resources[name] = Palette.Brush(color);
+
+    public void UpdateMotion(DependencyObject root, bool enabled)
+    {
+        AnimationsEnabled = enabled && !Tokens.HighContrast;
+        Resources["PyDeckAnimationsEnabled"] = AnimationsEnabled;
+        ApplyMotion(root);
+        if (Tokens.Design == "Material" && root is FrameworkElement { XamlRoot: { } xamlRoot })
+            foreach (var popup in VisualTreeHelper.GetOpenPopupsForXamlRoot(xamlRoot))
+                if (popup.Child is { } child) ApplyMotion(child);
+    }
+
+    public void ApplyMotion(DependencyObject root)
+    {
+        if (Tokens.Design != "Material") return;
+        var duration = new Duration(TimeSpan.FromMilliseconds(AnimationsEnabled ? Tokens.StateDurationMs : 0));
+        MaterialTemplates.UpdateMotion(root, duration);
+    }
+
+    private static void OnMotionControlLoaded(object sender, RoutedEventArgs args)
+    {
+        if (sender is Control control && motionOwners.TryGetValue(control, out var owner)) owner.Components.ApplyMotion(control);
+    }
+
+    protected void TrackMotion(Control control)
+    {
+        if (Tokens.Design != "Material")
+        {
+            if (motionOwners.Remove(control)) control.Loaded -= OnMotionControlLoaded;
+            MaterialRipple.Detach(control);
+            return;
+        }
+        // Shared shell controls survive palette changes. One static handler consults
+        // the current owner instead of retaining every previous palette instance.
+        if (motionOwners.TryGetValue(control, out var owner)) owner.Components = this;
+        else
+        {
+            motionOwners.Add(control, new() { Components = this });
+            control.Loaded += OnMotionControlLoaded;
+        }
+        if (control.IsLoaded)
+        {
+            // Applying a style can still be inside WinUI's template invalidation.
+            // Let layout realize its replacement before visiting visual states;
+            // forcing ApplyTemplate here can re-enter native XAML initialization.
+            control.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                if (control.IsLoaded && motionOwners.TryGetValue(control, out var current))
+                    current.Components.ApplyMotion(control);
+            });
+        }
+    }
 
     public void ConfigureExpander(Expander expander) => DesignExpanderStyles.Configure(expander, Resources, Tokens);
 
@@ -267,6 +322,7 @@ internal abstract class DesignComponents
         button.Resources["PyDeckActionPressedCornerRadius"] = new CornerRadius(Tokens.PressedActionRadius);
         button.Resources["PyDeckHoverOpacity"] = Tokens.HighContrast ? .18 : Tokens.HoverStateOpacity;
         button.Resources["PyDeckPressedOpacity"] = Tokens.HighContrast ? .28 : Tokens.PressedStateOpacity;
+        TrackMotion(button);
     }
 
     public Button IconAction(string label, string icon)
@@ -303,7 +359,7 @@ internal abstract class DesignComponents
         button.Background = Palette.Brush(selected ? Tokens.SecondaryContainer : Tokens.ControlFill);
         button.Foreground = Palette.Brush(selected ? Tokens.OnSecondaryContainer : Tokens.Text);
         button.BorderBrush = Palette.Brush(selected ? Tokens.Accent : Tokens.Outline);
-        button.BorderThickness = new(selected ? 2 : 1);
+        button.BorderThickness = new(Tokens.Design == "Material" && !Tokens.HighContrast ? 0 : selected ? 2 : 1);
         button.CornerRadius = new(Tokens.ActionRadius);
         button.FontFamily = new FontFamily(Tokens.FontFamily);
         button.UseSystemFocusVisuals = true;
@@ -331,6 +387,7 @@ internal abstract class DesignComponents
         control.UseSystemFocusVisuals = true;
         control.FocusVisualPrimaryBrush = Palette.Brush(Tokens.Accent);
         control.FocusVisualSecondaryBrush = Palette.Brush(Tokens.Surface);
+        TrackMotion(control);
     }
 
     public virtual void ConfigureSelector(ComboBox selector) { }
@@ -368,6 +425,7 @@ internal sealed class MaterialExpressiveComponents : DesignComponents
     public MaterialExpressiveComponents(DesignTokens tokens) : base(tokens)
     {
         InstallMaterialSearchResources();
+        InstallMaterialSurfaceBorders();
         MaterialSelectorTemplates.Install(Resources, tokens);
         // Material's radio has a primary ring and center on a surface, rather than a filled Fluent disc.
         foreach (var suffix in new[] { "", "PointerOver", "Pressed", "Disabled" })
@@ -380,9 +438,26 @@ internal sealed class MaterialExpressiveComponents : DesignComponents
         Resources["RadioButtonCheckGlyphSize"] = 10.0;
         Resources["RadioButtonBorderThemeThickness"] = 2.0;
         InstallActionStyles();
-        var toggle = (Style)XamlReader.Load(MaterialTemplates.ToggleSwitch(AnimationsEnabled ? tokens.StateDurationMs : 0));
+        var toggle = (Style)XamlReader.Load(MaterialTemplates.ToggleSwitch());
         Resources["PyDeckToggleSwitchStyle"] = toggle;
         Resources[typeof(ToggleSwitch)] = toggle;
+    }
+
+    private void InstallMaterialSurfaceBorders()
+    {
+        if (Tokens.HighContrast) return;
+        // Native dialogs, menus and helper buttons retain their SDK templates.
+        // Remove only decorative strokes, leaving fill, geometry and focus intact.
+        foreach (var state in new[] { "", "PointerOver", "Pressed", "Disabled" })
+        {
+            AddBrush("ButtonBorderBrush" + state, Microsoft.UI.Colors.Transparent);
+            AddBrush("AccentButtonBorderBrush" + state, Microsoft.UI.Colors.Transparent);
+            foreach (var selection in new[] { "", "Checked", "Indeterminate" })
+                AddBrush("ToggleButtonBorderBrush" + selection + state, Microsoft.UI.Colors.Transparent);
+        }
+        foreach (var key in new[] { "MenuFlyoutPresenterBorderBrush", "FlyoutPresenterBorderBrush", "ToolTipBorderBrush",
+            "ToolTipBorderThemeBrush", "ContentDialogBorderBrush", "ContentDialogBorderThemeBrush", "AutoSuggestBoxSuggestionsListBorderBrush" })
+            AddBrush(key, Microsoft.UI.Colors.Transparent);
     }
     private void InstallMaterialSearchResources()
     {
@@ -401,7 +476,8 @@ internal sealed class MaterialExpressiveComponents : DesignComponents
             AddBrush("TextControlBackground" + state, fill);
             AddBrush("TextControlForeground" + state, disabled ? DisabledText() : Tokens.Text);
             AddBrush("TextControlPlaceholderForeground" + state, disabled ? DisabledText() : Tokens.Muted);
-            AddBrush("TextControlBorderBrush" + state, disabled ? DisabledText() : state == "Focused" ? Tokens.Accent : Tokens.Outline);
+            AddBrush("TextControlBorderBrush" + state, state == "Focused" ? Tokens.Accent
+                : Tokens.HighContrast ? disabled ? DisabledText() : Tokens.Outline : Microsoft.UI.Colors.Transparent);
             AddBrush("TextControlHeaderForeground" + state, disabled ? DisabledText() : Tokens.Text);
         }
         foreach (var state in new[] { "", "PointerOver", "Pressed", "Disabled" })
@@ -413,7 +489,7 @@ internal sealed class MaterialExpressiveComponents : DesignComponents
             AddBrush("TextControlButtonBorderBrush" + state, Microsoft.UI.Colors.Transparent);
         }
         AddBrush("TextControlSelectionHighlightColor", Tokens.Accent);
-        Resources["TextControlBorderThemeThickness"] = new Thickness(1);
+        Resources["TextControlBorderThemeThickness"] = new Thickness(Tokens.HighContrast ? 1 : 0);
         Resources["TextControlBorderThemeThicknessFocused"] = new Thickness(2);
         Resources["TextControlThemePadding"] = new Thickness(14, 8, 10, 8);
     }
@@ -425,8 +501,8 @@ internal sealed class MaterialExpressiveComponents : DesignComponents
                 search.Resources[key] = resource.Value;
         search.Background = Palette.Brush(Tokens.ControlFill);
         search.Foreground = Palette.Brush(Tokens.Text);
-        search.BorderBrush = Palette.Brush(Tokens.Outline);
-        search.BorderThickness = new(1);
+        search.BorderBrush = Palette.Brush(Tokens.HighContrast ? Tokens.Outline : Microsoft.UI.Colors.Transparent);
+        search.BorderThickness = new(Tokens.HighContrast ? 1 : 0);
         AutoSuggestBoxHelper.SetKeepInteriorCornersSquare(search, false);
     }
 
@@ -437,10 +513,10 @@ internal sealed class MaterialExpressiveComponents : DesignComponents
     {
         base.ConfigureSearchEditor(editor);
         editor.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(14, 8, 10, 8)));
-        editor.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
+        editor.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(Tokens.HighContrast ? 1 : 0)));
         // Keep native TextBoxStyle/Template: replacing it loses AutoSuggestBox's query/clear parts.
     }
-    protected override Style CreateActionStyle() => (Style)XamlReader.Load(MaterialTemplates.Button(AnimationsEnabled ? Tokens.StateDurationMs : 0));
+    protected override Style CreateActionStyle() => (Style)XamlReader.Load(MaterialTemplates.Button());
     protected override void ConfigureShape(Button button, bool compact) => button.CornerRadius = new(compact ? 16 : Tokens.ActionRadius);
     protected override ActionColorsToken ActionColors(ActionRole role) => role switch
     {
@@ -448,7 +524,7 @@ internal sealed class MaterialExpressiveComponents : DesignComponents
         ActionRole.Secondary => new(Tokens.SecondaryContainer, Tokens.OnSecondaryContainer, Tokens.SecondaryContainer, Tokens.HighContrast ? 1 : 0),
         ActionRole.Quiet => new(Microsoft.UI.Colors.Transparent, Tokens.Accent, Microsoft.UI.Colors.Transparent, 0),
         ActionRole.Destructive => new(Tokens.Error, Tokens.OnError, Tokens.Error, Tokens.HighContrast ? 1 : 0),
-        _ => new(Microsoft.UI.Colors.Transparent, Tokens.Accent, Tokens.Outline, 1)
+        _ => new(Microsoft.UI.Colors.Transparent, Tokens.Accent, Tokens.Outline, Tokens.HighContrast ? 1 : 0)
     };
     public override void ConfigureAccent(Control control)
     {
@@ -457,6 +533,7 @@ internal sealed class MaterialExpressiveComponents : DesignComponents
         {
             toggle.Style = (Style)Resources["PyDeckToggleSwitchStyle"];
             toggle.MinHeight = Tokens.ControlHeight;
+            TrackMotion(toggle);
         }
     }
 }
