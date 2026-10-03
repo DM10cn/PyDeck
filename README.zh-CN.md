@@ -10,7 +10,7 @@
 
 PyDeck 是 **Python Install Manager** 的原生 **WinUI 3** 图形界面，支持查看解释器、安装版本、设置默认版本和管理离线包，并提供 **Windows Fluent** 与 **Material 3 Expressive** 两种界面风格
 
-📦 **正式版 · 0.7.1-fix** · 🪟 **Windows 11 x64** · 📄 **MIT**
+📦 **版本 · 0.7.2** · 🪟 **Windows 11 x64** · 📄 **MIT**
 
 ## 📦 下载
 
@@ -18,12 +18,13 @@ PyDeck 是 **Python Install Manager** 的原生 **WinUI 3** 图形界面，支�
 
 | 下载文件 | 用途 |
 | --- | --- |
-| `PyDeck-Setup-0.7.1-fix-win-x64.exe` | 离线准备运行依赖，再进入 MSI 向导 |
-| `PyDeck-0.7.1-fix-win-x64.msi` | 当前用户独立安装包，运行时需另行准备 |
-| `PyDeck-0.7.1-fix-win-x64.msix` | Windows 管理的安装包，需要运行依赖与证书信任 |
-| `PyDeck-Dependencies-0.7.1-fix-win-x64.exe` | 就绪检查清单与官方下载入口，不安装 PyDeck |
+| `PyDeck-Setup-0.7.2-win-x64.exe` | 原生离线安装与维护，包含运行依赖准备 |
+| `PyDeck-0.7.2-win-x64.msi` | 当前用户独立安装包，运行时需另行准备 |
+| `PyDeck-Dependencies-0.7.2-win-x64.exe` | 就绪检查清单与官方下载入口，不安装 PyDeck |
 
 源码使用 Assets 中 GitHub 自动提供的 **Source code (zip)** / **Source code (tar.gz)** 链接。依赖要求、安装选项与 MSIX 证书信任步骤统一见 [安装说明](docs/INSTALL.zh-CN.md)
+
+**0.7.2 新增**：完善 Material 布局与涟漪交互，提供独立分类设置工作区和关于页面，改进原生 MSI 安装与缓存卸载流程。详见[更新说明](docs/RELEASE-0.7.2.md)与[安装器交互检查](docs/INSTALLER-CHECKS.md)。本次提供**未签名的 EXE/MSI**，不生成新版 MSIX 或证书；历史 0.7.1-fix 文件仍可单独下载
 
 **0.7.1-fix 新增**：🎨 分离的 Fluent 与 Material 3 Expressive 界面、基于壁纸的莫奈配色、手动基础色与可选双色方案，以及切换界面风格时可取消的重启弹窗。Material 搜索框、下拉菜单、展开项、滚动条及刷新 / 操作进度条统一跟随所选风格和配色。详见[外观说明](#-外观与语言)、[功能状态](docs/FEATURES.zh-CN.md)与[取色引擎源码说明](docs/MONET.md)
 
@@ -53,7 +54,7 @@ PyDeck 面向 **Windows 11 x64**。完整 GUI 需要 **.NET Runtime 10 x64** 和
 
 原生依赖窗口可在这些运行时尚未安装时打开。**管理 Python 需要 Python Install Manager，但缺少它不会阻止打开 GUI**：可从应用中的官方链接下载，手动安装后重新连接。独立 MSI 与 MSIX 需要另行安装运行时
 
-📦 **离线 Setup：**`PyDeck-Setup-0.7.1-fix-win-x64.exe` 可使用内嵌安装程序补装缺失运行时，再进入 MSI 向导；已有兼容运行时会跳过，仅准备依赖模式可供另行安装 MSIX 使用。独立依赖检查器仅显示就绪状态并打开官方下载页面。详见[安装说明](docs/INSTALL.zh-CN.md)，普通用户无需安装 SDK
+📦 **离线 Setup：**`PyDeck-Setup-0.7.2-win-x64.exe` 可使用内嵌安装程序补装缺失运行时，再在同一安装流程中执行 MSI；已有兼容运行时会跳过，仅准备依赖模式可供另行安装 MSIX 使用。独立依赖检查器仅显示就绪状态并打开官方下载页面。详见[安装说明](docs/INSTALL.zh-CN.md)，普通用户无需安装 SDK
 
 Windows 10 支持暂缓，下面的 Visual Studio 和编译工具仅供源码构建使用
 
@@ -104,7 +105,7 @@ Material 默认从本机**桌面壁纸**取色，也可应用**手动基础色**
 
 ## 🧪 验证状态
 
-**0.7.1-fix** 的最终 GUI 交互及 MSI / MSIX 安装仍待手动验收，本版不宣称完整自动验收通过。编译、打包及实际完成的附件检查会分别记录在[发行详情](https://github.com/DM10cn/PyDeck/releases)
+**0.7.2** 已通过编译和 20 组原生安装器检查，包含以模拟外部操作验证的按钮回调。未执行实际安装、修复、升级、卸载或应用 smoke 测试，不代表完整验收通过；详见[发行详情](https://github.com/DM10cn/PyDeck/releases/tag/v0.7.2)
 
 **0.7.0-fix 的 108 项核心检查与 26 组 GUI 检查**等历史结果保留在[功能状态](docs/FEATURES.zh-CN.md)，不代表新安装包已经通过验收。干净机器部署、证书信任、文字缩放和外部无障碍仍需独立确认
 

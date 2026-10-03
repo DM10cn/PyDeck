@@ -2,11 +2,11 @@
 
 [English](INSTALL.md) · **简体中文** · [🏠 项目首页](https://github.com/DM10cn/PyDeck)
 
-📦 **0.7.2 本地预览 · Windows 11 x64 · MSI / Setup**
+📦 **0.7.2 · Windows 11 x64 · MSI / Setup**
 
-新版 **0.7.2** MSI 与 Setup 是**尚未发布的本地未签名构建**。[现有 GitHub 发行页](https://github.com/DM10cn/PyDeck/releases/tag/v0.7.1)提供的是 **0.7.1-fix**，不包含这些新安装器。MSI 与 MSIX 不能相互升级，切换格式前请卸载旧格式；卸载会保留 Python 安装与 PyDeck 偏好设置
+从 [GitHub 0.7.2 发行页](https://github.com/DM10cn/PyDeck/releases/tag/v0.7.2)下载**未签名的 MSI 与 Setup**，以及安装说明和 SHA-256 校验文件。历史 0.7.1-fix 附件保持原样。MSI 与 MSIX 不能相互升级，切换格式前请卸载旧格式；卸载会保留 Python 安装与 PyDeck 偏好设置
 
-## 📦 本地 0.7.2 文件
+## 📦 0.7.2 下载文件
 
 | 文件 | 用途 |
 | --- | --- |
@@ -14,7 +14,7 @@
 | `PyDeck-0.7.2-win-x64.msi` | 当前用户独立安装包，可选目录、快捷方式和首次界面风格 |
 | `PyDeck-Dependencies-0.7.2-win-x64.exe` | 独立依赖清单与官方下载入口 |
 
-此次使用 `-MsiOnly` 构建，**不生成新版 MSIX 或签名证书**。下方 MSIX / 证书说明仅适用于历史 **0.7.1-fix** 发行包。新文件以本地构建的元数据与哈希为准，旧发行校验值不适用于 0.7.2
+此次使用 `-MsiOnly` 构建，**不生成新版 MSIX 或签名证书**。下方 MSIX / 证书说明仅适用于历史 **0.7.1-fix** 发行包。请使用 0.7.2 附带的 `SHA256SUMS.txt` 校验新文件，旧发行校验值不适用于 0.7.2
 
 ## 🧰 离线 Setup
 
@@ -75,7 +75,7 @@ GUI 运行时齐全后，可在未安装 PIM 时打开 PyDeck。在未连接页�
 
 ## 🛠️ MSI
 
-1. 打开本地的 `PyDeck-0.7.2-win-x64.msi`
+1. 下载并打开 `PyDeck-0.7.2-win-x64.msi`
 2. 输入安装目录，或点击 **Browse…（浏览）** 打开 Windows 文件夹选择窗口
 3. 按需勾选**创建桌面快捷方式**与**添加到开始菜单**，默认仅勾选开始菜单
 4. 选择首次启动的 **Material 3 Expressive**（默认）或 **Windows Fluent** 界面
@@ -95,13 +95,13 @@ msiexec /i PyDeck-0.7.2-win-x64.msi /qn INSTALLFOLDER="D:\Apps\PyDeck" DESKTOPSH
 
 `PYDECKSTYLE` 仅接受 `Material` 或 `Fluent`，不填写时沿用上次安装器选择，全新安装则使用 Material；它不会覆盖已有应用偏好。请选择当前账号有写入权限的目录。原生文件夹选择窗口不依赖 .NET；MSIX 的安装位置由 Windows 管理，不提供这些 MSI 选项
 
-本地 0.7.2 MSI、Setup 和依赖工具均**未签名**，不使用旧预览证书，也不要求导入它。遇到 Windows 提示时请核对源码来源和构建哈希；这些文件是本地预览产物，不是已签名的公开发行
+0.7.2 MSI、Setup 和依赖工具均**未签名**，不使用旧预览证书，也不要求导入它。遇到 Windows 提示时请核对下载来源和发行校验值
 
 较新的 MSI 会升级同一用户的安装，旧版本会被阻止。上文的 Setup 提供维护选项与版本冲突检查；独立 MSI 和 Windows **安装的应用**入口仍可使用。卸载只移除安装器所属的文件和快捷方式，不卸载 Python 或共享运行时
 
 ## 🪟 历史 0.7.1-fix MSIX — 自签安装包
 
-本节仅保留给已发布的 **0.7.1-fix** MSIX；本地 0.7.2 构建不生成 MSIX 或新证书。历史 MSIX 要求签名证书受信任，但**没有公开信任的签名**。请仅在核对文件并确实准备使用该包时信任发布者，签名私钥不会分发
+本节仅保留给已发布的 **0.7.1-fix** MSIX；0.7.2 发行不包含 MSIX 或新证书。历史 MSIX 要求签名证书受信任，但**没有公开信任的签名**。请仅在核对文件并确实准备使用该包时信任发布者，签名私钥不会分发
 
 1. 从同一发行页下载 `PyDeck-0.7.1-fix-win-x64.msix`、`PyDeck-preview.cer` 和 `SHA256SUMS.txt`
 2. 使用 `Get-FileHash -Algorithm SHA256`，将文件哈希与 `SHA256SUMS.txt` 对照
@@ -146,6 +146,6 @@ Fluent 与 Material 3 Expressive 使用分离的界面。Material 默认从本�
 
 ## 🧪 验证边界
 
-本地 **0.7.2** Setup 修改未进行实际安装、修复、升级或卸载验收。卸载优化减少的是不必要的解压和依赖处理，尚无前后耗时对比，不宣称提速比例；编译与静态安装包检查不代表实际安装验收
+**0.7.2** 已通过编译和 20 组原生安装器检查，包含以模拟外部操作验证的按钮回调，详见[交互检测报告](INSTALLER-CHECKS.md)。未执行实际安装、修复、升级、卸载或应用 smoke 测试。卸载优化减少的是不必要的解压和依赖处理，尚无前后耗时对比，不宣称提速比例；这些检查不代表实际安装验收
 
 历史 **0.7.1-fix** 同样缺少完整安装验收，包括运行时补装、MSI 升级与 MSIX 激活。一次性 Sandbox 中的历史 Python 生命周期结果不代表这两个版本已通过安装验收。历史范围见[已发布版本详情](https://github.com/DM10cn/PyDeck/releases/tag/v0.7.1)与[功能状态](https://github.com/DM10cn/PyDeck/blob/main/docs/FEATURES.zh-CN.md)

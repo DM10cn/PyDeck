@@ -2,11 +2,11 @@
 
 **English** · [简体中文](INSTALL.zh-CN.md) · [🏠 Project](https://github.com/DM10cn/PyDeck)
 
-📦 **0.7.2 local preview · Windows 11 x64 · MSI / Setup**
+📦 **0.7.2 · Windows 11 x64 · MSI / Setup**
 
-The new **0.7.2** MSI and Setup are local, unsigned builds and have **not been published**. The existing [GitHub release](https://github.com/DM10cn/PyDeck/releases/tag/v0.7.1) contains **0.7.1-fix** assets, not these new installers. MSI and MSIX do not upgrade each other; uninstall the previous format before switching. Removal keeps Python installations and PyDeck preferences.
+Download the **unsigned 0.7.2** MSI and Setup from the [GitHub release](https://github.com/DM10cn/PyDeck/releases/tag/v0.7.2), together with the installation notes and SHA-256 checksums. The historical 0.7.1-fix assets remain unchanged. MSI and MSIX do not upgrade each other; uninstall the previous format before switching. Removal keeps Python installations and PyDeck preferences.
 
-## 📦 Local 0.7.2 deliverables
+## 📦 0.7.2 downloads
 
 | File | Purpose |
 | --- | --- |
@@ -14,7 +14,7 @@ The new **0.7.2** MSI and Setup are local, unsigned builds and have **not been p
 | `PyDeck-0.7.2-win-x64.msi` | Standalone current-user installation, with folder, shortcut, and initial interface options |
 | `PyDeck-Dependencies-0.7.2-win-x64.exe` | Standalone dependency checklist and official download links |
 
-This build uses `-MsiOnly`: it produces no new MSIX or signing certificate. The MSIX/certificate instructions below apply only to the historical **0.7.1-fix** release. Refer to the local build's metadata and hashes for the new files; historical release checksums do not cover 0.7.2.
+This build uses `-MsiOnly`: it produces no new MSIX or signing certificate. The MSIX/certificate instructions below apply only to the historical **0.7.1-fix** release. Use `SHA256SUMS.txt` from the 0.7.2 release for these downloads; historical checksums do not apply.
 
 ## 🧰 Offline Setup
 
@@ -75,7 +75,7 @@ Once the GUI runtimes are ready, you can open PyDeck without PIM. Choose **Downl
 
 ## 🛠️ MSI
 
-1. Open the local `PyDeck-0.7.2-win-x64.msi`
+1. Download and open `PyDeck-0.7.2-win-x64.msi`
 2. Choose the installation folder, or use **Browse…** to open the Windows folder picker
 3. Choose **Create a desktop shortcut** and **Add PyDeck to the Start menu** as needed; only Start menu is selected by default
 4. Choose the initial **Material 3 Expressive** (default) or **Windows Fluent** interface
@@ -95,13 +95,13 @@ msiexec /i PyDeck-0.7.2-win-x64.msi /qn INSTALLFOLDER="D:\Apps\PyDeck" DESKTOPSH
 
 `PYDECKSTYLE` accepts exactly `Material` or `Fluent`; omitting it uses the previous installer choice, or Material for a new installation. It does not overwrite saved app preferences. Use a folder your account can write to. The native folder picker does not require .NET. MSIX uses Windows-managed placement and does not expose these MSI options.
 
-The local 0.7.2 MSI, Setup, and dependency helper are **unsigned**. They do not use the old preview certificate and do not require importing it. Review the source and build hashes before proceeding with a Windows prompt; these are local preview artifacts, not a signed public release.
+The 0.7.2 MSI, Setup, and dependency helper are **unsigned**. They do not use the old preview certificate and do not require importing it. Verify the download source and release hashes before proceeding with a Windows prompt.
 
 Newer MSI versions upgrade the same per-user installation and older versions are blocked. For the maintenance choices and version-conflict checks, use Setup as described above. The standalone MSI and Windows **Installed apps** remain available; removal affects installer-owned files and shortcuts, not Python or shared runtimes.
 
 ## 🪟 Historical 0.7.1-fix MSIX — self-signed package
 
-This section is retained for the published **0.7.1-fix** MSIX only. The 0.7.2 local build does not produce an MSIX or a new certificate. The historical MSIX requires a trusted signing certificate and is **not publicly trusted**. Only trust the publisher if you have verified the files and intend to use that package. The private signing key is never distributed.
+This section is retained for the published **0.7.1-fix** MSIX only. The 0.7.2 release does not include an MSIX or a new certificate. The historical MSIX requires a trusted signing certificate and is **not publicly trusted**. Only trust the publisher if you have verified the files and intend to use that package. The private signing key is never distributed.
 
 1. Download `PyDeck-0.7.1-fix-win-x64.msix`, `PyDeck-preview.cer`, and `SHA256SUMS.txt` from the same release
 2. Compare file hashes with `SHA256SUMS.txt`, using `Get-FileHash -Algorithm SHA256`
@@ -146,6 +146,6 @@ Use **Source code (zip)** or **Source code (tar.gz)** under the release's Assets
 
 ## 🧪 Validation limits
 
-The local **0.7.2** Setup changes have not been accepted through an actual install, repair, upgrade, or uninstall run. The uninstall optimization removes unnecessary extraction and dependency work; no before/after timing or percentage improvement is claimed. Compilation and static package checks do not establish installation acceptance.
+The **0.7.2** build and 20 native installer check groups passed, including button callbacks with simulated external effects; see [the interaction report](INSTALLER-CHECKS.md). Actual installation, repair, upgrade, uninstallation, and app smoke tests were not run. The uninstall optimization removes unnecessary extraction and dependency work; no before/after timing or percentage improvement is claimed. These checks do not establish installation acceptance.
 
 The historical **0.7.1-fix** packages also lack complete installation acceptance, including runtime preparation, MSI upgrades, and MSIX activation. Historical Python lifecycle results from a disposable Sandbox do not certify either release. See the [published release details](https://github.com/DM10cn/PyDeck/releases/tag/v0.7.1) and [feature status](https://github.com/DM10cn/PyDeck/blob/main/docs/FEATURES.md) for their stated scope.

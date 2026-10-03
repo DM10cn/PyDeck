@@ -10,7 +10,7 @@
 
 PyDeck is a native **WinUI 3** companion for **Python Install Manager**. Browse interpreters, install a version, choose your default, and keep offline packages close at hand — in a desktop interface with **Windows Fluent** and **Material 3 Expressive** styles.
 
-📦 **Stable release · 0.7.1-fix** · 🪟 **Windows 11 x64** · 📄 **MIT**
+📦 **Release · 0.7.2** · 🪟 **Windows 11 x64** · 📄 **MIT**
 
 ## 📦 Download
 
@@ -18,12 +18,13 @@ Get the packages from [GitHub Releases](https://github.com/DM10cn/PyDeck/release
 
 | Download | Purpose |
 | --- | --- |
-| `PyDeck-Setup-0.7.1-fix-win-x64.exe` | Offline runtime preparation followed by the MSI wizard |
-| `PyDeck-0.7.1-fix-win-x64.msi` | Standalone per-user installer; prepare runtimes separately |
-| `PyDeck-0.7.1-fix-win-x64.msix` | Windows-managed package; requires runtime dependencies and certificate trust |
-| `PyDeck-Dependencies-0.7.1-fix-win-x64.exe` | Readiness checklist and official download links; does not install PyDeck |
+| `PyDeck-Setup-0.7.2-win-x64.exe` | Native offline installation and maintenance, including runtime preparation |
+| `PyDeck-0.7.2-win-x64.msi` | Standalone per-user installer; prepare runtimes separately |
+| `PyDeck-Dependencies-0.7.2-win-x64.exe` | Readiness checklist and official download links; does not install PyDeck |
 
 For source, use GitHub's automatic **Source code (zip)** / **Source code (tar.gz)** links in Assets. Follow the [installation guide](docs/INSTALL.md) for dependencies, installer choices, and MSIX certificate trust.
+
+**0.7.2** refines Material layouts and ripple interactions, adds a categorized settings workspace and About page, and improves native MSI installation and cached uninstall flows. See the [release notes](docs/RELEASE-0.7.2.md) and [installer interaction checks](docs/INSTALLER-CHECKS.md). This release provides **unsigned EXE/MSI files**, with no new MSIX or certificate; historical 0.7.1-fix files remain available separately.
 
 New in **0.7.1-fix**: 🎨 separate Fluent and Material 3 Expressive presentations, wallpaper-based Monet colors, manual base colors and an optional two-color palette, plus a cancellable restart prompt for switching interface style. Material search fields, dropdowns, expanders, scrollbars, and refresh/operation progress now follow the selected design and colors. See [appearance](#-appearance-and-language), [feature status](docs/FEATURES.md), and the [color-engine source notes](docs/MONET.md).
 
@@ -53,7 +54,7 @@ PyDeck targets **Windows 11 x64**. The full GUI needs **.NET Runtime 10 x64** an
 
 The native dependency window can open before those runtimes are installed. **Python Install Manager is needed to manage Python, but its absence does not block the GUI**: download it from the app's official link, install it, then reconnect. The standalone MSI and MSIX require separate runtime installation.
 
-📦 **Offline Setup:** `PyDeck-Setup-0.7.1-fix-win-x64.exe` can install missing runtimes from its embedded installers, then open the MSI wizard. Compatible runtimes are skipped; dependencies-only mode prepares for a separate MSIX installation. The separate dependency checker only reports readiness and opens official download pages. See the [installation guide](docs/INSTALL.md); end users do not need an SDK.
+📦 **Offline Setup:** `PyDeck-Setup-0.7.2-win-x64.exe` can install missing runtimes from its embedded installers, then run MSI within the same setup flow. Compatible runtimes are skipped; dependencies-only mode prepares for a separate MSIX installation. The separate dependency checker only reports readiness and opens official download pages. See the [installation guide](docs/INSTALL.md); end users do not need an SDK.
 
 Windows 10 support is deferred. Visual Studio and the build tools below are only needed when building from source.
 
@@ -104,7 +105,7 @@ Language changes apply immediately and are saved. Documentation is maintained in
 
 ## 🧪 Validation status
 
-Final GUI interaction and MSI/MSIX installation for **0.7.1-fix** still require manual acceptance. This release does not claim a complete automated acceptance pass. Compilation, packaging, and any artifact checks are reported separately in the [release details](https://github.com/DM10cn/PyDeck/releases).
+**0.7.2** passed compilation and 20 native installer check groups, including button callbacks with simulated external effects. Actual installation, repair, upgrade, uninstallation, and app smoke tests were not run. This does not constitute complete acceptance; see the [release details](https://github.com/DM10cn/PyDeck/releases/tag/v0.7.2).
 
 Historical results, including **0.7.0-fix's 108 core checks and 26 GUI groups**, remain in [feature status](docs/FEATURES.md) and do not certify these new packages. Clean-machine deployment, certificate trust, text scaling, and external accessibility remain separate acceptance work.
 
