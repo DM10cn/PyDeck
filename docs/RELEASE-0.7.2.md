@@ -1,49 +1,13 @@
 # PyDeck 0.7.2
 
-本次更新完善 Material 3 Expressive 界面、设置工作区、壁纸取色性能与 Windows 原生安装流程，安装和维护以 MSI 为主。
+**English** · [简体中文](#简体中文)
 
-## 壁纸取色
+- Refines Material layouts and ripple interactions, with categorized settings and an About page.
+- Accelerates wallpaper color extraction with AVX2/SSSE3 pixel conversion, AVX2 quantization and removal of unused sorting.
+- Improves native Setup, repair and uninstall flows, including cached-MSI uninstall and clearer cancellation and retry behavior.
 
-- 壁纸 RGBA 像素转换使用手写 AVX2 汇编；不支持时选择 SSSE3，再不支持则保留精确的托管转换。
-- Color Quantization 的 WSMeans 最近聚类中心搜索使用 AVX2 汇编，检查 CPU 和操作系统支持；小调色板或不支持 AVX2 时使用原始 C++ 搜索。
-- 移除 WSMeans 未被读取的排序索引矩阵，以及每轮无用的行复制和排序；保留实际用于剪枝的距离矩阵。
-- 保持透明像素处理、双精度运算顺序、距离相同时的选择规则及种子颜色排序。
+## 简体中文
 
-## 界面与设置
-
-- 调整列表工作区宽度、滚动条位置和安装状态控件对齐，改进展开性能。
-- 完善 MD3E 色块、分组和按钮涟漪，去除普通控件细描边，保留键盘焦点提示。
-- 设置采用独立分类工作区，新增关于页面；新增设置功能同时覆盖 Fluent。
-- 调整无标题栏模式、窗口按钮配色和侧栏连接状态、刷新入口。
-
-## 安装与维护
-
-- 简洁的 Windows 原生 Setup，集中选择目录、快捷方式和首次界面风格。
-- 同一窗口显示依赖准备、MSI 安装阶段、完成状态和日志入口。
-- 支持修复、升级冲突检查和卸载；卸载直接使用 Windows 缓存的 MSI，省去离线依赖解压与准备。
-- 修复取消卸载后的状态同步、修复目录锁定、卸载重试及完成页默认按钮逻辑。
-- 卸载保留 Python、虚拟环境、共享运行时和 PyDeck 偏好设置。
-
-## 下载
-
-适用于 **Windows 11 x64**。首次安装推荐离线 Setup；已有运行依赖可使用独立 MSI。
-
-| 文件 | 用途 |
-| --- | --- |
-| `PyDeck-Setup-0.7.2-win-x64.exe` | 离线安装与维护，包含必要的微软运行时安装程序 |
-| `PyDeck-0.7.2-win-x64.msi` | 独立 MSI，不包含共享运行时 |
-| `PyDeck-Dependencies-0.7.2-win-x64.exe` | 只读依赖检查与官方下载入口 |
-| `INSTALL.md` / `INSTALL.zh-CN.md` | 英文与中文安装说明 |
-| `INSTALLER-CHECKS.md` | 安装器交互检查范围与结果 |
-| `RELEASE-0.7.2.md` | 本更新说明 |
-| `SHA256SUMS.txt` | 上述附件的 SHA-256 校验值 |
-
-本次 PyDeck EXE/MSI **未签名**，不要求导入历史预览证书；不提供新的 MSIX。历史 0.7.1-fix 附件保持不变。
-
-## 验证范围
-
-**122 项核心检查、9 组原生颜色检查通过**，其中包括 AVX2 最近中心搜索的 **16,448 组随机逐位精度检查**、边界与受保护内存检查，以及 **96 组完整量化输出与原始标量算法的对照**。测试参考分支保留上游排序，比较颜色数量、每个输入颜色的聚类结果和有序种子，并核对实际 DLL 的混合透明度处理。
-
-编译和 **20 组原生安装器检查通过**，覆盖按钮回调、目录与参数、语言、取消、修复、卸载重试、完成页和预览保护。执行安装、卸载及打开应用等外部操作由测试回调替代。原生 Setup 已做有限界面预览。
-
-**未执行实际安装、修复、升级、卸载、运行时补装或应用 smoke 测试。** 卸载性能改进基于减少不必要的工作，未测量提速比例。
+- 优化界面布局与涟漪，新增分类设置和关于页。
+- 使用汇编加速壁纸取色与颜色量化，移除无用排序。
+- 改进安装、修复、取消与重试，卸载直接使用缓存安装包。
