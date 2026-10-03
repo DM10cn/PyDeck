@@ -1,6 +1,6 @@
 # PyDeck 0.7.2
 
-**English** · [简体中文](#简体中文)
+## English
 
 - ✨ **A clearer workspace** — Refined Material layouts improve list widths, scrollbar placement and installation-status alignment. Tonal grouping and button ripples are more consistent, with keyboard focus indicators retained while ordinary control outlines are reduced.
 - ⚙️ **Organized settings** — Dedicated categories make the settings workspace easier to navigate, and an About page groups app information. Related settings are available in both interface styles, alongside refinements to window buttons and sidebar connection controls.
