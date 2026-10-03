@@ -16,6 +16,8 @@ With **Material 3 Expressive** active, open **Settings → Dynamic colors**. Cho
 
 The source headers and Apache 2.0 license are retained under `src/PyDeck.Colors`. MCU source files are vendored so a normal build does not fetch algorithm code. Windows portability changes, where present, are identified by the source manifest. Third-party code remains under its original license; PyDeck's MIT license does not relicense it.
 
+PyDeck also patches WSMeans nearest-center search with an optional AVX2 assembly kernel for palettes with at least 16 centers. It preserves double-precision operation order, pruning, tie handling and the original scalar fallback; full quantizer outputs are compared against the retained original branch. The patch and local hash are recorded in the vendor manifest. This is a PyDeck performance adaptation of the pinned algorithm.
+
 ## 🪟 Windows adapter and user behavior
 
 The default source is the wallpaper on the display containing most of the PyDeck window. `IDesktopWallpaper` supplies the monitor-specific file, with a desktop SPI fallback when necessary. The Windows image decoder applies EXIF orientation and converts to sRGB; bounded image sampling feeds the native quantizer. Nonopaque samples are ignored. Android's wallpaper cropping, dimming, low-memory-device alternative quantizer and lock-screen policy are not emulated.
@@ -57,6 +59,8 @@ Native checks cover the algorithm and ABI; managed checks cover persistence and 
 PyDeck 使用固定版本的官方 **Material Color Utilities C++**，包括 Celebi 量化、CAM16/HCT、色调调色板和 49 个动态语义颜色角色。壁纸候选色排序移植自 AOSP `ColorScheme.getSeedColors(filter=true)`，保留色度过滤、相邻色相占比评分、色度权重及蓝色后备值 `#1B6EF3`，不使用简单 RGB 平均、HSL 染色或通用 MCU `Score` 替代
 
 具体提交与来源链接见上方“Pinned sources”。C++ 动态角色采用 **2021 颜色规范**和标准对比度，不宣称与 2025、2026 规范或所有 Android 厂商主题完全一致。上游源码、变更清单与 Apache 2.0 许可证随引擎保留，PyDeck 的 MIT 许可证不会改变第三方代码许可
+
+PyDeck 对 WSMeans 最近聚类中心搜索增加了 AVX2 汇编优化，仅在至少 16 个聚类中心且 CPU/系统支持时启用。双精度运算顺序、候选剪枝、相同距离的选择规则及原始 C++ 回退均保留。生产代码移除了从未读取的排序索引矩阵及每轮复制、排序操作，实际用于剪枝的距离矩阵保持原样；测试参考分支保留上游排序及标量循环，逐项比较完整量化输出。该修改属于 PyDeck 的性能适配，变更说明和本地文件哈希记录在供应商源码清单中
 
 ### 🎨 双色如何组合
 

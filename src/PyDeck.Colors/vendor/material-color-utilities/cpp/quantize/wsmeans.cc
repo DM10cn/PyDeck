@@ -30,6 +30,13 @@
 #include "absl/container/flat_hash_map.h"
 #include "cpp/quantize/lab.h"
 
+// PyDeck modification: optional AVX2 nearest-center search, preserving the
+// upstream scalar path, arithmetic order, pruning and first-wins tie policy.
+// PYDECK_QUANTIZE_REFERENCE compiles the original algorithm for parity checks.
+#ifndef PYDECK_QUANTIZE_REFERENCE
+#include "Quantization.h"
+#endif
+
 constexpr int kMaxIterations = 100;
 constexpr double kMinDeltaE = 3.0;
 
@@ -50,6 +57,9 @@ struct DistanceToIndex {
     return distance < a.distance;
   }
 };
+#ifndef PYDECK_QUANTIZE_REFERENCE
+static_assert(sizeof(DistanceToIndex) == 16 && offsetof(DistanceToIndex, distance) == 0);
+#endif
 
 QuantizerResult QuantizeWsmeans(const std::vector<Argb>& input_pixels,
                                 const std::vector<Argb>& starting_clusters,
@@ -121,12 +131,20 @@ QuantizerResult QuantizeWsmeans(const std::vector<Argb>& input_pixels,
     cluster_indices.push_back(rand() % cluster_count);
   }
 
+#ifdef PYDECK_QUANTIZE_REFERENCE
+  // Retain upstream's unused sorted indices only in the comparison build.
   std::vector<std::vector<int>> index_matrix(
       cluster_count, std::vector<int>(cluster_count, 0));
+#endif
 
   std::vector<std::vector<DistanceToIndex>> distance_to_index_matrix(
       cluster_count, std::vector<DistanceToIndex>(cluster_count));
 
+#ifndef PYDECK_QUANTIZE_REFERENCE
+  // Small palettes do not amortize SIMD setup/call overhead; keep the original loop.
+  const bool use_avx2 = cluster_count >= 16 && pydeck::colors::QuantizerAvx2Available();
+  pydeck::colors::QuantizerCenters simd_centers;
+#endif
   for (int iteration = 0; iteration < kMaxIterations; iteration++) {
     // Calculate cluster distances
     for (int i = 0; i < cluster_count; i++) {
@@ -141,15 +159,26 @@ QuantizerResult QuantizeWsmeans(const std::vector<Argb>& input_pixels,
         distance_to_index_matrix[i][j].index = j;
       }
 
+#ifdef PYDECK_QUANTIZE_REFERENCE
       std::vector<DistanceToIndex> row = distance_to_index_matrix[i];
       std::sort(row.begin(), row.end());
 
       for (int j = 0; j < cluster_count; j++) {
         index_matrix[i][j] = row[j].index;
       }
+#endif
     }
 
     // Reassign points
+#ifndef PYDECK_QUANTIZE_REFERENCE
+    if (use_avx2) {
+      for (int j = 0; j < cluster_count; ++j) {
+        simd_centers.l[j] = clusters[j].l;
+        simd_centers.a[j] = clusters[j].a;
+        simd_centers.b[j] = clusters[j].b;
+      }
+    }
+#endif
     bool color_moved = false;
     for (size_t i = 0; i < points.size(); i++) {
       Lab point = points[i];
@@ -160,6 +189,16 @@ QuantizerResult QuantizeWsmeans(const std::vector<Argb>& input_pixels,
       double minimum_distance = previous_distance;
       int new_cluster_index = -1;
 
+#ifndef PYDECK_QUANTIZE_REFERENCE
+      if (use_avx2) {
+        pydeck::colors::QuantizerSearch search{point.l, point.a, point.b,
+            previous_distance, &simd_centers,
+            distance_to_index_matrix[previous_cluster_index].data(),
+            static_cast<uint32_t>(cluster_count)};
+        new_cluster_index = PyDeckQuantizerNearestAvx2(&search);
+        minimum_distance = search.minimumDistance;
+      } else
+#endif
       for (int j = 0; j < cluster_count; j++) {
         if (distance_to_index_matrix[previous_cluster_index][j].distance >=
             4 * previous_distance) {

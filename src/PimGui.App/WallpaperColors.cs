@@ -227,13 +227,8 @@ internal static class WallpaperColorReader
             ExifOrientationMode.RespectExifOrientation, ColorManagementMode.ColorManageToSRgb).AsTask(cancellation);
         var rgba = pixels.DetachPixelData();
         if (rgba.Length == 0 || rgba.Length > MaximumSamplePixels * 4 || rgba.Length % 4 != 0) return null;
-        var argb = new uint[rgba.Length / 4];
         // Preserve alpha: the shared quantizer excludes nonopaque samples instead of blending them into black.
-        for (var index = 0; index < argb.Length; index++)
-        {
-            var offset = index * 4;
-            argb[index] = (uint)rgba[offset + 3] << 24 | (uint)rgba[offset] << 16 | (uint)rgba[offset + 1] << 8 | rgba[offset + 2];
-        }
+        var argb = MonetColors.RgbaToArgb(rgba);
         cancellation.ThrowIfCancellationRequested();
         var seeds = MonetColors.SeedsFromPixels(argb);
         information.Refresh();

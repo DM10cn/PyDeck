@@ -168,8 +168,8 @@
     {
       "path": "cpp/quantize/wsmeans.cc",
       "upstreamSha256": "6d5b237075b9061fb86e1dd60f69fb9856773d176e888d885c716c6989dec6b6",
-      "vendoredSha256": "6d5b237075b9061fb86e1dd60f69fb9856773d176e888d885c716c6989dec6b6",
-      "patch": null
+      "vendoredSha256": "a7ffb8e4b8c934c796a7d65dab091f9db2c6350652350a7e52ef7ac59c00fabc",
+      "patch": "PyDeck optional AVX2 nearest-center search for >=16 centers; preserves double operation order, pruning and ties, with original scalar fallback; removes unused sorted index matrix and row copies/sorts in production, retaining upstream sorting in the reference-check build."
     },
     {
       "path": "cpp/quantize/wsmeans.h",

@@ -115,6 +115,36 @@ public static class MonetColors
         catch (Exception ex) when (IsLoadFailure(ex)) { throw Unavailable(ex); }
     }
 
+    /// <summary>Converts sampled RGBA bytes to ARGB words without altering transparency.</summary>
+    public static uint[] RgbaToArgb(byte[] rgba)
+    {
+        ArgumentNullException.ThrowIfNull(rgba);
+        if (rgba.Length % 4 != 0 || rgba.Length > MaximumPixelCount * 4)
+            throw new ArgumentException($"Supply complete RGBA pixels, no more than {MaximumPixelCount}.", nameof(rgba));
+        if (rgba.Length == 0) return [];
+        var argb = new uint[rgba.Length / 4];
+        try
+        {
+            var status = NativeRgbaToArgb(rgba, (uint)rgba.Length, argb, (uint)argb.Length);
+            if (status == 3) ConvertRgbaToArgbManaged(rgba, argb); // Neither AVX2 nor SSSE3 is usable.
+            else CheckStatus(status, "convert wallpaper pixels");
+        }
+        // Conversion is independent of palette generation. Older/missing native
+        // engines can use the original exact conversion; seed extraction retains
+        // its existing engine availability checks and never substitutes a palette.
+        catch (Exception ex) when (IsLoadFailure(ex)) { ConvertRgbaToArgbManaged(rgba, argb); }
+        return argb;
+    }
+
+    internal static void ConvertRgbaToArgbManaged(ReadOnlySpan<byte> rgba, Span<uint> argb)
+    {
+        for (var index = 0; index < argb.Length; index++)
+        {
+            var offset = index * 4;
+            argb[index] = (uint)rgba[offset + 3] << 24 | (uint)rgba[offset] << 16 | (uint)rgba[offset + 1] << 8 | rgba[offset + 2];
+        }
+    }
+
     public static uint[] SeedsFromPixels(uint[] argb)
     {
         ArgumentNullException.ThrowIfNull(argb);
@@ -194,6 +224,9 @@ public static class MonetColors
         if (status != 0) throw new InvalidOperationException($"The Material color engine could not {action} (native status {status}). The previous valid palette has been retained.");
     }
 
+    [DllImport(Library, EntryPoint = "PyDeckColorsRgbaToArgb", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.AssemblyDirectory | DllImportSearchPath.SafeDirectories)]
+    private static extern int NativeRgbaToArgb([In] byte[] rgba, uint byteCount, [Out] uint[] argb, uint capacity);
     [DllImport(Library, EntryPoint = "PyDeckColorsSeed", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
     [DefaultDllImportSearchPaths(DllImportSearchPath.AssemblyDirectory | DllImportSearchPath.SafeDirectories)]
     private static extern int NativeSeed([In] uint[] pixels, uint count, out uint seed);

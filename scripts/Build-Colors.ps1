@@ -15,9 +15,10 @@ $sdkRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10'
 $sdk = Get-ChildItem -LiteralPath (Join-Path $sdkRoot 'Include') -Directory | Where-Object Name -match '^10\.0\.\d+\.\d+$' | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
 if (!$toolset -or !$sdk) { throw 'PyDeck color engine requires the installed MSVC x64 toolset and Windows SDK.' }
 $compiler = Join-Path $toolset.FullName 'bin\Hostx64\x64\cl.exe'
+$assembler = Join-Path $toolset.FullName 'bin\Hostx64\x64\ml64.exe'
 $linker = Join-Path $toolset.FullName 'bin\Hostx64\x64\link.exe'
 $dumpbin = Join-Path $toolset.FullName 'bin\Hostx64\x64\dumpbin.exe'
-$inputFiles = @(Get-ChildItem -LiteralPath $source -Recurse -File | Where-Object Extension -in '.h','.cpp','.cc','.json') + @(Get-Item -LiteralPath $PSCommandPath,(Join-Path $repoRoot 'tests\Colors.Checks.cpp'))
+$inputFiles = @(Get-ChildItem -LiteralPath $source -Recurse -File | Where-Object Extension -in '.h','.cpp','.cc','.asm','.json') + @(Get-Item -LiteralPath $PSCommandPath,(Join-Path $repoRoot 'tests\Colors.Checks.cpp'),(Join-Path $repoRoot 'tests\Quantization.Checks.cpp'))
 $hashText = $compiler + '|' + $sdk.Name + '|' + (($inputFiles | Sort-Object FullName | ForEach-Object { $_.FullName + ':' + (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }) -join '|')
 $sourceHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($hashText)))
 $dll = Join-Path $output 'PyDeck.Colors.dll'
@@ -53,7 +54,9 @@ try {
         # Upstream uses bounded size_t->int conversions; retain its algorithms.
         Invoke-Native 'mcu-compile' $compiler ($common + @('/wd4244','/wd4267',"/Fo$work\") + $vendorSources)
         Invoke-Native 'adapter-compile' $compiler ($common + @('/W4','/WX',"/Fo$work\",(Join-Path $source 'AospSeed.cpp'),(Join-Path $source 'Colors.cpp')))
-        $objects = @(Get-ChildItem -LiteralPath $work -Filter '*.obj' | Where-Object Name -ne 'Colors.Checks.obj' | Select-Object -ExpandProperty FullName)
+        Invoke-Native 'pixels-assemble' $assembler @('/nologo','/c','/W3','/WX',"/Fo$work\RgbaToArgb.obj",(Join-Path $source 'RgbaToArgb.asm'))
+        Invoke-Native 'quantizer-assemble' $assembler @('/nologo','/c','/W3','/WX',"/Fo$work\QuantizerNearest.obj",(Join-Path $source 'QuantizerNearest.asm'))
+        $objects = @(Get-ChildItem -LiteralPath $work -Filter '*.obj' | Where-Object Name -notin 'Colors.Checks.obj','Quantization.Checks.obj','wsmeans-reference.obj' | Select-Object -ExpandProperty FullName)
         Invoke-Native 'dll-link' $linker ($linkOptions + @('/DLL',"/OUT:$dll","/IMPLIB:$output\PyDeck.Colors.lib") + $objects)
         $imports = & $dumpbin /nologo /dependents $dll
         if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect native color DLL imports.' }
@@ -65,6 +68,10 @@ try {
         $test = Join-Path $output 'Colors.Checks.exe'
         $testFlags = @($common | Where-Object { $_ -ne '/DPYDECK_COLORS_BUILD' }) + @('/W4','/WX',"/Fo$work\Colors.Checks.obj")
         Invoke-Native 'checks-compile' $compiler ($testFlags + @((Join-Path $repoRoot 'tests\Colors.Checks.cpp')))
+        Invoke-Native 'quantizer-checks-compile' $compiler (@($common | Where-Object { $_ -ne '/DPYDECK_COLORS_BUILD' }) + @('/W4','/WX',"/Fo$work\Quantization.Checks.obj",(Join-Path $repoRoot 'tests\Quantization.Checks.cpp')))
+        Invoke-Native 'quantizer-reference-compile' $compiler (@($common | Where-Object { $_ -ne '/DPYDECK_COLORS_BUILD' }) + @('/wd4244','/wd4267','/DPYDECK_QUANTIZE_REFERENCE','/DQuantizeWsmeans=QuantizeWsmeansReference',"/Fo$work\wsmeans-reference.obj",(Join-Path $vendor 'cpp\quantize\wsmeans.cc')))
+        # Direct kernel checks use the same assembly object as the DLL so both
+        # AVX2 and SSSE3 can be exercised on capable hosts, alongside DLL dispatch.
         $testObjects = @(Get-ChildItem -LiteralPath $work -Filter '*.obj' | Where-Object Name -ne 'Colors.obj' | Select-Object -ExpandProperty FullName)
         Invoke-Native 'checks-link' $linker ($linkOptions + @('/SUBSYSTEM:CONSOLE',"/OUT:$test",(Join-Path $output 'PyDeck.Colors.lib')) + $testObjects)
         Invoke-Native 'checks' $test @()

@@ -5,6 +5,34 @@ internal static class ColorsChecks
     public static void Run(Action<string, Action> check, string scratch)
     {
         static void Require(bool condition, string message) { if (!condition) throw new IOException(message); }
+        check("RGBA native conversion matches managed fallback, preserves alpha and feeds the same seeds", () =>
+        {
+            byte[] golden = [0x12,0x34,0x56,0x78, 255,0,0,255, 0,255,0,127, 0,0,255,0, 1,2,3,254];
+            Require(MonetColors.RgbaToArgb(golden).SequenceEqual(new uint[] { 0x78123456,0xFFFF0000,0x7F00FF00,0x000000FF,0xFE010203 }), "RGBA channel order or alpha changed");
+            var random = new Random(42688);
+            foreach (var count in Enumerable.Range(0, 34).Concat(new[] { 255,256,257,MonetColors.MaximumPixelCount-3,MonetColors.MaximumPixelCount-2,MonetColors.MaximumPixelCount-1,MonetColors.MaximumPixelCount }))
+            {
+                var rgba = new byte[count * 4]; random.NextBytes(rgba);
+                var original = rgba.ToArray();
+                var expected = new uint[count];
+                MonetColors.ConvertRgbaToArgbManaged(rgba, expected);
+                Require(MonetColors.RgbaToArgb(rgba).SequenceEqual(expected), $"Native/managed pixel mismatch at count {count}");
+                Require(rgba.SequenceEqual(original), "RGBA source mutated");
+            }
+            var argb = MonetColors.RgbaToArgb(golden);
+            Require(MonetColors.SeedsFromPixels(argb).SequenceEqual(new uint[] { 0xFFFF0000 }), "Converted transparent pixels changed the wallpaper seed");
+        });
+        check("RGBA adapter rejects null, partial pixels and oversized input", () =>
+        {
+            try { MonetColors.RgbaToArgb(null!); throw new IOException("Null RGBA accepted"); }
+            catch (ArgumentNullException) { }
+            foreach (var bytes in new[] { 1,2,3,5,MonetColors.MaximumPixelCount * 4 + 4 })
+            {
+                try { MonetColors.RgbaToArgb(new byte[bytes]); throw new IOException("Invalid RGBA length accepted"); }
+                catch (ArgumentException) { }
+            }
+            Require(MonetColors.RgbaToArgb([]).Length == 0, "Empty RGBA conversion failed");
+        });
         check("Monet settings migrate, normalize and persist separately from the active design", () =>
         {
             var store = new SettingsStore(Path.Combine(scratch, "monet-settings"));

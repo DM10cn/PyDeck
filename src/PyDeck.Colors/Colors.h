@@ -24,6 +24,13 @@ inline constexpr uint32_t ColorRoleCount = static_cast<uint32_t>(ColorRole::Coun
 inline constexpr uint32_t MaxWallpaperPixels = 112 * 112;
 inline constexpr uint32_t AospFallbackSeed = 0xff1b6ef3;
 inline constexpr uint32_t MaxWallpaperSeeds = 4;
+// Additive ABI: RGBA bytes -> 0xAARRGGBB words, preserving all alpha values.
+// byteCount must be divisible by 4 and <= MaxWallpaperPixels * 4; capacity is
+// measured in uint32_t pixels. Buffers must be disjoint, with no SIMD alignment
+// requirement. Empty input succeeds (null buffers allowed); invalid args write nothing.
+// AVX2 (CPU + OS state) preferred, then SSSE3. Status 3 means neither is available
+// and writes nothing; the managed caller must use its exact scalar conversion.
+PYDECK_COLOR_API int __cdecl PyDeckColorsRgbaToArgb(const uint8_t* rgba, uint32_t byteCount, uint32_t* argb, uint32_t capacity) noexcept;
 // Caller locally decodes/resamples to <=112*112 pixels. Non-opaque ignored.
 PYDECK_COLOR_API int __cdecl PyDeckColorsSeed(const uint32_t* pixels, uint32_t count, uint32_t* seed) noexcept;
 // variant 0 Tonal Spot / 1 Expressive; contrast 0.0, MCU legacy/2021 color spec.

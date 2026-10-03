@@ -1,5 +1,6 @@
 #include "Colors.h"
 #include "AospSeed.h"
+#include "PixelConversion.h"
 #include "cpp/quantize/celebi.h"
 #include "cpp/scheme/scheme_expressive.h"
 #include "cpp/scheme/scheme_tonal_spot.h"
@@ -27,6 +28,9 @@ void WriteScheme(const mcu::DynamicScheme& scheme, uint32_t* roles) {
         };
         std::copy(result.begin(), result.end(), roles);
 }
+}
+int __cdecl PyDeckColorsRgbaToArgb(const uint8_t* rgba, uint32_t byteCount, uint32_t* argb, uint32_t capacity) noexcept {
+    return pydeck::colors::ConvertPixels(pydeck::colors::CurrentPixelKernel(), rgba, byteCount, argb, capacity);
 }
 int __cdecl PyDeckColorsSeeds(const uint32_t* pixels, uint32_t count, uint32_t* seeds, uint32_t capacity, uint32_t* written) noexcept {
     if (!seeds || !written || capacity < MaxWallpaperSeeds || count > MaxWallpaperPixels || (count && !pixels)) return 1;

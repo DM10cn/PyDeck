@@ -79,7 +79,7 @@ variants and the old ABI remain unchanged; equal sources reproduce Tonal Spot.
 No vendored MCU source is changed for this extension. See `docs/MONET.md` for
 provenance and the distinction from Google's newer official two-source CMF.
 
-The numerical algorithms and constants remain upstream code. Three files have
+The numerical rules and constants remain those of the pinned upstream. Three files have
 C-style compound literals changed to equivalent standard C++ aggregate syntax
 for MSVC (`Vec3{...}` and `ViewingConditions{...}`). Each modified file has a
 notice and a source-manifest entry. Two small `compat/absl` headers supply only
@@ -87,11 +87,47 @@ the APIs actually used: a `std::unordered_map` alias for lookup/update in
 WSMeans, whose traversal vector is separate, and hexadecimal string formatting.
 No Abseil library download or runtime is required.
 
+`cpp/quantize/wsmeans.cc` additionally has a documented PyDeck performance patch:
+for at least 16 centers on AVX2-capable CPU/OS combinations, nearest-center search
+uses `QuantizerNearest.asm`. It evaluates four Lab distances in double precision,
+retains the original `(dl*dl + da*da) + db*db` order without FMA, applies the same
+separation cutoff, and reduces candidates in ascending index order with strict
+comparisons. A component-array snapshot of centers is prepared per iteration.
+The original C++ loop remains active for small palettes or unsupported CPUs.
+Wu initialization, population accumulation, random seed, movement threshold,
+iteration limit, alpha handling and AOSP seed scoring are unchanged. The vendor
+manifest records the patch and updated file hash; the original upstream hash is
+retained. This optimization is a PyDeck adaptation, not an upstream MCU feature.
+
 The x64 DLL uses the static Microsoft C++ runtime and imports only Windows
 `KERNEL32.dll`. This does not change the application's separate .NET / Windows
 App Runtime prerequisites.
 
 ## Build and checks
+
+Wallpaper RGBA samples enter through the additive `PyDeckColorsRgbaToArgb` ABI
+before quantization. `RgbaToArgb.asm` contains two Windows x64 MASM leaf kernels:
+AVX2 `vpshufb` processes eight pixels per iteration; SSSE3 `pshufb` processes four.
+The old SSE2 kernel has been removed. Both preserve every alpha value, handle
+unaligned SIMD loads/stores and convert the final 0–3 pixels with integer scalar
+instructions. AVX2 handles a remaining four-pixel block with a 128-bit VEX shuffle
+and executes `vzeroupper` on every exit. Neither kernel reads beyond the input.
+
+`PixelConversion.h` caches CPU/OS detection once: AVX2 requires CPUID XSAVE,
+OSXSAVE, AVX and AVX2 plus XCR0 XMM/YMM state bits; `XGETBV` is only executed
+after checking its CPU/OS prerequisites. Otherwise SSSE3 is selected if present.
+The dispatcher is compiled at the existing baseline, without `/arch:AVX2`.
+If neither kernel is supported, the ABI returns status 3 without touching output
+and the C# adapter performs the original exact conversion. That managed fallback
+also applies when the DLL or export is unavailable. Palette generation still
+requires the native engine. The C++ boundary validates byte count and output
+capacity; source/destination buffers must be disjoint.
+Pixel conversion is independent of the WSMeans optimization described above.
+
+The assembly follows the [Windows x64 calling convention](https://learn.microsoft.com/en-us/cpp/build/x64-calling-convention)
+and is built with the installed [MASM x64 assembler](https://learn.microsoft.com/en-us/cpp/assembler/masm/masm-for-x64-ml64-exe).
+Assembly sources participate in the incremental-build hash. This is a bounded
+assembly integration, not a claim of measurable UI or end-to-end speedup.
 
 From the repository root, with the installed MSVC x64 toolset and Windows SDK:
 
@@ -110,3 +146,25 @@ roles, and deterministic extraction of 12,544 colorful pixels with elapsed time.
 
 The checks exercise the native engine only. They do not validate Windows
 wallpaper decoding, the live WinUI appearance, or Android runtime equivalence.
+Pixel conversion checks call the actual DLL and cover channel-order goldens,
+all 256 alpha values, input offsets 0–31, output SIMD alignment, vector tails,
+maximum sample length, untouched source/canaries, invalid ABI arguments, and
+buffers ending at inaccessible pages to catch out-of-bounds reads/writes.
+Managed checks compare P/Invoke output against the retained C# conversion and
+verify that transparent pixels still do not influence seed selection.
+Native checks also exercise synthetic missing CPU/OS prerequisites, the
+unsupported/no-write status and each supported kernel directly using the same
+assembly object linked into the DLL. Unsupported kernels are explicitly skipped;
+the actual selected DLL path is checked separately. This does not emulate an
+older physical CPU or an OS with YMM state disabled.
+
+Production WSMeans omits the unused sorted index matrix and its per-iteration
+row copies/sorts; candidate pruning still reads the original distance matrix.
+Quantization checks retain the upstream sorting and scalar WSMeans branch under
+a separate reference symbol. They compare full population maps, every input-color cluster
+assignment and ordered seeds, including small/large palettes, random and gradient
+inputs, repeated colors and random initialization. AVX2 kernel checks require
+bit-identical minimum distances and indices for counts 0–256, including ties,
+pruning boundaries and guarded separation rows. Actual DLL mixed-alpha extraction
+is also compared to the reference. These fixtures do not establish equivalence
+for every possible image or measure live wallpaper/GUI latency.
